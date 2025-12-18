@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>EcoRide GPS-Client</title>
+
+  <!-- Supabase JS v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:0;padding:24px;background:#0f1115;color:#fff}
+    .wrap{max-width:720px;margin:0 auto}
+    .muted{opacity:.75}
+    .card{background:#161a22;border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:16px}
+    .row{display:flex;flex-direction:column;gap:6px;margin:12px 0}
+    .row.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    input{padding:12px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#0f1115;color:#fff}
+    button{padding:12px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);cursor:pointer}
+    .primary{background:#c7d92c;color:#000;font-weight:700}
+    .secondary{background:#0f1115;color:#fff}
+    .status{display:grid;gap:6px;margin-top:12px;padding:12px;border-radius:12px;background:#0f1115;border:1px solid rgba(255,255,255,.08)}
+    .hint{margin-top:10px;padding:10px;border-radius:12px;background:rgba(199,217,44,.12);border:1px solid rgba(199,217,44,.35)}
+    .log{margin-top:12px;background:#0b0d12;border:1px solid rgba(255,255,255,.08);padding:12px;border-radius:12px;min-height:120px;white-space:pre-wrap}
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <h1>EcoRide GPS-Client</h1>
+    <p class="muted">
+      Fahrer sendet Live-Positionen an Supabase. Optional: Bildschirm wach halten (Wake-Lock).
+    </p>
+
+    <div class="card">
+      <div class="row">
+        <label>Driver ID</label>
+        <input id="driverId" placeholder="z.B. Test_Bre" />
+      </div>
+
+      <div class="row two">
+        <button id="btnTrack" class="primary">Tracking START</button>
+        <button id="btnWake" class="secondary">Wake-Lock: AUS</button>
+      </div>
+
+      <div class="status">
+        <div><b>Tracking:</b> <span id="stTrack">AUS</span></div>
+        <div><b>Wake-Lock:</b> <span id="stWake">AUS</span></div>
+        <div><b>PWA:</b> <span id="stPwa">bereit</span></div>
+      </div>
+
+      <div class="hint" id="installHint" style="display:none;">
+        💡 Tipp: Du kannst diese Seite als App installieren („Zum Startbildschirm“).
+      </div>
+
+      <pre id="log" class="log"></pre>
+    </div>
+  </div>
+
+  <script>
+    /*************************************************
+     * EcoRide GPS-Client — FINAL (1:1)
+     *************************************************/
+
+    // ===== SUPABASE =====
+    const SUPABASE_URL = "https://ihpszsoivqcrkkiucjvv.supabase.co";
+    const SUPABASE_ANON_KEY =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlocHN6c29pdnFjcmtraXVjanZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg0NjMyNDAsImV4cCI6MjA3NDAzOTI0MH0.RTqNvbND-SlW-ekKGsXEO5CY0ai8zgvQwRm_17WtUmw";
+
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ===== STATE =====
+    let watchId = null;
+    let trackingActive = false;
+
+    let wakeLock = null;
+    let wakeListenerAttached = false;
+
+    let lastSend = 0;
+    const SEND_EVERY_MS = 1500;
+
+    // ===== ELEMENTE =====
+    const el = (id) => document.getElementById(id);
+
+    const driverInput = el("driverId");
+    const btnTrack = el("btnTrack");
+    const btnWake  = el("btnWake");
+
+    const stTrack = el("stTrack");
+    const stWake  = el("stWake");
+    const stPwa   = el("stPwa");
+
+    const logEl = el("log");
+    const installHint = el("installHint");
+
+    function log(msg) {
+      const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      console.log(line);
+      logEl.textContent = line + "\n" + (logEl.textContent || "");
+    }
+
+    // ===== PWA STATUS =====
+    function updatePwaStatus() {
+      const standalone =
+        window.matchMedia("(display-mode: standalone)").matches ||
+        window.navigator.standalone === true;
+
+      stPwa.textContent = standalone ? "aktiv" : "bereit";
+      installHint.style.display = standalone ? "none" : "block";
+    }
+    updatePwaStatus();
+
+    // ===== SUPABASE WRITE =====
+    async function sendToSupabase(driverId, pos) {
+      const now = Date.now();
+      if (now - lastSend < SEND_EVERY_MS) return;
+      lastSend = now;
+
+      const payload = {
+        driver_id: driverId,
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy,
+        speed: pos.coords.speed,
+        heading: pos.coords.heading,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = await sb
+        .from("live_positions")
+        .upsert(payload, { onConflict: "driver_id" });
+
+      if (error) {
+        log("SUPABASE ERROR: " + error.message);
+      } else {
+        log("SENT ✅ " + driverId);
+      }
+    }
+
+    // ===== GPS TRACKING =====
+    function startTracking() {
+      const driverId = driverInput.value.trim();
+      if (!driverId) return alert("Bitte Driver ID eingeben.");
+      if (!navigator.geolocation) return alert("GPS wird nicht unterstützt.");
+
+      log("Tracking START…");
+
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          log(`GPS ${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)} (±${Math.round(pos.coords.accuracy)}m)`);
+          sendToSupabase(driverId, pos);
+        },
+        (err) => {
+          log("GPS Fehler: " + err.message);
+          alert("GPS Fehler: " + err.message);
+          stopTracking();
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+      );
+
+      trackingActive = true;
+      stTrack.textContent = "AN";
+      btnTrack.textContent = "Tracking STOP";
+    }
+
+    function stopTracking() {
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+
+      trackingActive = false;
+      stTrack.textContent = "AUS";
+      btnTrack.textContent = "Tracking START";
+      log("Tracking STOP");
+    }
+
+    // ===== WAKE LOCK =====
+    function setWakeUi(on) {
+      stWake.textContent = on ? "AN" : "AUS";
+      btnWake.textContent = `Wake-Lock: ${on ? "AN" : "AUS"}`;
+    }
+
+    async function requestWakeLock() {
+      wakeLock = await navigator.wakeLock.request("screen");
+      setWakeUi(true);
+      log("Wake-Lock AN");
+
+      wakeLock.addEventListener("release", () => {
+        wakeLock = null;
+        setWakeUi(false);
+        log("Wake-Lock released");
+      });
+    }
+
+    async function toggleWakeLock() {
+      // iframe blockt oft (CodePen Preview)
+      if (window.self !== window.top) {
+        alert("Wake-Lock ist im CodePen-Preview (iframe) blockiert. Bitte Full Page/Debug View nutzen.");
+        return;
+      }
+
+      if (!("wakeLock" in navigator)) {
+        alert("Wake-Lock wird in diesem Browser/Device nicht unterstützt.");
+        return;
+      }
+
+      // AUS -> AN
+      if (!wakeLock) {
+        try {
+          await requestWakeLock();
+
+          // Re-acquire bei Tab zurück
+          if (!wakeListenerAttached) {
+            wakeListenerAttached = true;
+            document.addEventListener("visibilitychange", async () => {
+              if (document.visibilityState === "visible" && !wakeLock) {
+                try {
+                  await requestWakeLock();
+                  log("Wake-Lock re-acquired");
+                } catch (e) {
+                  wakeLock = null;
+                  setWakeUi(false);
+                  log("Wake-Lock re-acquire failed: " + e.message);
+                }
+              }
+            });
+          }
+        } catch (e) {
+          wakeLock = null;
+          setWakeUi(false);
+          log("WakeLock Fehler: " + e.message);
+          alert("WakeLock Fehler: " + e.message);
+        }
+        return;
+      }
+
+      // AN -> AUS
+      try {
+        await wakeLock.release();
+        wakeLock = null;
+        setWakeUi(false);
+        log("Wake-Lock AUS");
+      } catch (e) {
+        wakeLock = null;
+        setWakeUi(false);
+        log("WakeLock release Fehler: " + e.message);
+      }
+    }
+
+    // ===== BUTTONS =====
+    btnTrack.addEventListener("click", () => (trackingActive ? stopTracking() : startTracking()));
+    btnWake.addEventListener("click", toggleWakeLock);
+
+    log("EcoRide GPS-Client bereit ✅");
+  </script>
+</body>
+</html>
