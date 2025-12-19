@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>EcoRide – Live-Karte</title>
+
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Mapbox GL -->
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.17.0/mapbox-gl.css" rel="stylesheet" />
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.17.0/mapbox-gl.js"></script>
+
+  <style>
+    :root{
+      --bg:#0b0f14; --card:#111825; --text:#eaf0ff; --muted:#93a4bf; --line:#1f2a3d;
+      --accent:#a855f7; /* EcoRide-Purple (anpassen wenn du willst) */
+    }
+    html,body{height:100%; margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; background:var(--bg); color:var(--text);}
+    #map{position:absolute; inset:0;}
+    .panel{
+      position:absolute; left:12px; top:12px; z-index:5;
+      background:rgba(17,24,37,.92); backdrop-filter: blur(10px);
+      border:1px solid var(--line); border-radius:14px; padding:12px; width:min(360px, calc(100vw - 24px));
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+    }
+    .row{display:flex; gap:8px; align-items:center; margin-top:8px;}
+    .title{font-weight:800; letter-spacing:.2px; margin:0;}
+    .muted{color:var(--muted); font-size:13px; margin:6px 0 0;}
+    input{
+      flex:1; background:#0c1220; border:1px solid var(--line); color:var(--text);
+      padding:10px 10px; border-radius:10px; outline:none;
+    }
+    button{
+      background:var(--accent); border:0; color:white; font-weight:700;
+      padding:10px 12px; border-radius:10px; cursor:pointer;
+    }
+    button.secondary{background:#27324a;}
+    .stat{margin-top:10px; font-size:13px; color:var(--muted); display:flex; justify-content:space-between; gap:10px;}
+    .dot{display:inline-block; width:10px; height:10px; border-radius:50%; background:#ef4444; margin-right:6px;}
+    .dot.on{background:#22c55e;}
+    .marker{
+      width:18px; height:18px; border-radius:50%;
+      background:var(--accent);
+      border:2px solid white;
+      box-shadow:0 6px 16px rgba(0,0,0,.35);
+    }
+  </style>
+</head>
+
+<body>
+  <div id="map"></div>
+
+  <div class="panel">
+    <p class="title">EcoRide – Live-Karte</p>
+    <p class="muted">
+      Zeigt Live-Positionen aus <code>live_positions</code> (Supabase Realtime).
+      Optional filterbar nach Driver ID.
+    </p>
+
+    <div class="row">
+      <input id="driverFilter" placeholder="Filter: Driver ID (leer = alle)" />
+      <button id="btnApply">Anwenden</button>
+      <button id="btnAll" class="secondary">Alle</button>
+    </div>
+
+    <div class="stat">
+      <div><span id="rtDot" class="dot"></span><span id="rtTxt">Realtime: AUS</span></div>
+      <div><span id="countTxt">Marker: 0</span></div>
+    </div>
+
+    <div class="stat">
+      <div>Letztes Update:</div>
+      <div id="lastTxt">–</div>
+    </div>
+  </div>
+
+  <script>
+    /***** 1) HIER EINTRAGEN *****/
+    const MAPBOX_TOKEN = "pk.eyJ1IjoicGFwYXZlcm8iLCJhIjoiY21od2Mybml2MDVtNTJscXdqaGgybjB4aSJ9.bWmCCKZMgRv7dM37VvTajg";
+    const SUPABASE_URL = "https://ihpszsoivqcrkkiucjvv.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlocHN6c29pdnFjcmtraXVjanZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg0NjMyNDAsImV4cCI6MjA3NDAzOTI0MH0.RTqNvbND-SlW-ekKGsXEO5CY0ai8zgvQwRm_17WtUmw";
+
+    /***** 2) Basics *****/
+    mapboxgl.accessToken = MAPBOX_TOKEN;
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { persistSession: false }
+    });
+
+    const $ = (id) => document.getElementById(id);
+    const rtDot = $("rtDot");
+    const rtTxt = $("rtTxt");
+    const countTxt = $("countTxt");
+    const lastTxt = $("lastTxt");
+    const driverFilter = $("driverFilter");
+
+    let map;
+    let channel = null;
+    let markers = new Map(); // key: driver_id, value: mapboxgl.Marker
+    let currentFilter = "";  // driver_id filter (optional)
+
+    function setRealtime(on){
+      rtDot.classList.toggle("on", on);
+      rtTxt.textContent = "Realtime: " + (on ? "AN" : "AUS");
+    }
+
+    function setLast(){
+      const d = new Date();
+      lastTxt.textContent = d.toLocaleString("de-DE");
+    }
+
+    function setCount(){
+      countTxt.textContent = "Marker: " + markers.size;
+    }
+
+    function getFilterFromURL(){
+      const u = new URL(location.href);
+      const f = (u.searchParams.get("driverId") || "").trim();
+      return f;
+    }
+
+    function setURLFilter(f){
+      const u = new URL(location.href);
+      if (f) u.searchParams.set("driverId", f);
+      else u.searchParams.delete("driverId");
+      history.replaceState(null, "", u.toString());
+    }
+
+    /***** 3) Marker updaten *****/
+    function upsertMarker(row){
+      // row: { driver_id, lat, lng, updated_at, ... }
+      if (!row || row.lat == null || row.lng == null) return;
+
+      // Filter aktiv?
+      if (currentFilter && row.driver_id !== currentFilter) return;
+
+      const key = row.driver_id || "unknown";
+      const pos = [Number(row.lng), Number(row.lat)];
+
+      let m = markers.get(key);
+      if (!m){
+        const el = document.createElement("div");
+        el.className = "marker";
+        m = new mapboxgl.Marker({ element: el })
+          .setLngLat(pos)
+          .setPopup(new mapboxgl.Popup({ offset: 18 }).setHTML(
+            `<div style="font-family:system-ui">
+              <b>Driver:</b> ${escapeHtml(key)}<br/>
+              <small>${escapeHtml(row.updated_at || "")}</small>
+            </div>`
+          ))
+          .addTo(map);
+        markers.set(key, m);
+        setCount();
+      } else {
+        m.setLngLat(pos);
+      }
+      setLast();
+    }
+
+    function removeMarkerByDriverId(driverId){
+      const m = markers.get(driverId);
+      if (m){
+        m.remove();
+        markers.delete(driverId);
+        setCount();
+      }
+      setLast();
+    }
+
+    function clearMarkers(){
+      for (const m of markers.values()) m.remove();
+      markers.clear();
+      setCount();
+    }
+
+    function escapeHtml(str){
+      return String(str ?? "").replace(/[&<>"']/g, s => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+      }[s]));
+    }
+
+    /***** 4) Initial laden + Realtime abonnieren *****/
+    async function fetchLatest(){
+      clearMarkers();
+
+      let q = supabase
+        .from("live_positions")
+        .select("driver_id, lat, lng, updated_at")
+        .order("updated_at", { ascending: false })
+        .limit(200);
+
+      if (currentFilter) q = q.eq("driver_id", currentFilter);
+
+      const { data, error } = await q;
+      if (error){
+        console.error("Fetch error:", error);
+        alert("Fehler beim Laden aus live_positions.\nSiehe Konsole.");
+        return;
+      }
+
+      // Wir wollen pro Driver nur den neuesten Datensatz anzeigen
+      const seen = new Set();
+      for (const row of (data || [])){
+        if (!row.driver_id) continue;
+        if (seen.has(row.driver_id)) continue;
+        seen.add(row.driver_id);
+        upsertMarker(row);
+      }
+
+      // Karte passend zoomen
+      if (markers.size === 1){
+        const only = [...markers.values()][0].getLngLat();
+        map.flyTo({ center: [only.lng, only.lat], zoom: 14 });
+      } else if (markers.size > 1){
+        const bounds = new mapboxgl.LngLatBounds();
+        for (const m of markers.values()){
+          const p = m.getLngLat();
+          bounds.extend([p.lng, p.lat]);
+        }
+        map.fitBounds(bounds, { padding: 80, maxZoom: 15 });
+      }
+
+      setLast();
+    }
+
+    function unsubscribe(){
+      if (channel){
+        supabase.removeChannel(channel);
+        channel = null;
+      }
+      setRealtime(false);
+    }
+
+    function subscribe(){
+      unsubscribe();
+
+      // Hinweis: Realtime funktioniert nur, wenn deine Tabelle & Policies passen.
+      // Wir hören auf INSERT/UPDATE/DELETE in live_positions.
+      channel = supabase
+        .channel("live_positions_map")
+        .on("postgres_changes", { event: "*", schema: "public", table: "live_positions" }, (payload) => {
+          // payload.eventType: INSERT | UPDATE | DELETE
+          // payload.new / payload.old
+          if (payload.eventType === "DELETE"){
+            const oldRow = payload.old || {};
+            if (oldRow.driver_id) removeMarkerByDriverId(oldRow.driver_id);
+            return;
+          }
+          const row = payload.new || {};
+          upsertMarker(row);
+        })
+        .subscribe((status) => {
+          const on = (status === "SUBSCRIBED");
+          setRealtime(on);
+          if (!on) console.log("Realtime status:", status);
+        });
+    }
+
+    /***** 5) Start *****/
+    function initMap(){
+      map = new mapboxgl.Map({
+        container: "map",
+        style: "mapbox://styles/mapbox/streets-v12",
+        center: [8.8, 53.1], // Bremen default
+        zoom: 10
+      });
+
+      map.addControl(new mapboxgl.NavigationControl(), "bottom-right");
+
+      map.on("load", async () => {
+        // Filter aus URL übernehmen
+        currentFilter = getFilterFromURL();
+        driverFilter.value = currentFilter;
+
+        await fetchLatest();
+        subscribe();
+      });
+    }
+
+    $("btnApply").addEventListener("click", async () => {
+      currentFilter = driverFilter.value.trim();
+      setURLFilter(currentFilter);
+      await fetchLatest();
+      // Realtime bleibt an; Marker-Update wird ohnehin gefiltert
+    });
+
+    $("btnAll").addEventListener("click", async () => {
+      driverFilter.value = "";
+      currentFilter = "";
+      setURLFilter("");
+      await fetchLatest();
+    });
+
+    // Starten
+    initMap();
+  </script>
+</body>
+</html>
