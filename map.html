@@ -197,14 +197,16 @@ lastSeen.set(driverId, Number.isFinite(t) ? t : Date.now());
       setLast();
     }
 
-    function removeMarker(driverId){
-      const m = markers.get(driverId);
-      if (!m) return;
-      m.remove();
-      lastSeen.delete(driverId);
-      setCount(markers.size);
-      setLast();
-    }
+function removeMarker(driverId){
+  const m = markers.get(driverId);
+  if (!m) return;
+  m.remove();
+  markers.delete(driverId);     // ✅ WICHTIG
+  lastSeen.delete(driverId);    // ✅ WICHTIG
+  setCount(markers.size);
+  setLast();
+}
+
 setInterval(() => {
   const now = Date.now();
   for (const [driverId, ts] of lastSeen.entries()) {
@@ -336,6 +338,7 @@ setInterval(() => {
   </script>
 </body>
 </html>
+
 
 
 
