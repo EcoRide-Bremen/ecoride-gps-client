@@ -218,8 +218,18 @@ const lastSeen = new Map();   // driver_id -> timestamp(ms)
      <span class="er-tag">LIVE</span>
      <div class="er-row">👤 Fahrer: <b>${escapeHtml(driverId)}</b></div>
      <div class="er-row">📍 Position: ${Number(row.lat).toFixed(5)}, ${Number(row.lng).toFixed(5)}</div>
-     <div class="er-row">⏱️ Letztes Update: ${escapeHtml(row.updated_at || "–")}</div>
-   </div>`
+    <div class="er-row">⏱️ Letztes Update: ${
+  row.updated_at
+    ? new Date(row.updated_at).toLocaleTimeString("de-DE", {
+        timeZone: "Europe/Berlin",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      })
+    : "–"
+}</div>
+</div>
+
 ))
 
           .addTo(map);
@@ -375,6 +385,7 @@ setInterval(() => {
   </script>
 </body>
 </html>
+
 
 
 
