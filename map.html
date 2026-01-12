@@ -201,7 +201,7 @@ lastSeen.set(driverId, Number.isFinite(t) ? t : Date.now());
       const m = markers.get(driverId);
       if (!m) return;
       m.remove();
-      markers.delete(driverId);
+      lastSeen.delete(driverId);
       setCount(markers.size);
       setLast();
     }
@@ -336,6 +336,7 @@ setInterval(() => {
   </script>
 </body>
 </html>
+
 
 
 
