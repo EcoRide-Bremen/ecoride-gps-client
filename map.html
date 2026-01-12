@@ -211,13 +211,12 @@ setInterval(() => {
   const now = Date.now();
   for (const [driverId, ts] of lastSeen.entries()) {
     if ((now - ts) > TTL_MS) {
-      removeMarker(driverId);
-      lastSeen.delete(driverId);
+      removeMarker(driverId);   // ✅ reicht
     }
   }
 }, 3000);
 
-    async function fetchLatest(){
+  async function fetchLatest(){
       clearMarkers();
 
       let q = sb
@@ -338,6 +337,7 @@ setInterval(() => {
   </script>
 </body>
 </html>
+
 
 
 
