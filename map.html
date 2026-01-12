@@ -191,6 +191,9 @@ const lastSeen = new Map();   // driver_id -> timestamp(ms)
       } else {
         m.setLngLat(pos);
       }
+      const t = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
+lastSeen.set(driverId, Number.isFinite(t) ? t : Date.now());
+
       setLast();
     }
 
@@ -324,4 +327,5 @@ const lastSeen = new Map();   // driver_id -> timestamp(ms)
   </script>
 </body>
 </html>
+
 
