@@ -205,6 +205,15 @@ lastSeen.set(driverId, Number.isFinite(t) ? t : Date.now());
       setCount(markers.size);
       setLast();
     }
+setInterval(() => {
+  const now = Date.now();
+  for (const [driverId, ts] of lastSeen.entries()) {
+    if ((now - ts) > TTL_MS) {
+      removeMarker(driverId);
+      lastSeen.delete(driverId);
+    }
+  }
+}, 3000);
 
     async function fetchLatest(){
       clearMarkers();
@@ -327,5 +336,6 @@ lastSeen.set(driverId, Number.isFinite(t) ? t : Date.now());
   </script>
 </body>
 </html>
+
 
 
