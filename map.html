@@ -214,11 +214,14 @@ const lastSeen = new Map();   // driver_id -> timestamp(ms)
         m = new mapboxgl.Marker({ element: el })
           .setLngLat(pos)
           .setPopup(new mapboxgl.Popup({ offset: 18 }).setHTML(
-            `<div style="font-family:system-ui">
-              <b>Driver:</b> ${escapeHtml(driverId)}<br/>
-              <small>${escapeHtml(row.updated_at || "")}</small>
-            </div>`
-          ))
+  `<div class="er-popup">
+     <span class="er-tag">LIVE</span>
+     <div class="er-row">👤 Fahrer: <b>${escapeHtml(driverId)}</b></div>
+     <div class="er-row">📍 Position: ${Number(row.lat).toFixed(5)}, ${Number(row.lng).toFixed(5)}</div>
+     <div class="er-row">⏱️ Letztes Update: ${escapeHtml(row.updated_at || "–")}</div>
+   </div>`
+))
+
           .addTo(map);
 
         markers.set(driverId, m);
@@ -372,6 +375,7 @@ setInterval(() => {
   </script>
 </body>
 </html>
+
 
 
 
