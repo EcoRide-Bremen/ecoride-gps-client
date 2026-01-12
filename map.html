@@ -155,6 +155,8 @@
     let channel = null;
     const markers = new Map(); // driver_id -> Marker
     let currentFilter = "";
+const TTL_MS = 30000;         // 30 Sekunden
+const lastSeen = new Map();   // driver_id -> timestamp(ms)
 
     function clearMarkers(){
       for (const m of markers.values()) m.remove();
@@ -322,3 +324,4 @@
   </script>
 </body>
 </html>
+
