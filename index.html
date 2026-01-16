@@ -139,6 +139,8 @@
     }
 
     // ===== GPS TRACKING =====
+    let lastPos = null;
+
     function startTracking() {
       const driverId = driverInput.value.trim();
       if (!driverId) return alert("Bitte Driver ID eingeben.");
@@ -148,6 +150,11 @@
 
       watchId = navigator.geolocation.watchPosition(
         (pos) => {
+  lastPos = pos; // 👈 NEU
+  log(`GPS ${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)} (${Math.round(pos.coords.accuracy)}m)`);
+  sendToSupabase(driverId, pos);
+},
+
           log(`GPS ${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)} (±${Math.round(pos.coords.accuracy)}m)`);
           sendToSupabase(driverId, pos);
         },
@@ -173,6 +180,19 @@
       btnTrack.textContent = "Tracking START";
       log("Tracking STOP");
     }
+document.addEventListener("visibilitychange", () => {
+  if (!trackingActive) return;
+
+  if (document.visibilityState === "visible") {
+    log("App zurück → GPS neu starten");
+    startTracking();
+
+    // letzte bekannte Position sofort erneut senden
+    if (lastPos) {
+      sendToSupabase(driverInput.value.trim(), lastPos);
+    }
+  }
+});
 
     // ===== WAKE LOCK =====
     function setWakeUi(on) {
@@ -255,5 +275,6 @@
   </script>
 </body>
 </html>
+
 
 
