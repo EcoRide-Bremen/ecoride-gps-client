@@ -240,9 +240,17 @@ const ANIM_MS = 700;    // Dauer der Bewegung (ms)
 
         markers.set(driverId, m);
         setCount(markers.size);
-      } else {
-        m.setLngLat(pos);
-      }
+} else {
+  const cur = m.getLngLat();
+  anim.set(driverId, {
+    from: [cur.lng, cur.lat],
+    to: pos,
+    t0: performance.now(),
+    dur: ANIM_MS
+  });
+  requestAnimationFrame(tickAnim);
+}
+
       const t = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
 lastSeen.set(driverId, Number.isFinite(t) ? t : Date.now());
 
@@ -389,6 +397,7 @@ setInterval(() => {
   </script>
 </body>
 </html>
+
 
 
 
