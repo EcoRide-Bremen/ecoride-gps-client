@@ -237,13 +237,20 @@ const panel = document.querySelector(".panel");
 const btnPanelToggle = document.getElementById("btnPanelToggle");
 const btnPanelTrans  = document.getElementById("btnPanelTrans");
 
-function updatePanelButtons(){
+function updatePanelButtons() {
   if (!panel) return;
+
   const collapsed = panel.classList.contains("collapsed");
   const translucent = panel.classList.contains("translucent");
 
-  if (btnPanelToggle) btnPanelToggle.textContent = collapsed ? "Panel EIN" : "Panel AUS";
-  if (btnPanelTrans)  btnPanelTrans.textContent  = translucent ? "Normal" : "Transparent";
+  if (btnPanelToggle) {
+    btnPanelToggle.innerHTML = "⏻"; // 🔴 wichtig
+    btnPanelToggle.title = collapsed ? "Panel anzeigen" : "Panel ausblenden";
+  }
+
+  if (btnPanelTrans) {
+    btnPanelTrans.textContent = translucent ? "Normal" : "Transparent";
+  }
 }
 
 if (btnPanelToggle) {
@@ -490,6 +497,7 @@ setInterval(() => {
   </script>
 </body>
 </html>
+
 
 
 
