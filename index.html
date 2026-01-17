@@ -154,10 +154,6 @@
   log(`GPS ${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)} (${Math.round(pos.coords.accuracy)}m)`);
   sendToSupabase(driverId, pos);
 },
-
-          log(`GPS ${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)} (±${Math.round(pos.coords.accuracy)}m)`);
-          sendToSupabase(driverId, pos);
-        },
         (err) => {
           log("GPS Fehler: " + err.message);
           alert("GPS Fehler: " + err.message);
@@ -275,6 +271,7 @@ document.addEventListener("visibilitychange", () => {
   </script>
 </body>
 </html>
+
 
 
 
