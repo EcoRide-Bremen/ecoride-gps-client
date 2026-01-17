@@ -46,16 +46,20 @@
   cursor: pointer;
   color: var(--text);
   padding: 6px 8px;
+  line-height: 1;
 }
 
+/* Icon bleibt sichtbar, auch wenn Panel eingeklappt ist */
 .panel.collapsed .panel-icon{
   color: #fff;
 }
 
-    .panel.collapsed{
+/* Eingeklapptes Panel schmal */
+.panel.collapsed{
   width: auto;
   padding: 6px;
 }
+
 
 .panel.collapsed .panel-icon{
   margin-left: 4px;
@@ -497,6 +501,7 @@ setInterval(() => {
   </script>
 </body>
 </html>
+
 
 
 
