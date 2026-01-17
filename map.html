@@ -38,6 +38,29 @@
       padding:10px 12px; border-radius:10px; cursor:pointer;
     }
     button.secondary{background:#27324a;}
+    
+    .panel-icon{
+  background: transparent;
+  border: 0;
+  font-size: 22px;
+  cursor: pointer;
+  color: var(--text);
+  padding: 6px 8px;
+}
+
+.panel.collapsed .panel-icon{
+  color: #fff;
+}
+
+    .panel.collapsed{
+  width: auto;
+  padding: 6px;
+}
+
+.panel.collapsed .panel-icon{
+  margin-left: 4px;
+}
+
     .stat{margin-top:10px; font-size:13px; color:var(--muted); display:flex; justify-content:space-between; gap:10px;}
     .dot{display:inline-block; width:10px; height:10px; border-radius:50%; background:#ef4444; margin-right:6px;}
     .dot.on{background:#22c55e;}
@@ -467,6 +490,7 @@ setInterval(() => {
   </script>
 </body>
 </html>
+
 
 
 
