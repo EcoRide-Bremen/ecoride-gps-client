@@ -247,14 +247,12 @@ function updatePanelButtons() {
   const collapsed = panel.classList.contains("collapsed");
   const translucent = panel.classList.contains("translucent");
 
-  if (btnPanelToggle) {
-    btnPanelToggle.innerHTML = "⏻"; // 🔴 wichtig
-    btnPanelToggle.title = collapsed ? "Panel anzeigen" : "Panel ausblenden";
-  }
-
-  if (btnPanelTrans) {
-    btnPanelTrans.textContent = translucent ? "Normal" : "Transparent";
-  }
+ if (btnPanelToggle) {
+  // Power-Icon immer sichtbar
+  btnPanelToggle.innerHTML = "⏻";
+  btnPanelToggle.title = collapsed
+    ? "Panel anzeigen"
+    : "Panel ausblenden";
 }
 
 if (btnPanelToggle) {
@@ -501,6 +499,7 @@ setInterval(() => {
   </script>
 </body>
 </html>
+
 
 
 
