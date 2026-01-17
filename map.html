@@ -192,6 +192,11 @@
     let currentFilter = "";
 const TTL_MS = 20000;         // 20 Sekunden
 const lastSeen = new Map();   // driver_id -> timestamp(ms)
+    
+    // ===== Marker Animation (weich statt springen) =====
+const anim = new Map(); // driver_id -> { from:[lng,lat], to:[lng,lat], t0:number, dur:number }
+const ANIM_MS = 700;    // Dauer der Bewegung (ms)
+
 
     function clearMarkers(){
       for (const m of markers.values()) m.remove();
@@ -384,6 +389,7 @@ setInterval(() => {
   </script>
 </body>
 </html>
+
 
 
 
