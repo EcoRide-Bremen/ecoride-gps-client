@@ -256,6 +256,26 @@ lastSeen.set(driverId, Number.isFinite(t) ? t : Date.now());
 
       setLast();
     }
+function tickAnim() {
+  const now = performance.now();
+  let active = false;
+
+  for (const [driverId, a] of anim.entries()) {
+    const m = markers.get(driverId);
+    if (!m) { anim.delete(driverId); continue; }
+
+    const t = Math.min(1, (now - a.t0) / a.dur);
+    const lng = a.from[0] + (a.to[0] - a.from[0]) * t;
+    const lat = a.from[1] + (a.to[1] - a.from[1]) * t;
+
+    m.setLngLat([lng, lat]);
+
+    if (t >= 1) anim.delete(driverId);
+    else active = true;
+  }
+
+  if (active) requestAnimationFrame(tickAnim);
+}
 
 function removeMarker(driverId){
   const m = markers.get(driverId);
@@ -397,6 +417,7 @@ setInterval(() => {
   </script>
 </body>
 </html>
+
 
 
 
