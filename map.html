@@ -207,6 +207,38 @@
     let channel = null;
     const markers = new Map(); // driver_id -> Marker
     let currentFilter = "";
+
+    // ===== Panel Toggle / Transparent =====
+const panel = document.querySelector(".panel");
+const btnPanelToggle = document.getElementById("btnPanelToggle");
+const btnPanelTrans  = document.getElementById("btnPanelTrans");
+
+function updatePanelButtons(){
+  if (!panel) return;
+  const collapsed = panel.classList.contains("collapsed");
+  const translucent = panel.classList.contains("translucent");
+
+  if (btnPanelToggle) btnPanelToggle.textContent = collapsed ? "Panel EIN" : "Panel AUS";
+  if (btnPanelTrans)  btnPanelTrans.textContent  = translucent ? "Normal" : "Transparent";
+}
+
+if (btnPanelToggle) {
+  btnPanelToggle.addEventListener("click", () => {
+    panel.classList.toggle("collapsed");
+    updatePanelButtons();
+  });
+}
+
+if (btnPanelTrans) {
+  btnPanelTrans.addEventListener("click", () => {
+    panel.classList.toggle("translucent");
+    updatePanelButtons();
+  });
+}
+
+// Initial
+updatePanelButtons();
+
 const TTL_MS = 20000;         // 20 Sekunden
 const lastSeen = new Map();   // driver_id -> timestamp(ms)
     
@@ -434,6 +466,7 @@ setInterval(() => {
   </script>
 </body>
 </html>
+
 
 
 
