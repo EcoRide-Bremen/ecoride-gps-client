@@ -94,6 +94,18 @@
 }
 .er-row{display:flex; gap:8px; align-items:center; margin-top:4px;}
 .er-row b{font-weight:800;}
+    
+/* ===== Panel Toggle ===== */
+.panel.collapsed .muted,
+.panel.collapsed .row,
+.panel.collapsed .stat,
+.panel.collapsed .hint {
+  display: none;
+}
+
+.panel.translucent {
+  background: rgba(17,24,37,.55);
+}
 
   </style>
 </head>
@@ -417,6 +429,7 @@ setInterval(() => {
   </script>
 </body>
 </html>
+
 
 
 
