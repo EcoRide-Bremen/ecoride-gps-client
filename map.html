@@ -141,7 +141,14 @@
   <div id="map"></div>
 
   <div class="panel">
-    <p class="title">EcoRide – Live-Karte</p>
+   <div class="panel-head">
+  <p class="title">EcoRide – Live-Karte</p>
+
+  <div class="row toggle-row" style="margin:0">
+    <button id="btnPanelToggle" class="secondary">Ausblenden</button>
+  </div>
+</div>
+
     <p class="muted">
       Zeigt Live-Positionen aus <code>live_positions</code> (Supabase Realtime).
       Optional filterbar nach Driver ID.
@@ -486,6 +493,7 @@ setInterval(() => {
   </script>
 </body>
 </html>
+
 
 
 
