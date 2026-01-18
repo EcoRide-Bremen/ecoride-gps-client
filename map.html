@@ -248,9 +248,11 @@ const btnPanelToggle = document.getElementById("btnPanelToggle");
 
 function updatePanelButton() {
   if (!panel || !btnPanelToggle) return;
-  const collapsed = panel.classList.contains("collapsed");
-  btnPanelToggle.textContent = collapsed ? "Einblenden" : "Ausblenden";
-  btnPanelToggle.title = collapsed ? "Panel anzeigen" : "Panel ausblenden";
+  
+ const collapsed = panel.classList.contains("collapsed");
+btnPanelToggle.textContent = "⏻";
+btnPanelToggle.title = collapsed ? "Einblenden" : "Ausblenden";
+
 }
 
 if (btnPanelToggle && panel) {
@@ -490,6 +492,7 @@ setInterval(() => {
   </script>
 </body>
 </html>
+
 
 
 
