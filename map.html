@@ -236,50 +236,28 @@
     const markers = new Map(); // driver_id -> Marker
     let currentFilter = "";
 
-// ===== Panel Toggle / Transparent =====
+
+
+// ===== Panel Toggle =====
 const panel = document.querySelector(".panel");
 const btnPanelToggle = document.getElementById("btnPanelToggle");
-const btnPanelTrans  = document.getElementById("btnPanelTrans");
 
-function updatePanelButtons() {
-  if (!panel) return;
-
+function updatePanelButton() {
+  if (!panel || !btnPanelToggle) return;
   const collapsed = panel.classList.contains("collapsed");
-  const translucent = panel.classList.contains("translucent");
-
-  // Icon & Tooltip
-  if (btnPanelToggle) {
-    btnPanelToggle.innerHTML = collapsed ? "👁" : "⏻";
-    btnPanelToggle.title = collapsed ? "Panel anzeigen" : "Panel ausblenden";
-  }
-
-  // Optional: Button-Text passend zum Status
-  if (btnPanelTrans) {
-    btnPanelTrans.textContent = translucent ? "Opaque" : "Transparent";
-    btnPanelTrans.title = translucent ? "Panel wieder weniger transparent" : "Panel transparenter machen";
-  }
+  btnPanelToggle.textContent = collapsed ? "Einblenden" : "Ausblenden";
+  btnPanelToggle.title = collapsed ? "Panel anzeigen" : "Panel ausblenden";
 }
 
-if (btnPanelToggle) {
+if (btnPanelToggle && panel) {
   btnPanelToggle.addEventListener("click", () => {
     panel.classList.toggle("collapsed");
-    updatePanelButtons();
+    updatePanelButton();
   });
 }
 
-if (btnPanelTrans) {
-  btnPanelTrans.addEventListener("click", () => {
-    panel.classList.toggle("translucent");
-    updatePanelButtons();
-  });
-}
+updatePanelButton();
 
-// Initial
-updatePanelButtons();
-    
-
-// Initial
-updatePanelButtons();
 
 const TTL_MS = 20000;         // 20 Sekunden
 const lastSeen = new Map();   // driver_id -> timestamp(ms)
@@ -508,6 +486,7 @@ setInterval(() => {
   </script>
 </body>
 </html>
+
 
 
 
