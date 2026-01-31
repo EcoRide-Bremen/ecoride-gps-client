@@ -31,33 +31,33 @@
 
     .panel {
       position: absolute;
-      left: 12px;
-      top: 12px;
+      left: 20px;
+      top: 20px;
       z-index: 5;
-      background: rgba(17, 24, 37, 0.7);
+      background: rgba(17, 24, 37, 0.9);
       backdrop-filter: blur(12px);
       border: 1px solid var(--line);
       border-radius: 14px;
-      padding: 8px 12px;
-      width: min(380px, calc(100vw - 24px));
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      padding: 12px;
+      width: min(350px, calc(100vw - 40px));
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
       transition: max-height 0.3s ease;
       overflow: hidden;
       max-height: 400px;
     }
 
     .panel.collapsed {
-      max-height: 40px;
+      max-height: 50px;
     }
 
     .title {
-      font-weight: 500;
+      font-weight: 600;
       letter-spacing: .2px;
       margin: 0;
       cursor: pointer;
       user-select: none;
       padding: 4px 0;
-      font-size: 20px;
+      font-size: 18px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -78,15 +78,15 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 8px;
-      margin-top: 10px;
+      gap: 12px;
+      margin-top: 12px;
       width: 100%;
     }
 
     .input-button-group {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 12px;
       width: 100%;
       max-width: 300px;
       align-items: center;
@@ -97,15 +97,21 @@
       background: #0c1220;
       border: 1px solid var(--line);
       color: var(--text);
-      padding: 10px 12px;
+      padding: 12px;
       border-radius: 10px;
       outline: none;
+      text-align: center;
+      font-size: 16px;
+    }
+
+    input::placeholder {
+      color: var(--muted);
       text-align: center;
     }
 
     .button-group {
       display: flex;
-      gap: 8px;
+      gap: 12px;
       width: 100%;
       max-width: 300px;
     }
@@ -114,11 +120,12 @@
       background: var(--accent);
       border: 0;
       color: white;
-      font-weight: 500;
-      padding: 10px 12px;
+      font-weight: 600;
+      padding: 12px;
       border-radius: 10px;
       cursor: pointer;
       flex: 1;
+      font-size: 16px;
     }
 
     button.secondary {
@@ -126,8 +133,8 @@
     }
 
     .stat {
-      margin-top: 10px;
-      font-size: 13px;
+      margin-top: 12px;
+      font-size: 14px;
       color: var(--muted);
       display: flex;
       justify-content: space-between;
@@ -228,11 +235,6 @@
         left: 20px;
         right: 20px;
         width: auto;
-        max-width: none;
-      }
-
-      .input-button-group, .button-group {
-        max-width: 280px;
       }
     }
   </style>
