@@ -17,29 +17,44 @@
       --bg:#0b0f14; --card:#111825; --text:#eaf0ff; --muted:#93a4bf; --line:#1f2a3d;
       --accent:#a855f7;
     }
-    html,body{height:100%; margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; background:var(--bg); color:var(--text);}
-    #map{position:absolute; inset:0;}
+    html, body {
+      height: 100%;
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    #map {
+      position: absolute;
+      inset: 0;
+    }
 
-    .panel{
-      position:absolute; left:12px; top:12px; z-index:5;
-      background:rgba(17,24,37,0.7);
+    .panel {
+      position: absolute;
+      left: 50%;
+      top: 12px;
+      transform: translateX(-50%);
+      z-index: 5;
+      background: rgba(17, 24, 37, 0.7);
       backdrop-filter: blur(12px);
-      border:1px solid var(--line);
-      border-radius:14px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
       padding: 8px 12px;
-      width:min(380px, calc(100vw - 24px));
-      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      width: min(380px, 90%);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
       transition: max-height 0.3s ease;
       overflow: hidden;
       max-height: 400px;
     }
+
     .panel.collapsed {
       max-height: 40px;
     }
-    .title{
-      font-weight:800;
-      letter-spacing:.2px;
-      margin:0;
+
+    .title {
+      font-weight: 800;
+      letter-spacing: .2px;
+      margin: 0;
       cursor: pointer;
       user-select: none;
       padding: 4px 0;
@@ -49,144 +64,159 @@
       justify-content: center;
       height: 32px;
     }
+
     .toggle-icon {
       font-size: 12px;
       transition: transform 0.3s ease;
       margin-left: 8px;
     }
+
     .panel.collapsed .toggle-icon {
       transform: rotate(180deg);
     }
-    .muted{color:var(--muted); font-size:13px; margin:6px 0 0; line-height:1.35;}
-    .row{display:flex; gap:8px; align-items:center; margin-top:10px;}
 
-    input{
-      flex:1; background:#0c1220; border:1px solid var(--line); color:var(--text);
-      padding:10px 10px; border-radius:10px; outline:none;
-    }
-    button{
-      background:var(--accent); border:0; color:white; font-weight:700;
-      padding:10px 12px; border-radius:10px; cursor:pointer;
-    }
-    button.secondary{background:#27324a;}
-
-    .stat{
-      margin-top:10px; font-size:13px; color:var(--muted);
-      display:flex; justify-content:space-between; gap:10px;
-    }
-    .dot{display:inline-block; width:10px; height:10px; border-radius:50%; background:#ef4444; margin-right:6px;}
-    .dot.on{background:#22c55e;}
-
-    .marker{
-      width:18px; height:18px; border-radius:50%;
-      background:var(--accent);
-      border:2px solid white;
-      box-shadow:0 6px 16px rgba(0,0,0,.35);
+    .muted {
+      color: var(--muted);
+      font-size: 13px;
+      margin: 6px 0 0;
+      line-height: 1.35;
     }
 
-    .hint{
-      margin-top:10px;
-      padding:10px;
-      border-radius:10px;
-      border:1px dashed var(--line);
-      color:var(--muted);
-      font-size:12px;
-      display:none;
+    .row {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      width: 100%;
     }
-    .hint.show{display:block;}
-    code{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;}
+
+    .row > div {
+      display: flex;
+      gap: 8px;
+      width: 100%;
+      max-width: 300px;
+    }
+
+    input {
+      flex: 1;
+      background: #0c1220;
+      border: 1px solid var(--line);
+      color: var(--text);
+      padding: 10px 10px;
+      border-radius: 10px;
+      outline: none;
+    }
+
+    button {
+      background: var(--accent);
+      border: 0;
+      color: white;
+      font-weight: 700;
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: #27324a;
+    }
+
+    .stat {
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #ef4444;
+      margin-right: 6px;
+    }
+
+    .dot.on {
+      background: #22c55e;
+    }
+
+    .marker {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 2px solid white;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+    }
+
+    .hint {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px dashed var(--line);
+      color: var(--muted);
+      font-size: 12px;
+      display: none;
+    }
+
+    .hint.show {
+      display: block;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
 
     /* Popup-Stil */
-    .mapboxgl-popup-content{
+    .mapboxgl-popup-content {
       background: #ffffff !important;
       color: #0b0f14 !important;
       border-radius: 14px !important;
       padding: 12px 14px !important;
-      box-shadow: 0 14px 30px rgba(0,0,0,.35) !important;
+      box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35) !important;
       font-size: 14px !important;
     }
-    .mapboxgl-popup-close-button{ color:#0b0f14 !important; font-size: 18px !important; }
-    .mapboxgl-popup-tip{ border-top-color:#ffffff !important; }
 
-    .er-popup{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; line-height:1.35;}
-    .er-tag{
-      display:inline-block;
-      font-size:11px;
-      font-weight:800;
-      letter-spacing:.06em;
-      text-transform:uppercase;
-      padding:3px 10px;
-      border-radius:999px;
-      background:#ffeaa7;
-      color:#111;
-      margin-bottom:8px;
+    .mapboxgl-popup-close-button {
+      color: #0b0f14 !important;
+      font-size: 18px !important;
     }
-    .er-row{display:flex; gap:8px; align-items:center; margin-top:4px;}
-    .er-row b{font-weight:800;}
 
-    /* Mobile Anpassungen */
-    @media (max-width: 900px) {
-      .panel {
-        left: 50%;
-        top: 10px;
-        transform: translateX(-50%);
-        width: 90%;
-        max-height: 50px;
-        background: rgba(17, 24, 37, 0.7);
-        backdrop-filter: blur(12px);
-        border-radius: 14px;
-        padding: 8px;
-      }
+    .mapboxgl-popup-tip {
+      border-top-color: #ffffff !important;
+    }
 
-      .panel .title {
-        font-size: 18px;
-        margin: 0;
-        padding: 4px 0;
-        height: 28px;
-      }
+    .er-popup {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      line-height: 1.35;
+    }
 
-      .panel .muted,
-      .panel:not(.open) .row,
-      .panel:not(.open) .stat,
-      .panel:not(.open) .hint {
-        display: none;
-      }
+    .er-tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: #ffeaa7;
+      color: #111;
+      margin-bottom: 8px;
+    }
 
-      .panel.open {
-        max-height: 300px;
-      }
+    .er-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-top: 4px;
+    }
 
-      .panel.open .row {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 8px;
-        width: 100%;
-      }
-
-      .panel.open .row > div {
-        display: flex;
-        gap: 8px;
-        width: 100%;
-        max-width: 300px;
-      }
-
-      .panel.open input {
-        width: 100%;
-        font-size: 14px;
-        padding: 8px;
-      }
-
-      .panel.open button {
-        width: 100%;
-        padding: 8px 12px;
-        font-size: 14px;
-      }
-
-      .panel.open .stat {
-        font-size: 12px;
-        margin-top: 6px;
-      }
+    .er-row b {
+      font-weight: 800;
     }
   </style>
 </head>
@@ -241,34 +271,41 @@
     const driverFilter = $("driverFilter");
     const hintBox = $("hint");
 
-    function showHint(msg){
+    function showHint(msg) {
       hintBox.textContent = msg;
       hintBox.classList.add("show");
     }
-    function hideHint(){
+
+    function hideHint() {
       hintBox.classList.remove("show");
       hintBox.textContent = "";
     }
-    function setRealtime(on){
+
+    function setRealtime(on) {
       rtDot.classList.toggle("on", on);
       rtTxt.textContent = "Realtime: " + (on ? "AN" : "AUS");
     }
-    function setLast(){
+
+    function setLast() {
       lastTxt.textContent = new Date().toLocaleString("de-DE");
     }
-    function setCount(n){
+
+    function setCount(n) {
       countTxt.textContent = "Marker: " + n;
     }
-    function escapeHtml(str){
+
+    function escapeHtml(str) {
       return String(str ?? "").replace(/[&<>"']/g, s => ({
-        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
       }[s]));
     }
-    function getFilterFromURL(){
+
+    function getFilterFromURL() {
       const u = new URL(location.href);
       return (u.searchParams.get("driverId") || "").trim();
     }
-    function setURLFilter(f){
+
+    function setURLFilter(f) {
       const u = new URL(location.href);
       if (f) u.searchParams.set("driverId", f);
       else u.searchParams.delete("driverId");
@@ -276,10 +313,11 @@
     }
 
     /***** 3) Supabase Client *****/
-    if (!window.supabase || !window.supabase.createClient){
+    if (!window.supabase || !window.supabase.createClient) {
       showHint("Supabase SDK lädt nicht. Prüfe Netzwerk/Adblocker.");
       console.error("Supabase SDK missing");
     }
+
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: { persistSession: false }
     });
@@ -295,7 +333,7 @@
     const FOLLOW_ZOOM = 15;
     const FOLLOW_DURATION = 650;
 
-    function followIfNeeded(driverId, pos){
+    function followIfNeeded(driverId, pos) {
       if (!map) return;
       if (!followDriverId) return;
       if (driverId !== followDriverId) return;
@@ -327,13 +365,13 @@
     const anim = new Map();
     const ANIM_MS = 700;
 
-    function clearMarkers(){
+    function clearMarkers() {
       for (const m of markers.values()) m.remove();
       markers.clear();
       setCount(0);
     }
 
-    function upsertMarker(row){
+    function upsertMarker(row) {
       if (!row || row.lat == null || row.lng == null) return;
       if (currentFilter && row.driver_id !== currentFilter) return;
 
@@ -341,7 +379,7 @@
       const pos = [Number(row.lng), Number(row.lat)];
 
       let m = markers.get(driverId);
-      if (!m){
+      if (!m) {
         const el = document.createElement("div");
         el.className = "marker";
 
@@ -387,11 +425,11 @@
       followIfNeeded(driverId, pos);
     }
 
-    function tickAnim(){
+    function tickAnim() {
       const now = performance.now();
       let active = false;
 
-      for (const [driverId, a] of anim.entries()){
+      for (const [driverId, a] of anim.entries()) {
         const m = markers.get(driverId);
         if (!m) { anim.delete(driverId); continue; }
 
@@ -408,7 +446,7 @@
       if (active) requestAnimationFrame(tickAnim);
     }
 
-    function removeMarker(driverId){
+    function removeMarker(driverId) {
       const m = markers.get(driverId);
       if (!m) return;
       m.remove();
@@ -420,12 +458,12 @@
 
     setInterval(() => {
       const now = Date.now();
-      for (const [driverId, ts] of lastSeen.entries()){
+      for (const [driverId, ts] of lastSeen.entries()) {
         if ((now - ts) > TTL_MS) removeMarker(driverId);
       }
     }, 3000);
 
-    async function fetchLatest(){
+    async function fetchLatest() {
       clearMarkers();
 
       let q = sb
@@ -437,7 +475,7 @@
       if (currentFilter) q = q.eq("driver_id", currentFilter);
 
       const { data, error } = await q;
-      if (error){
+      if (error) {
         console.error("Supabase fetch error:", error);
         showHint("Supabase: Fehler beim Laden. (RLS/Policy?) Siehe Konsole.");
         return;
@@ -445,22 +483,22 @@
       hideHint();
 
       const seen = new Set();
-      for (const row of (data || [])){
+      for (const row of (data || [])) {
         if (!row.driver_id) continue;
         if (seen.has(row.driver_id)) continue;
         seen.add(row.driver_id);
         upsertMarker(row);
       }
 
-      if (followDriverId && markers.has(followDriverId)){
+      if (followDriverId && markers.has(followDriverId)) {
         const p = markers.get(followDriverId).getLngLat();
         map.easeTo({ center: [p.lng, p.lat], zoom: Math.max(map.getZoom(), FOLLOW_ZOOM), duration: 650 });
-      } else if (markers.size === 1){
+      } else if (markers.size === 1) {
         const only = [...markers.values()][0].getLngLat();
         map.flyTo({ center: [only.lng, only.lat], zoom: 14 });
-      } else if (markers.size > 1){
+      } else if (markers.size > 1) {
         const bounds = new mapboxgl.LngLatBounds();
-        for (const m of markers.values()){
+        for (const m of markers.values()) {
           const p = m.getLngLat();
           bounds.extend([p.lng, p.lat]);
         }
@@ -470,21 +508,21 @@
       setLast();
     }
 
-    function unsubscribe(){
-      if (channel){
+    function unsubscribe() {
+      if (channel) {
         sb.removeChannel(channel);
         channel = null;
       }
       setRealtime(false);
     }
 
-    function subscribe(){
+    function subscribe() {
       unsubscribe();
 
       channel = sb
         .channel("live_positions_map")
         .on("postgres_changes", { event: "*", schema: "public", table: "live_positions" }, (payload) => {
-          if (payload.eventType === "DELETE"){
+          if (payload.eventType === "DELETE") {
             const oldRow = payload.old || {};
             if (oldRow.driver_id) removeMarker(oldRow.driver_id);
             return;
@@ -499,7 +537,7 @@
         });
     }
 
-    function initMap(){
+    function initMap() {
       mapboxgl.accessToken = MAPBOX_TOKEN;
 
       map = new mapboxgl.Map({
