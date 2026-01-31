@@ -23,33 +23,12 @@
     .panel{
       position:absolute; left:12px; top:12px; z-index:5;
       background:rgba(17,24,37,.92); backdrop-filter: blur(10px);
-      border:1px solid var(--line); border-radius:14px; padding:12px;
-      width:min(380px, calc(100vw - 24px));
+      border:1px solid var(--line); border-radius:14px; padding:12px; width:min(380px, calc(100vw - 24px));
       box-shadow: 0 10px 30px rgba(0,0,0,.35);
-      transition: max-height 0.3s ease;
-      overflow: hidden;
-      max-height: 200px;
     }
-    .panel.collapsed {
-      max-height: 35px;
-    }
-    .title{
-      font-weight:800; letter-spacing:.2px; margin:0;
-      cursor: pointer;
-      user-select: none;
-      padding: 8px 0;
-    }
-    .toggle-icon {
-      float: right;
-      font-size: 12px;
-      transition: transform 0.3s ease;
-    }
-    .panel.collapsed .toggle-icon {
-      transform: rotate(180deg);
-    }
+    .title{font-weight:800; letter-spacing:.2px; margin:0;}
     .muted{color:var(--muted); font-size:13px; margin:6px 0 0; line-height:1.35;}
     .row{display:flex; gap:8px; align-items:center; margin-top:10px;}
-
     input{
       flex:1; background:#0c1220; border:1px solid var(--line); color:var(--text);
       padding:10px 10px; border-radius:10px; outline:none;
@@ -59,11 +38,34 @@
       padding:10px 12px; border-radius:10px; cursor:pointer;
     }
     button.secondary{background:#27324a;}
+    
+    .panel-icon{
+  background: transparent;
+  border: 0;
+  font-size: 22px;
+  cursor: pointer;
+  color: var(--text);
+  padding: 6px 8px;
+  line-height: 1;
+}
 
-    .stat{
-      margin-top:10px; font-size:13px; color:var(--muted);
-      display:flex; justify-content:space-between; gap:10px;
-    }
+/* Icon bleibt sichtbar, auch wenn Panel eingeklappt ist */
+.panel.collapsed .panel-icon{
+  color: #fff;
+}
+
+/* Eingeklapptes Panel schmal */
+.panel.collapsed{
+  width: auto;
+  padding: 6px;
+}
+
+
+.panel.collapsed .panel-icon{
+  margin-left: 4px;
+}
+
+    .stat{margin-top:10px; font-size:13px; color:var(--muted); display:flex; justify-content:space-between; gap:10px;}
     .dot{display:inline-block; width:10px; height:10px; border-radius:50%; background:#ef4444; margin-right:6px;}
     .dot.on{background:#22c55e;}
 
@@ -85,65 +87,53 @@
     }
     .hint.show{display:block;}
     code{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;}
-
+    
     /* ===== Popup kräftig (wie CodePen) ===== */
-    .mapboxgl-popup-content{
-      background: #ffffff !important;
-      color: #0b0f14 !important;
-      border-radius: 14px !important;
-      padding: 12px 14px !important;
-      box-shadow: 0 14px 30px rgba(0,0,0,.35) !important;
-      font-size: 14px !important;
-    }
-    .mapboxgl-popup-close-button{ color:#0b0f14 !important; font-size: 18px !important; }
-    .mapboxgl-popup-tip{ border-top-color:#ffffff !important; }
+.mapboxgl-popup-content{
+  background: #ffffff !important;
+  color: #0b0f14 !important;
+  border-radius: 14px !important;
+  padding: 12px 14px !important;
+  box-shadow: 0 14px 30px rgba(0,0,0,.35) !important;
+  font-size: 14px !important;
+}
+.mapboxgl-popup-close-button{
+  color:#0b0f14 !important;
+  font-size: 18px !important;
+}
+.mapboxgl-popup-tip{
+  border-top-color:#ffffff !important;
+}
 
-    .er-popup{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; line-height:1.35;}
-    .er-tag{
-      display:inline-block;
-      font-size:11px;
-      font-weight:800;
-      letter-spacing:.06em;
-      text-transform:uppercase;
-      padding:3px 10px;
-      border-radius:999px;
-      background:#ffeaa7;
-      color:#111;
-      margin-bottom:8px;
-    }
-    .er-row{display:flex; gap:8px; align-items:center; margin-top:4px;}
-    .er-row b{font-weight:800;}
+/* EcoRide Popup Inhalt */
+.er-popup{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; line-height:1.35;}
+.er-tag{
+  display:inline-block;
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  padding:3px 10px;
+  border-radius:999px;
+  background:#ffeaa7;
+  color:#111;
+  margin-bottom:8px;
+}
+.er-row{display:flex; gap:8px; align-items:center; margin-top:4px;}
+.er-row b{font-weight:800;}
+    
+/* ===== Panel Toggle ===== */
+.panel.collapsed .muted,
+.panel.collapsed .row,
+.panel.collapsed .stat,
+.panel.collapsed .hint {
+  display: none;
+}
 
-    /* ===== Responsive Panel Minimieren ===== */
-    @media (max-width: 900px){
-      .panel{
-        left:8px; top:8px;
-        width: calc(100vw - 16px);
-        max-width: calc(100vw - 16px);
-        padding: 10px;
-      }
+.panel.translucent {
+  background: rgba(17,24,37,.55);
+}
 
-      /* standardmäßig minimiert */
-      .panel .muted,
-      .panel .row,
-      .panel .stat,
-      .panel .hint{
-        display:none;
-      }
-
-      .panel .title{
-        font-size: 14px;
-        margin: 0;
-      }
-
-      /* geöffnet */
-      .panel.open .muted,
-      .panel.open .row,
-      .panel.open .stat,
-      .panel.open .hint{
-        display:block;
-      }
-    }
   </style>
 </head>
 
@@ -151,10 +141,10 @@
   <div id="map"></div>
 
   <div class="panel">
-    <p class="title">
-      EcoRide – Live-Karte
-      <span class="toggle-icon">▼</span>
-    </p>
+<div class="panel-head">
+  <p class="title">EcoRide – Live-Karte</p>
+  <button id="btnPanelMini" class="secondary mini-toggle">Einblenden</button>
+</div>
 
     <p class="muted">
       Zeigt Live-Positionen aus <code>live_positions</code> (Supabase Realtime).
@@ -166,6 +156,12 @@
       <button id="btnApply">Anwenden</button>
       <button id="btnAll" class="secondary">Alle</button>
     </div>
+    
+<div class="row toggle-row">
+  <button id="btnPanelToggle" class="secondary">
+    Ausblenden
+  </button>
+</div>
 
     <div class="stat">
       <div><span id="rtDot" class="dot"></span><span id="rtTxt">Realtime: AUS</span></div>
@@ -182,9 +178,9 @@
 
   <script>
     /***** 1) HIER EINTRAGEN *****/
-    const MAPBOX_TOKEN = "MAPBOX_TOKEN_PLACEHOLDER";
-    const SUPABASE_URL = "https://ihpszsoivqcrkkiucjvv.supabase.co";
-    const SUPABASE_ANON_KEY = "SUPABASE_KEY_PLACEHOLDER";
+    const MAPBOX_TOKEN = "MAPBOX_TOKEN_PLACEHOLDER";         // muss mit pk. beginnen
+    const SUPABASE_URL = "https://ihpszsoivqcrkkiucjvv.supabase.co";         // https://xxxx.supabase.co
+    const SUPABASE_ANON_KEY = "SUPABASE_KEY_PLACEHOLDER"; // publishable/anon key
 
     /***** 2) Helpers *****/
     const $ = (id) => document.getElementById(id);
@@ -229,7 +225,7 @@
       history.replaceState(null, "", u.toString());
     }
 
-    /***** 3) Supabase Client *****/
+    /***** 3) Supabase Client (WICHTIG: Name "sb" statt "supabase") *****/
     if (!window.supabase || !window.supabase.createClient){
       showHint("Supabase SDK lädt nicht. Prüfe Netzwerk/Adblocker.");
       console.error("Supabase SDK missing");
@@ -244,41 +240,38 @@
     const markers = new Map(); // driver_id -> Marker
     let currentFilter = "";
 
-    // ===== Follow Fahrer (auto wenn Filter gesetzt) =====
-    let followDriverId = "";          // driver_id oder "" (aus)
-    const FOLLOW_ZOOM = 15;
-    const FOLLOW_DURATION = 650;
 
-    function followIfNeeded(driverId, pos){
-      if (!map) return;
-      if (!followDriverId) return;
-      if (driverId !== followDriverId) return;
-      if (!Array.isArray(pos) || pos.length !== 2) return;
 
-      map.easeTo({
-        center: pos,
-        zoom: Math.max(map.getZoom(), FOLLOW_ZOOM),
-        duration: FOLLOW_DURATION
-      });
-    }
+// ===== Panel Toggle =====
+const panel = document.querySelector(".panel");
+const btnPanelToggle = document.getElementById("btnPanelToggle");
 
-    // ===== Responsive Panel: Titel klickbar (öffnet/schließt auf kleinen Screens) =====
-    const panel = document.querySelector(".panel");
-    const titleEl = document.querySelector(".panel .title");
+function updatePanelButton() {
+  if (!panel || !btnPanelToggle) return;
+  
+ const collapsed = panel.classList.contains("collapsed");
+btnPanelToggle.textContent = "⏻";
+btnPanelToggle.title = collapsed ? "Einblenden" : "Ausblenden";
 
-    if (panel && titleEl) {
-      titleEl.addEventListener("click", () => {
-        panel.classList.toggle("collapsed");
-      });
-    }
+}
 
-    // ===== TTL / Marker Cleanup =====
-    const TTL_MS = 20000;         // 20 Sekunden
-    const lastSeen = new Map();   // driver_id -> timestamp(ms)
+if (btnPanelToggle && panel) {
+  btnPanelToggle.addEventListener("click", () => {
+    panel.classList.toggle("collapsed");
+    updatePanelButton();
+  });
+}
 
+updatePanelButton();
+
+
+const TTL_MS = 20000;         // 20 Sekunden
+const lastSeen = new Map();   // driver_id -> timestamp(ms)
+    
     // ===== Marker Animation (weich statt springen) =====
-    const anim = new Map(); // driver_id -> { from:[lng,lat], to:[lng,lat], t0:number, dur:number }
-    const ANIM_MS = 700;
+const anim = new Map(); // driver_id -> { from:[lng,lat], to:[lng,lat], t0:number, dur:number }
+const ANIM_MS = 700;    // Dauer der Bewegung (ms)
+
 
     function clearMarkers(){
       for (const m of markers.values()) m.remove();
@@ -300,87 +293,85 @@
 
         m = new mapboxgl.Marker({ element: el })
           .setLngLat(pos)
-          .setPopup(new mapboxgl.Popup({ offset: 18 }).setHTML(`
-            <div class="er-popup">
-              <span class="er-tag">LIVE</span>
-              <div class="er-row">👤 Fahrer: <b>${escapeHtml(driverId)}</b></div>
-              <div class="er-row">📍 Position: ${Number(row.lat).toFixed(5)}, ${Number(row.lng).toFixed(5)}</div>
-              <div class="er-row">⏱️ Letztes Update: ${
-                row.updated_at
-                  ? new Date(row.updated_at).toLocaleTimeString("de-DE", {
-                      timeZone: "Europe/Berlin",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      second: "2-digit",
-                    })
-                  : "–"
-              }</div>
-            </div>
-          `))
+.setPopup(new mapboxgl.Popup({ offset: 18 }).setHTML(`
+  <div class="er-popup">
+    <span class="er-tag">LIVE</span>
+    <div class="er-row">👤 Fahrer: <b>${escapeHtml(driverId)}</b></div>
+    <div class="er-row">📍 Position: ${Number(row.lat).toFixed(5)}, ${Number(row.lng).toFixed(5)}</div>
+    <div class="er-row">⏱️ Letztes Update: ${
+      row.updated_at
+        ? new Date(row.updated_at).toLocaleTimeString("de-DE", {
+            timeZone: "Europe/Berlin",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          })
+        : "–"
+    }</div>
+  </div>
+`))
+
           .addTo(map);
 
         markers.set(driverId, m);
         setCount(markers.size);
-
-      } else {
-        const cur = m.getLngLat();
-        anim.set(driverId, {
-          from: [cur.lng, cur.lat],
-          to: pos,
-          t0: performance.now(),
-          dur: ANIM_MS
-        });
-        requestAnimationFrame(tickAnim);
-      }
+} else {
+  const cur = m.getLngLat();
+  anim.set(driverId, {
+    from: [cur.lng, cur.lat],
+    to: pos,
+    t0: performance.now(),
+    dur: ANIM_MS
+  });
+  requestAnimationFrame(tickAnim);
+}
 
       const t = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
-      lastSeen.set(driverId, Number.isFinite(t) ? t : Date.now());
+lastSeen.set(driverId, Number.isFinite(t) ? t : Date.now());
 
       setLast();
-
-      // Follow: bei Updates zentrieren
-      followIfNeeded(driverId, pos);
     }
+function tickAnim() {
+  const now = performance.now();
+  let active = false;
 
-    function tickAnim(){
-      const now = performance.now();
-      let active = false;
+  for (const [driverId, a] of anim.entries()) {
+    const m = markers.get(driverId);
+    if (!m) { anim.delete(driverId); continue; }
 
-      for (const [driverId, a] of anim.entries()){
-        const m = markers.get(driverId);
-        if (!m) { anim.delete(driverId); continue; }
+    const t = Math.min(1, (now - a.t0) / a.dur);
+    const lng = a.from[0] + (a.to[0] - a.from[0]) * t;
+    const lat = a.from[1] + (a.to[1] - a.from[1]) * t;
 
-        const t = Math.min(1, (now - a.t0) / a.dur);
-        const lng = a.from[0] + (a.to[0] - a.from[0]) * t;
-        const lat = a.from[1] + (a.to[1] - a.from[1]) * t;
+    m.setLngLat([lng, lat]);
 
-        m.setLngLat([lng, lat]);
+    if (t >= 1) anim.delete(driverId);
+    else active = true;
+  }
 
-        if (t >= 1) anim.delete(driverId);
-        else active = true;
-      }
+  if (active) requestAnimationFrame(tickAnim);
+}
 
-      if (active) requestAnimationFrame(tickAnim);
+function removeMarker(driverId){
+  const m = markers.get(driverId);
+  if (!m) return;
+  m.remove();
+  markers.delete(driverId);     // ✅ WICHTIG
+  lastSeen.delete(driverId);    // ✅ WICHTIG
+  setCount(markers.size);
+  setLast();
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [driverId, ts] of lastSeen.entries()) {
+    if ((now - ts) > TTL_MS) {
+      removeMarker(driverId);   // ✅ reicht
     }
+  }
+}, 3000);
 
-    function removeMarker(driverId){
-      const m = markers.get(driverId);
-      if (!m) return;
-      m.remove();
-      markers.delete(driverId);
-      lastSeen.delete(driverId);
-      setCount(markers.size);
-      setLast();
-    }
-
-    setInterval(() => {
-      const now = Date.now();
-      for (const [driverId, ts] of lastSeen.entries()){
-        if ((now - ts) > TTL_MS) removeMarker(driverId);
-      }
-    }, 3000);
-
-    async function fetchLatest(){
+  async function fetchLatest(){
       clearMarkers();
 
       let q = sb
@@ -399,6 +390,7 @@
       }
       hideHint();
 
+      // pro Driver nur den neuesten Datensatz
       const seen = new Set();
       for (const row of (data || [])){
         if (!row.driver_id) continue;
@@ -407,11 +399,8 @@
         upsertMarker(row);
       }
 
-      // Zentrieren bei Follow oder normaler Auto-Zoom
-      if (followDriverId && markers.has(followDriverId)){
-        const p = markers.get(followDriverId).getLngLat();
-        map.easeTo({ center: [p.lng, p.lat], zoom: Math.max(map.getZoom(), FOLLOW_ZOOM), duration: 650 });
-      } else if (markers.size === 1){
+      // Auto-Zoom
+      if (markers.size === 1){
         const only = [...markers.values()][0].getLngLat();
         map.flyTo({ center: [only.lng, only.lat], zoom: 14 });
       } else if (markers.size > 1){
@@ -456,6 +445,7 @@
     }
 
     function initMap(){
+      // Mapbox Token setzen
       mapboxgl.accessToken = MAPBOX_TOKEN;
 
       map = new mapboxgl.Map({
@@ -467,6 +457,7 @@
 
       map.addControl(new mapboxgl.NavigationControl(), "bottom-right");
 
+      // Sichtbare Fehler, falls Mapbox blockt (Token/URL-Restriction/WebGL/Adblock)
       map.on("error", (e) => {
         console.error("Mapbox error:", e?.error || e);
         showHint("Mapbox lädt nicht. Prüfe Token + URL-Restriction + Adblock. (Konsole öffnen)");
@@ -477,8 +468,6 @@
         currentFilter = getFilterFromURL();
         driverFilter.value = currentFilter;
 
-        followDriverId = currentFilter || "";
-
         await fetchLatest();
         subscribe();
       });
@@ -487,27 +476,19 @@
     $("btnApply").addEventListener("click", async () => {
       currentFilter = driverFilter.value.trim();
       setURLFilter(currentFilter);
-
-      followDriverId = currentFilter || "";
-
       await fetchLatest();
+      // Realtime bleibt an; Updates werden gefiltert
     });
 
     $("btnAll").addEventListener("click", async () => {
       driverFilter.value = "";
       currentFilter = "";
       setURLFilter("");
-
-      followDriverId = "";
-
       await fetchLatest();
     });
 
+    // Start
     initMap();
   </script>
 </body>
 </html>
-
-
-
-
