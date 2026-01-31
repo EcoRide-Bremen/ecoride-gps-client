@@ -298,4 +298,332 @@
     /***** 1) HIER EINTRAGEN *****/
     const MAPBOX_TOKEN = "MAPBOX_TOKEN_PLACEHOLDER";
     const SUPABASE_URL = "https://ihpszsoivqcrkkiucjvv.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlocHN6c29pdnFjcmtraXVjanZ2Iiwicm9sZSI6ImFub24iLCJp
+    const SUPABASE_ANON_KEY = "SUPABASE_KEY_PLACEHOLDER";
+
+    /***** 2) Helpers *****/
+    const $ = (id) => document.getElementById(id);
+    const rtDot = $("rtDot");
+    const rtTxt = $("rtTxt");
+    const countTxt = $("countTxt");
+    const lastTxt = $("lastTxt");
+    const driverFilter = $("driverFilter");
+    const hintBox = $("hint");
+
+    function showHint(msg) {
+      hintBox.textContent = msg;
+      hintBox.classList.add("show");
+    }
+
+    function hideHint() {
+      hintBox.classList.remove("show");
+      hintBox.textContent = "";
+    }
+
+    function setRealtime(on) {
+      rtDot.classList.toggle("on", on);
+      rtTxt.textContent = "Realtime: " + (on ? "AN" : "AUS");
+    }
+
+    function setLast() {
+      lastTxt.textContent = new Date().toLocaleString("de-DE");
+    }
+
+    function setCount(n) {
+      countTxt.textContent = "Marker: " + n;
+    }
+
+    function escapeHtml(str) {
+      return String(str ?? "").replace(/[&<>"']/g, s => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
+      }[s]));
+    }
+
+    function getFilterFromURL() {
+      const u = new URL(location.href);
+      return (u.searchParams.get("driverId") || "").trim();
+    }
+
+    function setURLFilter(f) {
+      const u = new URL(location.href);
+      if (f) u.searchParams.set("driverId", f);
+      else u.searchParams.delete("driverId");
+      history.replaceState(null, "", u.toString());
+    }
+
+    /***** 3) Supabase Client *****/
+    if (!window.supabase || !window.supabase.createClient) {
+      showHint("Supabase SDK lädt nicht. Prüfe Netzwerk/Adblocker.");
+      console.error("Supabase SDK missing");
+    }
+
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { persistSession: false }
+    });
+
+    /***** 4) Map + Live State *****/
+    let map;
+    let channel = null;
+    const markers = new Map(); // driver_id -> Marker
+    let currentFilter = "";
+
+    // ===== Follow Fahrer (auto wenn Filter gesetzt) =====
+    let followDriverId = "";
+    const FOLLOW_ZOOM = 15;
+    const FOLLOW_DURATION = 650;
+
+    function followIfNeeded(driverId, pos) {
+      if (!map) return;
+      if (!followDriverId) return;
+      if (driverId !== followDriverId) return;
+      if (!Array.isArray(pos) || pos.length !== 2) return;
+
+      map.easeTo({
+        center: pos,
+        zoom: Math.max(map.getZoom(), FOLLOW_ZOOM),
+        duration: FOLLOW_DURATION
+      });
+    }
+
+    // ===== Panel ein- und ausklappen =====
+    const panel = document.querySelector(".panel");
+    const titleEl = document.querySelector(".panel .title");
+
+    if (panel && titleEl) {
+      titleEl.addEventListener("click", () => {
+        panel.classList.toggle("open");
+        panel.classList.toggle("collapsed");
+      });
+    }
+
+    // ===== TTL / Marker Cleanup =====
+    const TTL_MS = 20000;
+    const lastSeen = new Map();
+
+    // ===== Marker Animation =====
+    const anim = new Map();
+    const ANIM_MS = 700;
+
+    function clearMarkers() {
+      for (const m of markers.values()) m.remove();
+      markers.clear();
+      setCount(0);
+    }
+
+    function upsertMarker(row) {
+      if (!row || row.lat == null || row.lng == null) return;
+      if (currentFilter && row.driver_id !== currentFilter) return;
+
+      const driverId = row.driver_id || "unknown";
+      const pos = [Number(row.lng), Number(row.lat)];
+
+      let m = markers.get(driverId);
+      if (!m) {
+        const el = document.createElement("div");
+        el.className = "marker";
+
+        m = new mapboxgl.Marker({ element: el })
+          .setLngLat(pos)
+          .setPopup(new mapboxgl.Popup({ offset: 18 }).setHTML(`
+            <div class="er-popup">
+              <span class="er-tag">LIVE</span>
+              <div class="er-row">👤 Fahrer: <b>${escapeHtml(driverId)}</b></div>
+              <div class="er-row">📍 Position: ${Number(row.lat).toFixed(5)}, ${Number(row.lng).toFixed(5)}</div>
+              <div class="er-row">⏱️ Letztes Update: ${
+                row.updated_at
+                  ? new Date(row.updated_at).toLocaleTimeString("de-DE", {
+                      timeZone: "Europe/Berlin",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                    })
+                  : "–"
+              }</div>
+            </div>
+          `))
+          .addTo(map);
+
+        markers.set(driverId, m);
+        setCount(markers.size);
+
+      } else {
+        const cur = m.getLngLat();
+        anim.set(driverId, {
+          from: [cur.lng, cur.lat],
+          to: pos,
+          t0: performance.now(),
+          dur: ANIM_MS
+        });
+        requestAnimationFrame(tickAnim);
+      }
+
+      const t = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
+      lastSeen.set(driverId, Number.isFinite(t) ? t : Date.now());
+
+      setLast();
+      followIfNeeded(driverId, pos);
+    }
+
+    function tickAnim() {
+      const now = performance.now();
+      let active = false;
+
+      for (const [driverId, a] of anim.entries()) {
+        const m = markers.get(driverId);
+        if (!m) { anim.delete(driverId); continue; }
+
+        const t = Math.min(1, (now - a.t0) / a.dur);
+        const lng = a.from[0] + (a.to[0] - a.from[0]) * t;
+        const lat = a.from[1] + (a.to[1] - a.from[1]) * t;
+
+        m.setLngLat([lng, lat]);
+
+        if (t >= 1) anim.delete(driverId);
+        else active = true;
+      }
+
+      if (active) requestAnimationFrame(tickAnim);
+    }
+
+    function removeMarker(driverId) {
+      const m = markers.get(driverId);
+      if (!m) return;
+      m.remove();
+      markers.delete(driverId);
+      lastSeen.delete(driverId);
+      setCount(markers.size);
+      setLast();
+    }
+
+    setInterval(() => {
+      const now = Date.now();
+      for (const [driverId, ts] of lastSeen.entries()) {
+        if ((now - ts) > TTL_MS) removeMarker(driverId);
+      }
+    }, 3000);
+
+    async function fetchLatest() {
+      clearMarkers();
+
+      let q = sb
+        .from("live_positions")
+        .select("driver_id, lat, lng, updated_at")
+        .order("updated_at", { ascending: false })
+        .limit(200);
+
+      if (currentFilter) q = q.eq("driver_id", currentFilter);
+
+      const { data, error } = await q;
+      if (error) {
+        console.error("Supabase fetch error:", error);
+        showHint("Supabase: Fehler beim Laden. (RLS/Policy?) Siehe Konsole.");
+        return;
+      }
+      hideHint();
+
+      const seen = new Set();
+      for (const row of (data || [])) {
+        if (!row.driver_id) continue;
+        if (seen.has(row.driver_id)) continue;
+        seen.add(row.driver_id);
+        upsertMarker(row);
+      }
+
+      if (followDriverId && markers.has(followDriverId)) {
+        const p = markers.get(followDriverId).getLngLat();
+        map.easeTo({ center: [p.lng, p.lat], zoom: Math.max(map.getZoom(), FOLLOW_ZOOM), duration: 650 });
+      } else if (markers.size === 1) {
+        const only = [...markers.values()][0].getLngLat();
+        map.flyTo({ center: [only.lng, only.lat], zoom: 14 });
+      } else if (markers.size > 1) {
+        const bounds = new mapboxgl.LngLatBounds();
+        for (const m of markers.values()) {
+          const p = m.getLngLat();
+          bounds.extend([p.lng, p.lat]);
+        }
+        map.fitBounds(bounds, { padding: 80, maxZoom: 15 });
+      }
+
+      setLast();
+    }
+
+    function unsubscribe() {
+      if (channel) {
+        sb.removeChannel(channel);
+        channel = null;
+      }
+      setRealtime(false);
+    }
+
+    function subscribe() {
+      unsubscribe();
+
+      channel = sb
+        .channel("live_positions_map")
+        .on("postgres_changes", { event: "*", schema: "public", table: "live_positions" }, (payload) => {
+          if (payload.eventType === "DELETE") {
+            const oldRow = payload.old || {};
+            if (oldRow.driver_id) removeMarker(oldRow.driver_id);
+            return;
+          }
+          const row = payload.new || {};
+          upsertMarker(row);
+        })
+        .subscribe((status) => {
+          const on = (status === "SUBSCRIBED");
+          setRealtime(on);
+          if (!on) console.log("Realtime status:", status);
+        });
+    }
+
+    function initMap() {
+      mapboxgl.accessToken = MAPBOX_TOKEN;
+
+      map = new mapboxgl.Map({
+        container: "map",
+        style: "mapbox://styles/mapbox/streets-v12",
+        center: [8.8, 53.1],
+        zoom: 10
+      });
+
+      map.addControl(new mapboxgl.NavigationControl(), "bottom-right");
+
+      map.on("error", (e) => {
+        console.error("Mapbox error:", e?.error || e);
+        showHint("Mapbox lädt nicht. Prüfe Token + URL-Restriction + Adblock. (Konsole öffnen)");
+      });
+
+      map.on("load", async () => {
+        hideHint();
+        currentFilter = getFilterFromURL();
+        driverFilter.value = currentFilter;
+
+        followDriverId = currentFilter || "";
+
+        await fetchLatest();
+        subscribe();
+      });
+    }
+
+    $("btnApply").addEventListener("click", async () => {
+      currentFilter = driverFilter.value.trim();
+      setURLFilter(currentFilter);
+
+      followDriverId = currentFilter || "";
+
+      await fetchLatest();
+    });
+
+    $("btnAll").addEventListener("click", async () => {
+      driverFilter.value = "";
+      currentFilter = "";
+      setURLFilter("");
+
+      followDriverId = "";
+
+      await fetchLatest();
+    });
+
+    initMap();
+  </script>
+</body>
+</html>
