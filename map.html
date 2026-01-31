@@ -74,13 +74,6 @@
       transform: rotate(180deg);
     }
 
-    .muted {
-      color: var(--muted);
-      font-size: 13px;
-      margin: 6px 0 0;
-      line-height: 1.35;
-    }
-
     .row {
       display: flex;
       flex-direction: column;
@@ -111,6 +104,7 @@
       display: flex;
       gap: 8px;
       width: 100%;
+      max-width: 300px;
     }
 
     button {
@@ -242,11 +236,6 @@
     <p class="title">
       EcoRide – Live-Karte
       <span class="toggle-icon">▼</span>
-    </p>
-
-    <p class="muted">
-      Zeigt Live-Positionen aus <code>live_positions</code> (Supabase Realtime).
-      Optional filterbar nach Driver ID.
     </p>
 
     <div class="row">
