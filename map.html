@@ -127,14 +127,15 @@
     /* Mobile Anpassungen */
     @media (max-width: 900px) {
       .panel {
-        left: 12px;
-        top: 12px;
-        width: calc(100vw - 24px);
+        left: 50%;
+        top: 10px;
+        transform: translateX(-50%);
+        width: 90%;
         max-height: 50px;
         background: rgba(17, 24, 37, 0.7);
         backdrop-filter: blur(12px);
         border-radius: 14px;
-        padding: 8px 12px;
+        padding: 8px;
       }
 
       .panel .title {
@@ -156,9 +157,18 @@
       }
 
       .panel.open .row {
+        display: flex;
         flex-direction: column;
-        align-items: stretch;
+        align-items: center;
         gap: 8px;
+        width: 100%;
+      }
+
+      .panel.open .row > div {
+        display: flex;
+        gap: 8px;
+        width: 100%;
+        max-width: 300px;
       }
 
       .panel.open input {
@@ -197,7 +207,7 @@
 
     <div class="row">
       <input id="driverFilter" placeholder="Filter: Driver ID (leer = alle)" />
-      <div style="display: flex; gap: 8px;">
+      <div>
         <button id="btnApply">Anwenden</button>
         <button id="btnAll" class="secondary">Alle</button>
       </div>
