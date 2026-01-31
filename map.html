@@ -22,10 +22,13 @@
 
     .panel{
       position:absolute; left:12px; top:12px; z-index:5;
-      background:rgba(17,24,37,.92); backdrop-filter: blur(10px);
-      border:1px solid var(--line); border-radius:14px; padding:12px;
+      background:rgba(17,24,37,0.7); /* Transparenz erhöht */
+      backdrop-filter: blur(12px); /* Stärkere Unschärfe */
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:12px;
       width:min(380px, calc(100vw - 24px));
-      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2); /* Schatten reduziert */
       transition: max-height 0.3s ease;
       overflow: hidden;
       max-height: 400px;
@@ -34,7 +37,9 @@
       max-height: 40px;
     }
     .title{
-      font-weight:800; letter-spacing:.2px; margin:0;
+      font-weight:800;
+      letter-spacing:.2px;
+      margin:0;
       cursor: pointer;
       user-select: none;
       padding: 8px 0;
@@ -87,7 +92,7 @@
     .hint.show{display:block;}
     code{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;}
 
-    /* ===== Popup kräftig (wie CodePen) ===== */
+    /* Popup-Stil */
     .mapboxgl-popup-content{
       background: #ffffff !important;
       color: #0b0f14 !important;
@@ -115,17 +120,18 @@
     .er-row{display:flex; gap:8px; align-items:center; margin-top:4px;}
     .er-row b{font-weight:800;}
 
-    /* ===== Mobile Anpassungen ===== */
+    /* Mobile Anpassungen */
     @media (max-width: 900px) {
       .panel {
         left: 5%;
         top: 10px;
         width: 90%;
         max-height: 50px;
-        background: rgba(17, 24, 37, 0.9);
-        backdrop-filter: blur(8px);
+        background: rgba(17, 24, 37, 0.7); /* Transparenz für Mobile */
+        backdrop-filter: blur(12px);
         border-radius: 10px;
         padding: 8px;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
       }
 
       .panel.open {
@@ -269,7 +275,7 @@
     let currentFilter = "";
 
     // ===== Follow Fahrer (auto wenn Filter gesetzt) =====
-    let followDriverId = "";          // driver_id oder "" (aus)
+    let followDriverId = "";
     const FOLLOW_ZOOM = 15;
     const FOLLOW_DURATION = 650;
 
@@ -298,11 +304,11 @@
     }
 
     // ===== TTL / Marker Cleanup =====
-    const TTL_MS = 20000;         // 20 Sekunden
-    const lastSeen = new Map();   // driver_id -> timestamp(ms)
+    const TTL_MS = 20000;
+    const lastSeen = new Map();
 
-    // ===== Marker Animation (weich statt springen) =====
-    const anim = new Map(); // driver_id -> { from:[lng,lat], to:[lng,lat], t0:number, dur:number }
+    // ===== Marker Animation =====
+    const anim = new Map();
     const ANIM_MS = 700;
 
     function clearMarkers(){
@@ -362,8 +368,6 @@
       lastSeen.set(driverId, Number.isFinite(t) ? t : Date.now());
 
       setLast();
-
-      // Follow: bei Updates zentrieren
       followIfNeeded(driverId, pos);
     }
 
@@ -432,7 +436,6 @@
         upsertMarker(row);
       }
 
-      // Zentrieren bei Follow oder normaler Auto-Zoom
       if (followDriverId && markers.has(followDriverId)){
         const p = markers.get(followDriverId).getLngLat();
         map.easeTo({ center: [p.lng, p.lat], zoom: Math.max(map.getZoom(), FOLLOW_ZOOM), duration: 650 });
@@ -486,7 +489,7 @@
       map = new mapboxgl.Map({
         container: "map",
         style: "mapbox://styles/mapbox/streets-v12",
-        center: [8.8, 53.1], // Bremen
+        center: [8.8, 53.1],
         zoom: 10
       });
 
