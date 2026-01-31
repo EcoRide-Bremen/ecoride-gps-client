@@ -14,250 +14,270 @@
 
   <style>
     :root{
-      --bg:#0b0f14; --card:#111825; --text:#eaf0ff; --muted:#93a4bf; --line:#1f2a3d;
-      --accent:#a855f7;
+      /* EcoRide GPS-Client Look */
+      --bg:#0b0f14;
+      --card:#121926;                 /* Panel-Background */
+      --text:#eaf0ff;
+      --muted:#9aa9c3;
+      --line:rgba(255,255,255,.10);
+
+      /* Primary (Tracking START lime) */
+      --accent:#c7e23a;               /* EcoRide lime */
+      --accentText:#0b0f14;
+
+      /* Secondary */
+      --secondary:rgba(15,22,36,.78);
+      --secondaryLine:rgba(255,255,255,.12);
+
+      /* Glows */
+      --glow:rgba(199,226,58,.28);
+      --glowStrong:rgba(199,226,58,.40);
     }
-    html, body {
-      height: 100%;
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+
+    html, body{
+      height:100%;
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       background: var(--bg);
       color: var(--text);
     }
-    #map {
-      position: absolute;
-      inset: 0;
+
+    #map{
+      position:absolute;
+      inset:0;
     }
 
-    .panel {
-      position: absolute;
-      left: 20px;
-      top: 20px;
-      z-index: 5;
-      background: rgba(17, 24, 37, 0.5);
+    .panel{
+      position:absolute;
+      left:20px;
+      top:20px;
+      z-index:5;
+
+      background: linear-gradient(180deg, rgba(18,25,38,.92), rgba(14,19,30,.86));
       backdrop-filter: blur(18px);
       border: 1px solid var(--line);
-      border-radius: 14px;
+      border-radius: 16px;
       padding: 12px;
-      width: min(350px, calc(100vw - 40px));
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-      transition: max-height 0.3s ease, padding 0.3s ease;
-      overflow: hidden;
-      max-height: 400px;
+
+      width: min(360px, calc(100vw - 40px));
+      box-shadow: 0 16px 40px rgba(0,0,0,.35);
+
+      overflow:hidden;
+      transition: max-height .3s ease, padding .3s ease;
+      max-height: 440px;
     }
 
-    .panel.collapsed {
-      max-height: 48px;
-      padding: 6px 12px;
+    /* Eingeklappt: nur Kopfzeile sichtbar */
+    .panel.collapsed{
+      max-height: 54px;
+      padding: 10px 12px;
     }
 
-    .title {
-      font-weight: 600;
+    .title{
+      font-weight: 800;
       letter-spacing: .2px;
       margin: 0;
       cursor: pointer;
       user-select: none;
-      padding: 4px 0;
+
+      display:flex;
+      align-items:center;
+      justify-content: space-between;
+
+      padding: 6px 2px;
       font-size: 18px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 32px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      line-height: 1.1;
     }
 
-    .toggle-icon {
+    .toggle-icon{
       font-size: 12px;
-      transition: transform 0.3s ease;
-      margin-left: 8px;
+      opacity: .9;
+      transition: transform .25s ease;
+      margin-left: 10px;
     }
-
-    .panel.collapsed .toggle-icon {
+    .panel.collapsed .toggle-icon{
       transform: rotate(180deg);
     }
 
-    .row {
-      display: flex;
+    .muted{
+      color: var(--muted);
+      font-size: 13px;
+      margin: 6px 0 0;
+      line-height: 1.35;
+    }
+
+    .row{
+      display:flex;
       flex-direction: column;
-      align-items: center;
       gap: 12px;
       margin-top: 12px;
       width: 100%;
-      opacity: 1;
-      transition: opacity 0.3s ease;
     }
 
-    .panel.collapsed .row {
-      display: none;
+    /* alles außer Titel ausblenden, wenn collapsed */
+    .panel.collapsed .muted,
+    .panel.collapsed .row,
+    .panel.collapsed .stat,
+    .panel.collapsed .hint{
+      display:none;
     }
 
-    .input-button-group {
-      display: flex;
+    .input-button-group{
+      width:100%;
+      display:flex;
       flex-direction: column;
       gap: 12px;
-      width: 100%;
-      max-width: 300px;
-      align-items: center;
+      align-items:center;
     }
 
-    input {
+    .button-group{
+      width:100%;
+      display:flex;
+      gap: 12px;
+    }
+
+    input{
       width: 100%;
-      background: rgba(12, 18, 32, 0.6);
+      background: rgba(12,18,32,.60);
       border: 1px solid var(--line);
       color: var(--text);
       padding: 12px;
-      border-radius: 10px;
-      outline: none;
-      text-align: center;
+      border-radius: 12px;
+      outline:none;
+      text-align:center;
       font-size: 16px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     }
-
-    input::placeholder {
+    input::placeholder{
       color: var(--muted);
-      text-align: center;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      text-align:center;
     }
 
-    .button-group {
-      display: flex;
-      gap: 12px;
-      width: 100%;
-      max-width: 300px;
-    }
-
-    button {
+    button{
       background: var(--accent);
-      border: 0;
-      color: white;
-      font-weight: 600;
-      padding: 12px;
-      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,.06);
+      color: var(--accentText);
+      font-weight: 800;
+      padding: 12px 14px;
+      border-radius: 12px;
       cursor: pointer;
       flex: 1;
       font-size: 16px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      box-shadow:
+        0 10px 22px rgba(0,0,0,.25),
+        0 0 0 2px rgba(199,226,58,.10),
+        0 0 18px var(--glow);
+      transition: transform .08s ease, filter .15s ease, box-shadow .2s ease;
+    }
+    button:hover{
+      filter: brightness(1.06);
+      box-shadow:
+        0 12px 26px rgba(0,0,0,.28),
+        0 0 0 2px rgba(199,226,58,.16),
+        0 0 22px var(--glowStrong);
+    }
+    button:active{
+      transform: translateY(1px);
     }
 
-    button.secondary {
-      background: rgba(39, 50, 74, 0.7);
+    button.secondary{
+      background: var(--secondary);
+      color: var(--text);
+      border: 1px solid var(--secondaryLine);
+      box-shadow: 0 10px 22px rgba(0,0,0,.22);
     }
+    button.secondary:hover{ filter: brightness(1.05); }
 
-    .stat {
+    .stat{
       margin-top: 12px;
       font-size: 14px;
       color: var(--muted);
-      display: flex;
+      display:flex;
       justify-content: space-between;
       gap: 10px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      opacity: 1;
-      transition: opacity 0.3s ease;
     }
 
-    .panel.collapsed .stat {
-      display: none;
+    .dot{
+      display:inline-block;
+      width:10px;
+      height:10px;
+      border-radius:50%;
+      background:#ef4444;
+      margin-right:6px;
     }
+    .dot.on{ background:#22c55e; }
 
-    .dot {
-      display: inline-block;
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: #ef4444;
-      margin-right: 6px;
-    }
-
-    .dot.on {
-      background: #22c55e;
-    }
-
-    .marker {
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
+    .marker{
+      width:18px; height:18px;
+      border-radius:50%;
       background: var(--accent);
-      border: 2px solid white;
-      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+      border: 2px solid rgba(255,255,255,.95);
+      box-shadow: 0 10px 22px rgba(0,0,0,.35), 0 0 18px var(--glowStrong);
     }
 
-    .hint {
+    .hint{
       margin-top: 10px;
       padding: 10px;
-      border-radius: 10px;
+      border-radius: 12px;
       border: 1px dashed var(--line);
       color: var(--muted);
       font-size: 12px;
-      display: none;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      display:none;
     }
+    .hint.show{ display:block; }
 
-    .hint.show {
-      display: block;
-    }
-
-    code {
+    code{
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     }
 
-    /* Popup-Stil */
-    .mapboxgl-popup-content {
+    /* Popup */
+    .mapboxgl-popup-content{
       background: #ffffff !important;
       color: #0b0f14 !important;
       border-radius: 14px !important;
       padding: 12px 14px !important;
-      box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35) !important;
+      box-shadow: 0 14px 30px rgba(0,0,0,.35) !important;
       font-size: 14px !important;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif !important;
     }
+    .mapboxgl-popup-close-button{ color:#0b0f14 !important; font-size: 18px !important; }
+    .mapboxgl-popup-tip{ border-top-color:#ffffff !important; }
 
-    .mapboxgl-popup-close-button {
-      color: #0b0f14 !important;
-      font-size: 18px !important;
+    .er-popup{ line-height:1.35; }
+    .er-tag{
+      display:inline-block;
+      font-size:11px;
+      font-weight:900;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+      padding:3px 10px;
+      border-radius:999px;
+      background:#ffeaa7;
+      color:#111;
+      margin-bottom:8px;
     }
+    .er-row{ display:flex; gap:8px; align-items:center; margin-top:4px; }
+    .er-row b{ font-weight:900; }
 
-    .mapboxgl-popup-tip {
-      border-top-color: #ffffff !important;
-    }
-
-    .er-popup {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      line-height: 1.35;
-    }
-
-    .er-tag {
-      display: inline-block;
-      font-size: 11px;
-      font-weight: 800;
-      letter-spacing: .06em;
-      text-transform: uppercase;
-      padding: 3px 10px;
-      border-radius: 999px;
-      background: #ffeaa7;
-      color: #111;
-      margin-bottom: 8px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    }
-
-    .er-row {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      margin-top: 4px;
-    }
-
-    .er-row b {
-      font-weight: 800;
-    }
-
-    /* Mobile Anpassungen */
-    @media (max-width: 900px) {
-      .panel {
-        left: 20px;
-        right: 20px;
-        width: auto;
-        background: rgba(17, 24, 37, 0.5);
+    /* Mobile */
+    @media (max-width: 900px){
+      .panel{
+        left:12px;
+        top:12px;
+        right:12px;
+        width:auto;
+        padding: 12px;
+        border-radius: 16px;
       }
+      button{
+        padding: 14px 14px;
+        border-radius: 14px;
+        font-size: 16px;
+      }
+      input{
+        padding: 14px 12px;
+        border-radius: 14px;
+        font-size: 16px;
+      }
+      .title{ font-size: 16px; }
     }
   </style>
 </head>
@@ -265,16 +285,23 @@
 <body>
   <div id="map"></div>
 
+  <!-- Standard: minimiert (collapsed) -->
   <div class="panel collapsed">
-    <p class="title">
+    <p class="title" id="panelTitle">
       EcoRide – Live-Karte
-      <span class="toggle-icon">▼</span>
+      <span class="toggle-icon" aria-hidden="true">▼</span>
+    </p>
+
+    <p class="muted">
+      Zeigt Live-Positionen aus <code>live_positions</code> (Supabase Realtime).
+      Optional filterbar nach Driver ID.
     </p>
 
     <div class="row">
       <div class="input-button-group">
-        <input id="driverFilter" placeholder="Driver ID" />
+        <input id="driverFilter" placeholder="Driver ID (leer = alle)" />
       </div>
+
       <div class="button-group">
         <button id="btnApply">Anwenden</button>
         <button id="btnAll" class="secondary">Alle</button>
@@ -309,41 +336,34 @@
     const driverFilter = $("driverFilter");
     const hintBox = $("hint");
 
-    function showHint(msg) {
+    function showHint(msg){
       hintBox.textContent = msg;
       hintBox.classList.add("show");
     }
-
-    function hideHint() {
+    function hideHint(){
       hintBox.classList.remove("show");
       hintBox.textContent = "";
     }
-
-    function setRealtime(on) {
+    function setRealtime(on){
       rtDot.classList.toggle("on", on);
       rtTxt.textContent = "Realtime: " + (on ? "AN" : "AUS");
     }
-
-    function setLast() {
+    function setLast(){
       lastTxt.textContent = new Date().toLocaleString("de-DE");
     }
-
-    function setCount(n) {
+    function setCount(n){
       countTxt.textContent = "Marker: " + n;
     }
-
-    function escapeHtml(str) {
+    function escapeHtml(str){
       return String(str ?? "").replace(/[&<>"']/g, s => ({
-        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
+        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
       }[s]));
     }
-
-    function getFilterFromURL() {
+    function getFilterFromURL(){
       const u = new URL(location.href);
       return (u.searchParams.get("driverId") || "").trim();
     }
-
-    function setURLFilter(f) {
+    function setURLFilter(f){
       const u = new URL(location.href);
       if (f) u.searchParams.set("driverId", f);
       else u.searchParams.delete("driverId");
@@ -351,7 +371,7 @@
     }
 
     /***** 3) Supabase Client *****/
-    if (!window.supabase || !window.supabase.createClient) {
+    if (!window.supabase || !window.supabase.createClient){
       showHint("Supabase SDK lädt nicht. Prüfe Netzwerk/Adblocker.");
       console.error("Supabase SDK missing");
     }
@@ -360,18 +380,27 @@
       auth: { persistSession: false }
     });
 
-    /***** 4) Map + Live State *****/
+    /***** 4) Panel Toggle (Titel klickbar) *****/
+    const panel = document.querySelector(".panel");
+    const panelTitle = document.getElementById("panelTitle");
+    if (panel && panelTitle){
+      panelTitle.addEventListener("click", () => {
+        panel.classList.toggle("collapsed");
+      });
+    }
+
+    /***** 5) Map + Live State *****/
     let map;
     let channel = null;
     const markers = new Map(); // driver_id -> Marker
     let currentFilter = "";
 
     // ===== Follow Fahrer (auto wenn Filter gesetzt) =====
-    let followDriverId = "";
+    let followDriverId = "";          // driver_id oder "" (aus)
     const FOLLOW_ZOOM = 15;
     const FOLLOW_DURATION = 650;
 
-    function followIfNeeded(driverId, pos) {
+    function followIfNeeded(driverId, pos){
       if (!map) return;
       if (!followDriverId) return;
       if (driverId !== followDriverId) return;
@@ -384,40 +413,32 @@
       });
     }
 
-    // ===== Panel ein- und ausklappen =====
-    const panel = document.querySelector(".panel");
-    const titleEl = document.querySelector(".panel .title");
-
-    if (panel && titleEl) {
-      titleEl.addEventListener("click", () => {
-        panel.classList.toggle("open");
-        panel.classList.toggle("collapsed");
-      });
-    }
-
     // ===== TTL / Marker Cleanup =====
-    const TTL_MS = 20000;
-    const lastSeen = new Map();
+    const TTL_MS = 20000;         // 20 Sekunden
+    const lastSeen = new Map();   // driver_id -> timestamp(ms)
 
-    // ===== Marker Animation =====
-    const anim = new Map();
+    // ===== Marker Animation (weich statt springen) =====
+    const anim = new Map(); // driver_id -> { from:[lng,lat], to:[lng,lat], t0:number, dur:number }
     const ANIM_MS = 700;
 
-    function clearMarkers() {
+    function clearMarkers(){
       for (const m of markers.values()) m.remove();
       markers.clear();
       setCount(0);
     }
 
-    function upsertMarker(row) {
+    function upsertMarker(row){
       if (!row || row.lat == null || row.lng == null) return;
-      if (currentFilter && row.driver_id !== currentFilter) return;
 
       const driverId = row.driver_id || "unknown";
+      if (currentFilter && driverId !== currentFilter) return;
+
       const pos = [Number(row.lng), Number(row.lat)];
+      if (!Number.isFinite(pos[0]) || !Number.isFinite(pos[1])) return;
 
       let m = markers.get(driverId);
-      if (!m) {
+
+      if (!m){
         const el = document.createElement("div");
         el.className = "marker";
 
@@ -460,14 +481,16 @@
       lastSeen.set(driverId, Number.isFinite(t) ? t : Date.now());
 
       setLast();
+
+      // Follow: bei Updates zentrieren
       followIfNeeded(driverId, pos);
     }
 
-    function tickAnim() {
+    function tickAnim(){
       const now = performance.now();
       let active = false;
 
-      for (const [driverId, a] of anim.entries()) {
+      for (const [driverId, a] of anim.entries()){
         const m = markers.get(driverId);
         if (!m) { anim.delete(driverId); continue; }
 
@@ -484,7 +507,7 @@
       if (active) requestAnimationFrame(tickAnim);
     }
 
-    function removeMarker(driverId) {
+    function removeMarker(driverId){
       const m = markers.get(driverId);
       if (!m) return;
       m.remove();
@@ -496,12 +519,12 @@
 
     setInterval(() => {
       const now = Date.now();
-      for (const [driverId, ts] of lastSeen.entries()) {
+      for (const [driverId, ts] of lastSeen.entries()){
         if ((now - ts) > TTL_MS) removeMarker(driverId);
       }
     }, 3000);
 
-    async function fetchLatest() {
+    async function fetchLatest(){
       clearMarkers();
 
       let q = sb
@@ -513,30 +536,38 @@
       if (currentFilter) q = q.eq("driver_id", currentFilter);
 
       const { data, error } = await q;
-      if (error) {
+
+      if (error){
         console.error("Supabase fetch error:", error);
         showHint("Supabase: Fehler beim Laden. (RLS/Policy?) Siehe Konsole.");
         return;
       }
+
       hideHint();
 
+      // pro Driver nur den neuesten Datensatz
       const seen = new Set();
-      for (const row of (data || [])) {
+      for (const row of (data || [])){
         if (!row.driver_id) continue;
         if (seen.has(row.driver_id)) continue;
         seen.add(row.driver_id);
         upsertMarker(row);
       }
 
-      if (followDriverId && markers.has(followDriverId)) {
+      // Zentrieren bei Follow oder normaler Auto-Zoom
+      if (followDriverId && markers.has(followDriverId)){
         const p = markers.get(followDriverId).getLngLat();
-        map.easeTo({ center: [p.lng, p.lat], zoom: Math.max(map.getZoom(), FOLLOW_ZOOM), duration: 650 });
-      } else if (markers.size === 1) {
+        map.easeTo({
+          center: [p.lng, p.lat],
+          zoom: Math.max(map.getZoom(), FOLLOW_ZOOM),
+          duration: FOLLOW_DURATION
+        });
+      } else if (markers.size === 1){
         const only = [...markers.values()][0].getLngLat();
         map.flyTo({ center: [only.lng, only.lat], zoom: 14 });
-      } else if (markers.size > 1) {
+      } else if (markers.size > 1){
         const bounds = new mapboxgl.LngLatBounds();
-        for (const m of markers.values()) {
+        for (const m of markers.values()){
           const p = m.getLngLat();
           bounds.extend([p.lng, p.lat]);
         }
@@ -546,21 +577,21 @@
       setLast();
     }
 
-    function unsubscribe() {
-      if (channel) {
+    function unsubscribe(){
+      if (channel){
         sb.removeChannel(channel);
         channel = null;
       }
       setRealtime(false);
     }
 
-    function subscribe() {
+    function subscribe(){
       unsubscribe();
 
       channel = sb
         .channel("live_positions_map")
         .on("postgres_changes", { event: "*", schema: "public", table: "live_positions" }, (payload) => {
-          if (payload.eventType === "DELETE") {
+          if (payload.eventType === "DELETE"){
             const oldRow = payload.old || {};
             if (oldRow.driver_id) removeMarker(oldRow.driver_id);
             return;
@@ -575,13 +606,13 @@
         });
     }
 
-    function initMap() {
+    function initMap(){
       mapboxgl.accessToken = MAPBOX_TOKEN;
 
       map = new mapboxgl.Map({
         container: "map",
         style: "mapbox://styles/mapbox/streets-v12",
-        center: [8.8, 53.1],
+        center: [8.8, 53.1], // Bremen
         zoom: 10
       });
 
@@ -594,9 +625,11 @@
 
       map.on("load", async () => {
         hideHint();
+
         currentFilter = getFilterFromURL();
         driverFilter.value = currentFilter;
 
+        // Follow automatisch, wenn Filter gesetzt
         followDriverId = currentFilter || "";
 
         await fetchLatest();
