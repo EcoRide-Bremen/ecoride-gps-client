@@ -26,8 +26,27 @@
       border:1px solid var(--line); border-radius:14px; padding:12px;
       width:min(380px, calc(100vw - 24px));
       box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      transition: max-height 0.3s ease;
+      overflow: hidden;
+      max-height: 400px;
     }
-    .title{font-weight:800; letter-spacing:.2px; margin:0;}
+    .panel.collapsed {
+      max-height: 40px;
+    }
+    .title{
+      font-weight:800; letter-spacing:.2px; margin:0;
+      cursor: pointer;
+      user-select: none;
+      padding: 8px 0;
+    }
+    .toggle-icon {
+      float: right;
+      font-size: 12px;
+      transition: transform 0.3s ease;
+    }
+    .panel.collapsed .toggle-icon {
+      transform: rotate(180deg);
+    }
     .muted{color:var(--muted); font-size:13px; margin:6px 0 0; line-height:1.35;}
     .row{display:flex; gap:8px; align-items:center; margin-top:10px;}
 
@@ -96,9 +115,6 @@
     .er-row b{font-weight:800;}
 
     /* ===== Responsive Panel Minimieren ===== */
-    /* Desktop/Website: alles sichtbar (Standard) */
-
-    /* Mobile & kleine Screens: standardmäßig kompakt, per Titel klickbar */
     @media (max-width: 900px){
       .panel{
         left:8px; top:8px;
@@ -135,7 +151,10 @@
   <div id="map"></div>
 
   <div class="panel">
-    <p class="title">EcoRide – Live-Karte</p>
+    <p class="title">
+      EcoRide – Live-Karte
+      <span class="toggle-icon">▼</span>
+    </p>
 
     <p class="muted">
       Zeigt Live-Positionen aus <code>live_positions</code> (Supabase Realtime).
@@ -248,10 +267,8 @@
     const titleEl = document.querySelector(".panel .title");
 
     if (panel && titleEl) {
-      titleEl.style.cursor = "pointer";
-      titleEl.title = "Tippen zum Öffnen / Schließen";
       titleEl.addEventListener("click", () => {
-        panel.classList.toggle("open");
+        panel.classList.toggle("collapsed");
       });
     }
 
