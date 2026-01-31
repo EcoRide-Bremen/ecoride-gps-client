@@ -63,6 +63,7 @@
       align-items: center;
       justify-content: center;
       height: 32px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     }
 
     .toggle-icon {
@@ -109,11 +110,13 @@
       outline: none;
       text-align: center;
       font-size: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     }
 
     input::placeholder {
       color: var(--muted);
       text-align: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     }
 
     .button-group {
@@ -133,6 +136,7 @@
       cursor: pointer;
       flex: 1;
       font-size: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     }
 
     button.secondary {
@@ -146,6 +150,7 @@
       display: flex;
       justify-content: space-between;
       gap: 10px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
       opacity: 1;
       transition: opacity 0.3s ease;
     }
@@ -184,10 +189,15 @@
       color: var(--muted);
       font-size: 12px;
       display: none;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     }
 
     .hint.show {
       display: block;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     }
 
     /* Popup-Stil */
@@ -198,25 +208,47 @@
       padding: 12px 14px !important;
       box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35) !important;
       font-size: 14px !important;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif !important;
     }
-    .mapboxgl-popup-close-button { color:#0b0f14 !important; font-size: 18px !important; }
-    .mapboxgl-popup-tip { border-top-color: #ffffff !important; }
 
-    .er-popup { line-height: 1.35; }
-    .er-tag{
-      display:inline-block;
-      font-size:11px;
-      font-weight:800;
-      letter-spacing:.06em;
-      text-transform:uppercase;
-      padding:3px 10px;
-      border-radius:999px;
-      background:#ffeaa7;
-      color:#111;
-      margin-bottom:8px;
+    .mapboxgl-popup-close-button {
+      color: #0b0f14 !important;
+      font-size: 18px !important;
     }
-    .er-row{display:flex; gap:8px; align-items:center; margin-top:4px;}
-    .er-row b{font-weight:800;}
+
+    .mapboxgl-popup-tip {
+      border-top-color: #ffffff !important;
+    }
+
+    .er-popup {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      line-height: 1.35;
+    }
+
+    .er-tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: #ffeaa7;
+      color: #111;
+      margin-bottom: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+
+    .er-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-top: 4px;
+    }
+
+    .er-row b {
+      font-weight: 800;
+    }
 
     /* Mobile Anpassungen */
     @media (max-width: 900px) {
@@ -224,6 +256,7 @@
         left: 20px;
         right: 20px;
         width: auto;
+        background: rgba(17, 24, 37, 0.5);
       }
     }
   </style>
@@ -280,29 +313,36 @@
       hintBox.textContent = msg;
       hintBox.classList.add("show");
     }
+
     function hideHint() {
       hintBox.classList.remove("show");
       hintBox.textContent = "";
     }
+
     function setRealtime(on) {
       rtDot.classList.toggle("on", on);
       rtTxt.textContent = "Realtime: " + (on ? "AN" : "AUS");
     }
+
     function setLast() {
       lastTxt.textContent = new Date().toLocaleString("de-DE");
     }
+
     function setCount(n) {
       countTxt.textContent = "Marker: " + n;
     }
+
     function escapeHtml(str) {
       return String(str ?? "").replace(/[&<>"']/g, s => ({
         "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
       }[s]));
     }
+
     function getFilterFromURL() {
       const u = new URL(location.href);
       return (u.searchParams.get("driverId") || "").trim();
     }
+
     function setURLFilter(f) {
       const u = new URL(location.href);
       if (f) u.searchParams.set("driverId", f);
@@ -310,16 +350,12 @@
       history.replaceState(null, "", u.toString());
     }
 
-    // ✅ Neu: normalisiert Driver IDs robust (trim + lowercase + string)
-    function normId(v){
-      return String(v ?? "").trim().toLowerCase();
-    }
-
     /***** 3) Supabase Client *****/
     if (!window.supabase || !window.supabase.createClient) {
       showHint("Supabase SDK lädt nicht. Prüfe Netzwerk/Adblocker.");
       console.error("Supabase SDK missing");
     }
+
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: { persistSession: false }
     });
@@ -328,19 +364,17 @@
     let map;
     let channel = null;
     const markers = new Map(); // driver_id -> Marker
-
     let currentFilter = "";
-    let currentFilterNorm = "";
 
     // ===== Follow Fahrer (auto wenn Filter gesetzt) =====
-    let followDriverId = ""; // normiert
+    let followDriverId = "";
     const FOLLOW_ZOOM = 15;
     const FOLLOW_DURATION = 650;
 
     function followIfNeeded(driverId, pos) {
       if (!map) return;
       if (!followDriverId) return;
-      if (normId(driverId) !== followDriverId) return;
+      if (driverId !== followDriverId) return;
       if (!Array.isArray(pos) || pos.length !== 2) return;
 
       map.easeTo({
@@ -350,22 +384,15 @@
       });
     }
 
-    // ===== Panel ein- und ausklappen (nur collapsed, kein open) =====
+    // ===== Panel ein- und ausklappen =====
     const panel = document.querySelector(".panel");
     const titleEl = document.querySelector(".panel .title");
-    const iconEl = document.querySelector(".toggle-icon");
-
-    function syncPanelIcon(){
-      if (!panel || !iconEl) return;
-      iconEl.textContent = panel.classList.contains("collapsed") ? "▲" : "▼";
-    }
 
     if (panel && titleEl) {
       titleEl.addEventListener("click", () => {
+        panel.classList.toggle("open");
         panel.classList.toggle("collapsed");
-        syncPanelIcon();
       });
-      syncPanelIcon();
     }
 
     // ===== TTL / Marker Cleanup =====
@@ -384,16 +411,12 @@
 
     function upsertMarker(row) {
       if (!row || row.lat == null || row.lng == null) return;
+      if (currentFilter && row.driver_id !== currentFilter) return;
 
-      const driverIdRaw = row.driver_id ?? "";
-      const driverIdNorm = normId(driverIdRaw);
-
-      if (currentFilterNorm && driverIdNorm !== currentFilterNorm) return;
-
-      const driverId = String(driverIdRaw || "unknown").trim();
+      const driverId = row.driver_id || "unknown";
       const pos = [Number(row.lng), Number(row.lat)];
 
-      let m = markers.get(driverIdNorm); // ✅ key ist normiert
+      let m = markers.get(driverId);
       if (!m) {
         const el = document.createElement("div");
         el.className = "marker";
@@ -419,12 +442,12 @@
           `))
           .addTo(map);
 
-        markers.set(driverIdNorm, m);
+        markers.set(driverId, m);
         setCount(markers.size);
 
       } else {
         const cur = m.getLngLat();
-        anim.set(driverIdNorm, {
+        anim.set(driverId, {
           from: [cur.lng, cur.lat],
           to: pos,
           t0: performance.now(),
@@ -434,7 +457,7 @@
       }
 
       const t = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
-      lastSeen.set(driverIdNorm, Number.isFinite(t) ? t : Date.now());
+      lastSeen.set(driverId, Number.isFinite(t) ? t : Date.now());
 
       setLast();
       followIfNeeded(driverId, pos);
@@ -444,9 +467,9 @@
       const now = performance.now();
       let active = false;
 
-      for (const [driverKey, a] of anim.entries()) {
-        const m = markers.get(driverKey);
-        if (!m) { anim.delete(driverKey); continue; }
+      for (const [driverId, a] of anim.entries()) {
+        const m = markers.get(driverId);
+        if (!m) { anim.delete(driverId); continue; }
 
         const t = Math.min(1, (now - a.t0) / a.dur);
         const lng = a.from[0] + (a.to[0] - a.from[0]) * t;
@@ -454,27 +477,27 @@
 
         m.setLngLat([lng, lat]);
 
-        if (t >= 1) anim.delete(driverKey);
+        if (t >= 1) anim.delete(driverId);
         else active = true;
       }
 
       if (active) requestAnimationFrame(tickAnim);
     }
 
-    function removeMarker(driverKey) {
-      const m = markers.get(driverKey);
+    function removeMarker(driverId) {
+      const m = markers.get(driverId);
       if (!m) return;
       m.remove();
-      markers.delete(driverKey);
-      lastSeen.delete(driverKey);
+      markers.delete(driverId);
+      lastSeen.delete(driverId);
       setCount(markers.size);
       setLast();
     }
 
     setInterval(() => {
       const now = Date.now();
-      for (const [driverKey, ts] of lastSeen.entries()) {
-        if ((now - ts) > TTL_MS) removeMarker(driverKey);
+      for (const [driverId, ts] of lastSeen.entries()) {
+        if ((now - ts) > TTL_MS) removeMarker(driverId);
       }
     }, 3000);
 
@@ -490,7 +513,6 @@
       if (currentFilter) q = q.eq("driver_id", currentFilter);
 
       const { data, error } = await q;
-
       if (error) {
         console.error("Supabase fetch error:", error);
         showHint("Supabase: Fehler beim Laden. (RLS/Policy?) Siehe Konsole.");
@@ -500,10 +522,9 @@
 
       const seen = new Set();
       for (const row of (data || [])) {
-        const key = normId(row.driver_id);
-        if (!key) continue;
-        if (seen.has(key)) continue;
-        seen.add(key);
+        if (!row.driver_id) continue;
+        if (seen.has(row.driver_id)) continue;
+        seen.add(row.driver_id);
         upsertMarker(row);
       }
 
@@ -541,8 +562,7 @@
         .on("postgres_changes", { event: "*", schema: "public", table: "live_positions" }, (payload) => {
           if (payload.eventType === "DELETE") {
             const oldRow = payload.old || {};
-            const k = normId(oldRow.driver_id);
-            if (k) removeMarker(k);
+            if (oldRow.driver_id) removeMarker(oldRow.driver_id);
             return;
           }
           const row = payload.new || {};
@@ -574,13 +594,10 @@
 
       map.on("load", async () => {
         hideHint();
-
         currentFilter = getFilterFromURL();
-        currentFilterNorm = normId(currentFilter);
-
         driverFilter.value = currentFilter;
 
-        followDriverId = currentFilterNorm;
+        followDriverId = currentFilter || "";
 
         await fetchLatest();
         subscribe();
@@ -589,11 +606,9 @@
 
     $("btnApply").addEventListener("click", async () => {
       currentFilter = driverFilter.value.trim();
-      currentFilterNorm = normId(currentFilter);
-
       setURLFilter(currentFilter);
 
-      followDriverId = currentFilterNorm;
+      followDriverId = currentFilter || "";
 
       await fetchLatest();
     });
@@ -601,7 +616,6 @@
     $("btnAll").addEventListener("click", async () => {
       driverFilter.value = "";
       currentFilter = "";
-      currentFilterNorm = "";
       setURLFilter("");
 
       followDriverId = "";
