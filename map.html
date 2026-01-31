@@ -41,13 +41,14 @@
       padding: 12px;
       width: min(350px, calc(100vw - 40px));
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-      transition: max-height 0.3s ease;
+      transition: max-height 0.3s ease, padding 0.3s ease;
       overflow: hidden;
       max-height: 400px;
     }
 
     .panel.collapsed {
-      max-height: 50px;
+      max-height: 48px;
+      padding: 6px 12px;
     }
 
     .title {
@@ -82,6 +83,12 @@
       gap: 12px;
       margin-top: 12px;
       width: 100%;
+      opacity: 1;
+      transition: opacity 0.3s ease;
+    }
+
+    .panel.collapsed .row {
+      display: none;
     }
 
     .input-button-group {
@@ -144,6 +151,12 @@
       justify-content: space-between;
       gap: 10px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      opacity: 1;
+      transition: opacity 0.3s ease;
+    }
+
+    .panel.collapsed .stat {
+      display: none;
     }
 
     .dot {
@@ -243,7 +256,6 @@
         left: 20px;
         right: 20px;
         width: auto;
-        background: rgba(17, 24, 37, 0.6);
       }
     }
   </style>
