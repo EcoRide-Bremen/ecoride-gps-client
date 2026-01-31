@@ -43,13 +43,16 @@
       cursor: pointer;
       user-select: none;
       padding: 8px 0;
-      font-size: 24px; /* Schriftgröße erhöht */
-      text-align: center; /* Zentriert für alle Ansichten */
+      font-size: 24px;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .toggle-icon {
-      float: right;
       font-size: 12px;
       transition: transform 0.3s ease;
+      margin-left: 8px;
     }
     .panel.collapsed .toggle-icon {
       transform: rotate(180deg);
@@ -126,7 +129,7 @@
       .panel {
         left: 50%;
         top: 10px;
-        transform: translateX(-50%); /* Zentriert das Panel horizontal */
+        transform: translateX(-50%);
         width: 90%;
         max-height: 50px;
         background: rgba(17, 24, 37, 0.7);
@@ -137,7 +140,7 @@
       }
 
       .panel .title {
-        font-size: 18px; /* Schriftgröße für Mobile erhöht */
+        font-size: 18px;
         margin: 0;
         padding: 8px 0;
       }
