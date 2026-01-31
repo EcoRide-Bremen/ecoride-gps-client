@@ -28,16 +28,17 @@
       box-shadow: 0 10px 30px rgba(0,0,0,.35);
       transition: max-height 0.3s ease;
       overflow: hidden;
-      max-height: 250px;
+      max-height: 400px;
     }
     .panel.collapsed {
-      max-height: 35px;
+      max-height: 40px;
     }
     .title{
       font-weight:800; letter-spacing:.2px; margin:0;
       cursor: pointer;
       user-select: none;
       padding: 8px 0;
+      font-size: 20px;
     }
     .toggle-icon {
       float: right;
@@ -114,34 +115,57 @@
     .er-row{display:flex; gap:8px; align-items:center; margin-top:4px;}
     .er-row b{font-weight:800;}
 
-    /* ===== Responsive Panel Minimieren ===== */
-    @media (max-width: 900px){
-      .panel{
-        left:8px; top:8px;
-        width: calc(100vw - 16px);
-        max-width: calc(100vw - 16px);
-        padding: 10px;
+    /* ===== Mobile Anpassungen ===== */
+    @media (max-width: 900px) {
+      .panel {
+        left: 5%;
+        top: 10px;
+        width: 90%;
+        max-height: 50px;
+        background: rgba(17, 24, 37, 0.9);
+        backdrop-filter: blur(8px);
+        border-radius: 10px;
+        padding: 8px;
       }
 
-      /* standardmäßig minimiert */
+      .panel.open {
+        max-height: 300px;
+      }
+
+      .panel .title {
+        font-size: 16px;
+        margin: 0;
+        padding: 8px 0;
+      }
+
       .panel .muted,
       .panel .row,
       .panel .stat,
-      .panel .hint{
-        display:none;
+      .panel .hint {
+        display: none;
       }
 
-      .panel .title{
-        font-size: 14px;
-        margin: 0;
-      }
-
-      /* geöffnet */
       .panel.open .muted,
       .panel.open .row,
       .panel.open .stat,
-      .panel.open .hint{
-        display:block;
+      .panel.open .hint {
+        display: block;
+      }
+
+      .panel.open input {
+        width: 60%;
+        font-size: 14px;
+        padding: 8px;
+      }
+
+      .panel.open button {
+        padding: 8px 10px;
+        font-size: 14px;
+      }
+
+      .panel.open .stat {
+        font-size: 12px;
+        margin-top: 6px;
       }
     }
   </style>
@@ -262,12 +286,13 @@
       });
     }
 
-    // ===== Responsive Panel: Titel klickbar (öffnet/schließt auf kleinen Screens) =====
+    // ===== Panel ein- und ausklappen =====
     const panel = document.querySelector(".panel");
     const titleEl = document.querySelector(".panel .title");
 
     if (panel && titleEl) {
       titleEl.addEventListener("click", () => {
+        panel.classList.toggle("open");
         panel.classList.toggle("collapsed");
       });
     }
