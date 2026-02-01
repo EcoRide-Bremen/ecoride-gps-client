@@ -92,10 +92,10 @@
     const SUPABASE_ANON_KEY = "SUPABASE_KEY_PLACEHOLDER";
 
     // TTL / Pruning
-    const STALE_MS = 120_000;        // Marker älter als 60s entfernen
-    const PRUNE_EVERY_MS = 10_000;  // alle 10s prüfen
+    const STALE_MS = 120_000;        // 2 Minuten: Fahrer ohne Update -> weg
+    const PRUNE_EVERY_MS = 10_000;   // alle 10s prüfen
 
-    // --- 2. Helper-Funktionen (sichere DOM-Manipulation) ---
+    // --- 2. Helper-Funktionen ---
     function setSafeTextContent(id, text) {
       const el = document.getElementById(id);
       if (el) el.textContent = text ?? "";
@@ -166,13 +166,13 @@
     let map;
     let channel = null;
 
-    const markers = new Map();
-    const lastSeen = new Map();
+    const markers = new Map();   // driverKey -> mapboxgl.Marker
+    const lastSeen = new Map();  // driverKey -> timestamp(ms)
 
     let currentFilter = "";
     let currentFilterKey = "";
 
-    // --- 5. Core-Funktionen ---
+    // --- 5. UI ---
     function setRealtime(on) {
       const rtDot = document.getElementById("rtDot");
       const rtTxt = document.getElementById("rtTxt");
@@ -199,7 +199,7 @@
       setCount(0);
     }
 
-    // --- 6. Initialisierung ---
+    // --- 6. Init ---
     function initMap() {
       map = initMapbox();
       if (!map) return;
@@ -215,7 +215,6 @@
         await fetchLatest();
       });
 
-      // Konsistenzpunkt: wie bei den anderen -> optional chaining
       document.getElementById("btnAll")?.addEventListener("click", async () => {
         const df = document.getElementById("driverFilter");
         if (df) df.value = "";
@@ -228,11 +227,15 @@
       subscribe();
     }
 
-    // --- 7. Supabase-Realtime & Datenladen ---
+    // --- 7. Initial Load: nur aktive Fahrer ---
     async function fetchLatest() {
+      const now = Date.now();
+      const cutoff = new Date(now - STALE_MS).toISOString();
+
       const { data, error } = await sb
         .from("live_positions")
         .select("driver_id, lat, lng, updated_at")
+        .gte("updated_at", cutoff) // nur "aktive" Daten
         .order("updated_at", { ascending: false })
         .limit(200);
 
@@ -242,7 +245,6 @@
         return;
       }
 
-      // WICHTIG: erst nach erfolgreichem Fetch löschen
       clearMarkers();
 
       const seen = new Set();
@@ -256,6 +258,7 @@
       setLast();
     }
 
+    // --- 8. Realtime: patch statt reset ---
     function subscribe() {
       if (channel) sb.removeChannel(channel);
 
@@ -266,6 +269,7 @@
           table: "live_positions"
         }, (payload) => {
           if (payload?.eventType === "INSERT" || payload?.eventType === "UPDATE") {
+            // ✅ KEIN clearMarkers() hier -> aktive Fahrer bleiben sichtbar
             upsertMarker(payload.new);
           } else if (payload?.eventType === "DELETE") {
             removeMarker(normId(payload.old?.driver_id));
@@ -285,13 +289,14 @@
       setRealtime(false);
     }
 
-    // --- 8. Marker-Logik ---
+    // --- 9. Marker-Logik ---
     function upsertMarker(row) {
       if (!map || !row?.driver_id) return;
 
       const driverKey = normId(row.driver_id);
       if (!driverKey) return;
 
+      // UI-Filter
       if (currentFilterKey && driverKey !== currentFilterKey) return;
 
       const lat = Number(row.lat);
@@ -303,6 +308,13 @@
       }
 
       const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
+
+      // Nur aktiv anzeigen: falls doch mal ein altes Update reinflattert
+      if (Date.now() - ts > STALE_MS) {
+        removeMarker(driverKey);
+        return;
+      }
+
       const timeStr = row.updated_at ? new Date(row.updated_at).toLocaleTimeString("de-DE") : "–";
 
       let marker = markers.get(driverKey);
@@ -345,17 +357,18 @@
       }
     }
 
-    // --- 9. TTL-Check / Pruning (Konstanten statt Magic Numbers) ---
+    // --- 10. TTL-Check / Pruning (entfernt inaktive Fahrer) ---
     setInterval(() => {
+      if (lastSeen.size === 0) return;
+
       const now = Date.now();
       for (const [driverKey, ts] of lastSeen.entries()) {
         if (now - ts > STALE_MS) removeMarker(driverKey);
       }
     }, PRUNE_EVERY_MS);
 
-    // --- 10. Start ---
+    // --- 11. Start ---
     document.addEventListener("DOMContentLoaded", initMap);
   </script>
 </body>
 </html>
-
