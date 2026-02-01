@@ -203,13 +203,12 @@
         await fetchLatest();
       });
 
-      document.getElementById("btnAll")?.addEventListener("click", async () => {
-        // Null-safe
-        document.getElementById("driverFilter")?.value = "";
-        currentFilter = "";
-        currentFilterKey = "";
-        await fetchLatest();
-      });
+      document.getElementById("btnAll").addEventListener("click", async () => {
+  document.getElementById("driverFilter")?.value = "";  // ✅ Korrekt: Innerhalb eines Codeblocks
+  currentFilter = "";
+  currentFilterKey = "";
+  await fetchLatest();
+});
 
       // Initiales Laden (auch ohne Realtime)
       fetchLatest().catch((e) => logError("Initial fetchLatest() fehlgeschlagen:", e));
@@ -355,6 +354,7 @@
   </script>
 </body>
 </html>
+
 
 
 
