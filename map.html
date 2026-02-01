@@ -184,15 +184,21 @@
   box-shadow: 0 10px 22px rgba(0,0,0,.16);
 }
 
-/* Sicherheit: überschreibt secondary */
-button#btnAll{
-  color:#e5e7eb !important;
+/* Button "Alle" = optisch identisch zum Driver-ID Input */
+button#btnAll.btn-like-input{
+  background: rgba(17,24,37,0.28) !important;
+  border: 1px solid rgba(199,223,58,0.18) !important;
+  color: #e5e7eb !important;
+
+  height: 32px;                /* exakt wie input */
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 400;
+  backdrop-filter: blur(10px);
+  box-shadow: none !important;
 }
 
-    /* Button "Alle" = gleiche Schriftfarbe wie Driver ID */
-.btn-like-input{
-  color: #e5e7eb !important;
-}
 
     input::placeholder{
       color:#9aa9c3;
@@ -734,6 +740,7 @@ button#btnAll{
   </script>
 </body>
 </html>
+
 
 
 
