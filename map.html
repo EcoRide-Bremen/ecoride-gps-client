@@ -318,12 +318,11 @@
 
       const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
 
-      // Prüfe, ob der Marker bereits existiert und veraltet ist
-      const existingMarker = markers.get(driverKey);
-      if (existingMarker && Date.now() - ts > STALE_MS) {
-        removeMarker(driverKey);
-        return;
-      }
+// Alte (stale) Updates grundsätzlich ignorieren
+if (Date.now() - ts > STALE_MS) {
+  removeMarker(driverKey); // falls er existiert
+  return;
+}
 
       const timeStr = row.updated_at ? new Date(row.updated_at).toLocaleTimeString("de-DE") : "–";
 
@@ -388,3 +387,4 @@
   </script>
 </body>
 </html>
+
