@@ -87,13 +87,14 @@
     // --- 1. Konfiguration & Debug-Modus ---
     const DEBUG = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
 
+    // API-Keys (ersetze mit deinen eigenen)
     const MAPBOX_TOKEN = "MAPBOX_TOKEN_PLACEHOLDER";
     const SUPABASE_URL = "https://ihpszsoivqcrkkiucjvv.supabase.co";
     const SUPABASE_ANON_KEY = "SUPABASE_KEY_PLACEHOLDER";
 
     // TTL / Pruning
     const STALE_MS = 120_000;        // 2 Minuten: Fahrer ohne Update -> weg
-    const PRUNE_EVERY_MS = 10_000;   // alle 10s prüfen
+    const PRUNE_EVERY_MS = 10_000;   // Alle 10 Sekunden prüfen
 
     // --- 2. Helper-Funktionen ---
     function setSafeTextContent(id, text) {
@@ -132,7 +133,6 @@
       }
 
       mapboxgl.accessToken = MAPBOX_TOKEN;
-
       const map = new mapboxgl.Map({
         container: "map",
         style: "mapbox://styles/mapbox/streets-v12",
@@ -162,17 +162,14 @@
     }
 
     const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
     let map;
     let channel = null;
-
     const markers = new Map();   // driverKey -> mapboxgl.Marker
     const lastSeen = new Map();  // driverKey -> timestamp(ms)
-
     let currentFilter = "";
     let currentFilterKey = "";
 
-    // --- 5. UI ---
+    // --- 5. UI-Funktionen ---
     function setRealtime(on) {
       const rtDot = document.getElementById("rtDot");
       const rtTxt = document.getElementById("rtTxt");
@@ -199,7 +196,7 @@
       setCount(0);
     }
 
-    // --- 6. Init ---
+    // --- 6. Initialisierung ---
     function initMap() {
       map = initMapbox();
       if (!map) return;
@@ -235,7 +232,7 @@
       const { data, error } = await sb
         .from("live_positions")
         .select("driver_id, lat, lng, updated_at")
-        .gte("updated_at", cutoff) // nur "aktive" Daten
+        .gte("updated_at", cutoff) // Nur aktuelle Daten laden
         .order("updated_at", { ascending: false })
         .limit(200);
 
@@ -245,13 +242,26 @@
         return;
       }
 
-      clearMarkers();
-
       const seen = new Set();
+      const newMarkers = new Map();
+
+      // Sammle alle neuen Marker-Daten
       for (const row of data || []) {
         const driverKey = normId(row?.driver_id);
         if (!driverKey || seen.has(driverKey)) continue;
         seen.add(driverKey);
+        newMarkers.set(driverKey, row);
+      }
+
+      // Entferne nur Marker, die nicht mehr in den neuen Daten vorhanden sind
+      for (const [driverKey] of markers.entries()) {
+        if (!newMarkers.has(driverKey)) {
+          removeMarker(driverKey);
+        }
+      }
+
+      // Füge neue Marker hinzu oder aktualisiere bestehende
+      for (const [driverKey, row] of newMarkers.entries()) {
         upsertMarker(row);
       }
 
@@ -269,8 +279,7 @@
           table: "live_positions"
         }, (payload) => {
           if (payload?.eventType === "INSERT" || payload?.eventType === "UPDATE") {
-            // ✅ KEIN clearMarkers() hier -> aktive Fahrer bleiben sichtbar
-            upsertMarker(payload.new);
+            upsertMarker(payload.new); // Kein clearMarkers() hier -> aktive Fahrer bleiben sichtbar
           } else if (payload?.eventType === "DELETE") {
             removeMarker(normId(payload.old?.driver_id));
           }
@@ -309,8 +318,9 @@
 
       const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
 
-      // Nur aktiv anzeigen: falls doch mal ein altes Update reinflattert
-      if (Date.now() - ts > STALE_MS) {
+      // Prüfe, ob der Marker bereits existiert und veraltet ist
+      const existingMarker = markers.get(driverKey);
+      if (existingMarker && Date.now() - ts > STALE_MS) {
         removeMarker(driverKey);
         return;
       }
@@ -362,9 +372,15 @@
       if (lastSeen.size === 0) return;
 
       const now = Date.now();
+      const staleKeys = [];
+
       for (const [driverKey, ts] of lastSeen.entries()) {
-        if (now - ts > STALE_MS) removeMarker(driverKey);
+        if (now - ts > STALE_MS) {
+          staleKeys.push(driverKey);
+        }
       }
+
+      staleKeys.forEach(driverKey => removeMarker(driverKey));
     }, PRUNE_EVERY_MS);
 
     // --- 11. Start ---
