@@ -86,9 +86,14 @@
   <script>
     // --- 1. Konfiguration & Debug-Modus ---
     const DEBUG = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-    const MAPBOX_TOKEN = "MAPBOX_TOKEN_PLACEHOLDER"; // Ersetze mit deinem Token
-    const SUPABASE_URL = "https://ihpszsoivqcrkkiucjvv.supabase.co"; // Ersetze mit deiner URL
-    const SUPABASE_ANON_KEY = "SUPABASE_KEY_PLACEHOLDER"; // Ersetze mit deinem Key
+
+    const MAPBOX_TOKEN = "MAPBOX_TOKEN_PLACEHOLDER";
+    const SUPABASE_URL = "https://ihpszsoivqcrkkiucjvv.supabase.co";
+    const SUPABASE_ANON_KEY = "SUPABASE_KEY_PLACEHOLDER";
+
+    // TTL / Pruning
+    const STALE_MS = 60_000;        // Marker älter als 60s entfernen
+    const PRUNE_EVERY_MS = 10_000;  // alle 10s prüfen
 
     // --- 2. Helper-Funktionen (sichere DOM-Manipulation) ---
     function setSafeTextContent(id, text) {
@@ -127,6 +132,7 @@
       }
 
       mapboxgl.accessToken = MAPBOX_TOKEN;
+
       const map = new mapboxgl.Map({
         container: "map",
         style: "mapbox://styles/mapbox/streets-v12",
@@ -156,10 +162,13 @@
     }
 
     const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
     let map;
     let channel = null;
+
     const markers = new Map();
     const lastSeen = new Map();
+
     let currentFilter = "";
     let currentFilterKey = "";
 
@@ -206,7 +215,8 @@
         await fetchLatest();
       });
 
-      document.getElementById("btnAll").addEventListener("click", async () => {
+      // Konsistenzpunkt: wie bei den anderen -> optional chaining
+      document.getElementById("btnAll")?.addEventListener("click", async () => {
         const df = document.getElementById("driverFilter");
         if (df) df.value = "";
         currentFilter = "";
@@ -220,8 +230,6 @@
 
     // --- 7. Supabase-Realtime & Datenladen ---
     async function fetchLatest() {
-      clearMarkers(); // Alte Marker löschen
-
       const { data, error } = await sb
         .from("live_positions")
         .select("driver_id, lat, lng, updated_at")
@@ -234,6 +242,9 @@
         return;
       }
 
+      // WICHTIG: erst nach erfolgreichem Fetch löschen
+      clearMarkers();
+
       const seen = new Set();
       for (const row of data || []) {
         const driverKey = normId(row?.driver_id);
@@ -241,6 +252,7 @@
         seen.add(driverKey);
         upsertMarker(row);
       }
+
       setLast();
     }
 
@@ -284,6 +296,7 @@
 
       const lat = Number(row.lat);
       const lng = Number(row.lng);
+
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
         logError("Ungültige Koordinaten für Driver:", driverKey, row);
         return;
@@ -293,6 +306,7 @@
       const timeStr = row.updated_at ? new Date(row.updated_at).toLocaleTimeString("de-DE") : "–";
 
       let marker = markers.get(driverKey);
+
       if (!marker) {
         const el = document.createElement("div");
         el.className = "marker";
@@ -321,6 +335,7 @@
 
     function removeMarker(driverKey) {
       if (!driverKey) return;
+
       const marker = markers.get(driverKey);
       if (marker) {
         marker.remove();
@@ -330,15 +345,13 @@
       }
     }
 
-    // --- 9. TTL-Check für Marker (60 Sekunden) ---
+    // --- 9. TTL-Check / Pruning (Konstanten statt Magic Numbers) ---
     setInterval(() => {
       const now = Date.now();
       for (const [driverKey, ts] of lastSeen.entries()) {
-        if ((now - ts) > 60000) { // 60 Sekunden TTL
-          removeMarker(driverKey);
-        }
+        if (now - ts > STALE_MS) removeMarker(driverKey);
       }
-    }, 10000);
+    }, PRUNE_EVERY_MS);
 
     // --- 10. Start ---
     document.addEventListener("DOMContentLoaded", initMap);
