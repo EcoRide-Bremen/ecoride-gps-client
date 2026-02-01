@@ -35,6 +35,9 @@
       /* EcoRide glow */
       --glow: rgba(199,223,58,0.22);
       --glowStrong: rgba(199,223,58,0.36);
+
+      /* Wunsch: Status/Titel schwarz */
+      --ink: #111;
     }
 
     html, body{
@@ -77,33 +80,37 @@
       padding: 10px 12px;
     }
 
-.title{
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-               Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    .title{
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                   Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      font-weight: 600;
+      font-size: 15px;
+      letter-spacing: 0.2px;
 
-  font-weight: 600;
-  font-size: 15px;
-  letter-spacing: 0.2px;
-  color: #e5e7eb;
+      /* Wunsch: schwarz */
+      color: var(--ink);
 
-  margin: 0;
-  padding: 6px 0;
+      margin: 0;
+      padding: 6px 0;
 
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
 
-  text-align: center;
-  cursor: pointer;
-  user-select: none;
-}
+      text-align: center;
+      cursor: pointer;
+      user-select: none;
+    }
 
- .toggle-icon{
+    .toggle-icon{
       font-size: 12px;
       opacity: .9;
       transition: transform .25s ease;
       margin-left: 10px;
+
+      /* Wunsch: schwarz */
+      color: var(--ink);
     }
     .panel.collapsed .toggle-icon{
       transform: rotate(180deg);
@@ -116,14 +123,13 @@
       line-height: 1.35;
     }
 
-.row{
-  display:flex;
-  flex-direction:column;
-  gap:8px;          /* weniger vertikaler Abstand */
-  margin-top:8px;   /* vorher 12px */
-  width:100%;
-}
-
+    .row{
+      display:flex;
+      flex-direction:column;
+      gap:8px;          /* weniger vertikaler Abstand */
+      margin-top:8px;   /* vorher 12px */
+      width:100%;
+    }
 
     /* alles außer Titel ausblenden, wenn collapsed */
     .panel.collapsed .muted,
@@ -151,11 +157,7 @@
       margin: 0 auto;
     }
 
-    /* ===== Golden Ratio (Desktop) =====
-       Input-H = 32px (Basis)
-       Button-H = 32/φ ≈ 20px
-       Gaps ~ 12px
-    */
+    /* ===== Golden Ratio (Desktop) ===== */
     input{
       width:100%;
       background: rgba(17,24,37,0.28);
@@ -199,27 +201,34 @@
     }
     button:active{ transform: translateY(1px); }
 
+    /* ✅ Wunsch: Button "Alle" wie Driver-ID Feld */
     button.secondary{
-      background: var(--secondaryBg);
-      color: #d1d5db;
-      border: 1px solid var(--secondaryBorder);
-      backdrop-filter: blur(8px);
+      background: rgba(17,24,37,0.28);                 /* wie input */
+      border: 1px solid rgba(199,223,58,0.18);         /* wie input */
+      color: #e5e7eb;
+      backdrop-filter: blur(10px);
       box-shadow: 0 10px 22px rgba(0,0,0,.16);
     }
     button.secondary:hover{
       filter: brightness(1.05);
     }
 
-.stat{
-  margin-top:8px;        /* ruhiger */
-  font-size:12.5px;     /* weniger dominant */
-  color:var(--muted);
-  display:flex;
-  justify-content:space-between;
-  gap:8px;
-  opacity:0.85;         /* optisch zurückgenommen */
-}
-
+    /* ✅ Wunsch: Statuszeile schwarz + ruhiger */
+    .stat{
+      margin-top:8px;
+      font-size:12.5px;
+      color: var(--ink);
+      display:flex;
+      justify-content:space-between;
+      gap:8px;
+      opacity:0.85;
+    }
+    .stat span,
+    #lastTxt,
+    #countTxt,
+    #rtTxt{
+      color: var(--ink);
+    }
 
     .dot{
       display:inline-block;
@@ -282,7 +291,7 @@
     .er-row{ display:flex; gap:8px; align-items:center; margin-top:4px; }
     .er-row b{ font-weight:900; }
 
-    /* Mobile: Touch-friendly, aber Desktop bleibt goldener Schnitt */
+    /* Mobile */
     @media (max-width: 900px){
       .panel{
         left:12px;
@@ -318,12 +327,15 @@
 
     <div class="row">
       <div class="input-button-group">
-        <input id="driverFilter" placeholder="Driver ID (leer = alle)" />
+        <!-- ✅ Wunsch: nur "Driver ID" -->
+        <input id="driverFilter" placeholder="Driver ID" />
       </div>
 
       <div class="button-group">
         <button id="btnApply">Anwenden</button>
-        <button id="btnAll" class="secondary">Alle</button>
+        <!-- ✅ Optional: Text so, dass klar ist: Alle = leer
+             Wenn du nur "Alle" willst: einfach "Alle (leer)" -> "Alle" -->
+        <button id="btnAll" class="secondary">Alle (leer)</button>
       </div>
     </div>
 
@@ -698,12 +710,3 @@
   </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
