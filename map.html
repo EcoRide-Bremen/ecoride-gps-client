@@ -26,7 +26,6 @@
     }
     html, body { height:100%; margin:0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
     #map { position:absolute; inset:0; }
-
     .panel { position:absolute; left:20px; top:20px; z-index:5; background: linear-gradient(180deg, var(--panelA), var(--panelB)); backdrop-filter: blur(18px); border: 1px solid var(--line); border-radius: 16px; padding: 12px; width: min(360px, calc(100vw - 40px)); box-shadow: 0 16px 40px rgba(0,0,0,.35); max-height: 460px; transition: max-height .3s ease; }
     .panel.collapsed { max-height: 54px; padding: 10px 12px; }
     .title { font-weight: 600; color: var(--ink); margin: 0; padding: 6px 0; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; }
@@ -39,6 +38,7 @@
     .button-group { width:100%; max-width: 240px; display:flex; gap: 10px; margin: 0 auto; }
     input { width:100%; background: rgba(17,24,37,0.28); border: 1px solid rgba(199,223,58,0.18); height: 32px; padding: 0 14px; border-radius: 999px; font-size: 14px; color: #e5e7eb; text-align: center; }
     button { background: rgba(199,223,58,0.78); color: var(--accentText); height: 32px; padding: 0 14px; border-radius: 999px; font-size: 12.5px; border: none; cursor:pointer; flex:1; }
+    button.secondary { background: rgba(17,24,37,0.28); border: 1px solid rgba(199,223,58,0.18); color: #e5e7eb; backdrop-filter: blur(10px); }
     .stat { margin-top:8px; font-size:12.5px; color: var(--ink); display:flex; justify-content:space-between; gap:8px; opacity:0.85; }
     .dot { display:inline-block; width:10px; height:10px; border-radius:50%; background:#ef4444; margin-right:6px; }
     .dot.on { background:#22c55e; }
@@ -118,36 +118,35 @@
       if (hintBox) hintBox.classList.remove("show");
     }
 
-    // --- 3. Mapbox-Initialisierung (kapselt alle Map-Logik) ---
+    // --- 3. Mapbox-Initialisierung ---
     function initMapbox() {
-       if (!MAPBOX_TOKEN || MAPBOX_TOKEN.includes("DEIN_MAPBOX_TOKEN")) {
+      if (!MAPBOX_TOKEN || MAPBOX_TOKEN.includes("DEIN_MAPBOX_TOKEN")) {
         showHint("Mapbox Token fehlt. Bitte MAPBOX_TOKEN in map.html setzen.");
         logError("MAPBOX_TOKEN ist nicht gesetzt.");
         return null;
       }
 
       mapboxgl.accessToken = MAPBOX_TOKEN;
-
-      const mapInstance = new mapboxgl.Map({
+      const map = new mapboxgl.Map({
         container: "map",
         style: "mapbox://styles/mapbox/streets-v12",
         center: [8.8, 53.1], // Bremen
         zoom: 10,
       });
 
-      mapInstance.addControl(new mapboxgl.NavigationControl(), "bottom-right");
+      map.addControl(new mapboxgl.NavigationControl(), "bottom-right");
 
-      mapInstance.on("load", () => {
+      map.on("load", () => {
         logDebug("Karte erfolgreich geladen");
         hideHint();
       });
 
-      mapInstance.on("error", (e) => {
+      map.on("error", (e) => {
         logError("Mapbox-Fehler:", e?.error || e);
         showHint("Karte konnte nicht geladen werden. Prüfe Token/Internetverbindung.");
       });
 
-      return mapInstance;
+      return map;
     }
 
     // --- 4. Supabase-Client & Globale Variablen ---
@@ -157,17 +156,14 @@
     }
 
     const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    let map = null;
+    let map;
     let channel = null;
-
     const markers = new Map();
     const lastSeen = new Map();
-
     let currentFilter = "";
     let currentFilterKey = "";
 
-    // --- 5. Core-Funktionen (mit Null-Checks) ---
+    // --- 5. Core-Funktionen ---
     function setRealtime(on) {
       const rtDot = document.getElementById("rtDot");
       const rtTxt = document.getElementById("rtTxt");
@@ -187,11 +183,18 @@
       return String(v ?? "").trim().toLowerCase();
     }
 
+    function clearMarkers() {
+      markers.forEach(marker => marker.remove());
+      markers.clear();
+      lastSeen.clear();
+      setCount(0);
+    }
+
     // --- 6. Initialisierung ---
     function initMap() {
-      map = initMapbox(); // Mapbox initialisieren (kann null sein)
+      map = initMapbox();
+      if (!map) return;
 
-      // UI-Event-Listener
       document.getElementById("panelTitle")?.addEventListener("click", () => {
         document.querySelector(".panel")?.classList.toggle("collapsed");
       });
@@ -204,22 +207,21 @@
       });
 
       document.getElementById("btnAll").addEventListener("click", async () => {
-  const df = document.getElementById("driverFilter");
-if (df) df.value = "";
-currentFilter = "";
-currentFilterKey = "";
-await fetchLatest();
-});
+        const df = document.getElementById("driverFilter");
+        if (df) df.value = "";
+        currentFilter = "";
+        currentFilterKey = "";
+        await fetchLatest();
+      });
 
-      // Initiales Laden (auch ohne Realtime)
-      fetchLatest().catch((e) => logError("Initial fetchLatest() fehlgeschlagen:", e));
-
-      // Supabase-Realtime abonnieren
+      fetchLatest().catch(e => logError("Initial fetchLatest() fehlgeschlagen:", e));
       subscribe();
     }
 
     // --- 7. Supabase-Realtime & Datenladen ---
     async function fetchLatest() {
+      clearMarkers(); // Alte Marker löschen
+
       const { data, error } = await sb
         .from("live_positions")
         .select("driver_id, lat, lng, updated_at")
@@ -232,8 +234,6 @@ await fetchLatest();
         return;
       }
 
-      clearMarkers();
-
       const seen = new Set();
       for (const row of data || []) {
         const driverKey = normId(row?.driver_id);
@@ -241,7 +241,6 @@ await fetchLatest();
         seen.add(driverKey);
         upsertMarker(row);
       }
-
       setLast();
     }
 
@@ -274,45 +273,26 @@ await fetchLatest();
       setRealtime(false);
     }
 
-    // --- 8. Marker-Logik (robust) ---
-    function clearMarkers() {
-      markers.forEach(marker => marker.remove());
-      markers.clear();
-      lastSeen.clear();
-      setCount(0);
-    }
-
+    // --- 8. Marker-Logik ---
     function upsertMarker(row) {
-      // Guard: ohne Map nichts zeichnen
-      if (!map) {
-        if (DEBUG) console.warn("[DEBUG] map ist nicht initialisiert – Marker Update übersprungen");
-        return;
-      }
-
-      if (!row?.driver_id) {
-        logError("Ungültige Driver-ID:", row);
-        return;
-      }
+      if (!map || !row?.driver_id) return;
 
       const driverKey = normId(row.driver_id);
       if (!driverKey) return;
 
       if (currentFilterKey && driverKey !== currentFilterKey) return;
 
-      // Robust: Koordinaten als Number prüfen (verhindert toFixed-Crash)
       const lat = Number(row.lat);
       const lng = Number(row.lng);
-
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-        if (DEBUG) console.warn("[DEBUG] Ungültige Koordinaten:", row);
+        logError("Ungültige Koordinaten für Driver:", driverKey, row);
         return;
       }
 
-      const ts = row.updated_at ? new Date(row.updated_at) : new Date();
-      const timeStr = row.updated_at ? ts.toLocaleTimeString("de-DE") : "–";
+      const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
+      const timeStr = row.updated_at ? new Date(row.updated_at).toLocaleTimeString("de-DE") : "–";
 
       let marker = markers.get(driverKey);
-
       if (!marker) {
         const el = document.createElement("div");
         el.className = "marker";
@@ -334,7 +314,7 @@ await fetchLatest();
         marker.setLngLat([lng, lat]);
       }
 
-      lastSeen.set(driverKey, ts.getTime());
+      lastSeen.set(driverKey, ts);
       setCount(markers.size);
       setLast();
     }
@@ -350,13 +330,18 @@ await fetchLatest();
       }
     }
 
-    // --- 9. Start ---
+    // --- 9. TTL-Check für Marker (60 Sekunden) ---
+    setInterval(() => {
+      const now = Date.now();
+      for (const [driverKey, ts] of lastSeen.entries()) {
+        if ((now - ts) > 60000) { // 60 Sekunden TTL
+          removeMarker(driverKey);
+        }
+      }
+    }, 10000);
+
+    // --- 10. Start ---
     document.addEventListener("DOMContentLoaded", initMap);
   </script>
 </body>
 </html>
-
-
-
-
-
