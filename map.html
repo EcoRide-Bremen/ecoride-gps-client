@@ -5,38 +5,30 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>EcoRide – Live-Karte</title>
 
-  <!-- Supabase (global: window.supabase) -->
+  <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <!-- Mapbox GL -->
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.17.0/mapbox-gl.css" rel="stylesheet" />
   <script src="https://api.mapbox.com/mapbox-gl-js/v3.17.0/mapbox-gl.js"></script>
 
+  <!-- Turf.js für Distanzberechnung -->
+  <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+
   <style>
     :root{
-      /* EcoRide GPS-Client Look (keine lila/weiß Akzente) */
       --bg:#0b0f14;
       --text:#eaf0ff;
       --muted:#9aa9c3;
-
-      /* Transparente „Glass“ Card */
       --panelA: rgba(17,24,37,0.45);
       --panelB: rgba(14,19,30,0.38);
       --line: rgba(255,255,255,0.08);
-
-      /* EcoRide Primary */
-      --accent: #c7df3a;            /* EcoRide Lime */
+      --accent: #c7df3a;
       --accentText:#0b0f14;
-
-      /* Secondary (dark glass) */
       --secondaryBg: rgba(31,41,55,0.45);
       --secondaryBorder: rgba(255,255,255,0.06);
-
-      /* EcoRide glow */
       --glow: rgba(199,223,58,0.22);
       --glowStrong: rgba(199,223,58,0.36);
-
-      /* Wunsch: Status/Titel schwarz */
       --ink: #111;
     }
 
@@ -58,46 +50,35 @@
       left:20px;
       top:20px;
       z-index:5;
-
-      /* Transparenz bleibt */
       background: linear-gradient(180deg, var(--panelA), var(--panelB));
       backdrop-filter: blur(18px);
       border: 1px solid var(--line);
       border-radius: 16px;
       padding: 12px;
-
       width: min(360px, calc(100vw - 40px));
       box-shadow: 0 16px 40px rgba(0,0,0,.35);
-
       overflow:hidden;
       transition: max-height .3s ease, padding .3s ease;
       max-height: 460px;
     }
 
-    /* Eingeklappt = nur Kopfzeile */
     .panel.collapsed{
       max-height: 54px;
       padding: 10px 12px;
     }
 
     .title{
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-                   Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
       font-weight: 600;
       font-size: 15px;
       letter-spacing: 0.2px;
-
-      /* Wunsch: schwarz */
       color: var(--ink);
-
       margin: 0;
       padding: 6px 0;
-
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
-
       text-align: center;
       cursor: pointer;
       user-select: none;
@@ -108,8 +89,6 @@
       opacity: .9;
       transition: transform .25s ease;
       margin-left: 10px;
-
-      /* Wunsch: schwarz */
       color: var(--ink);
     }
     .panel.collapsed .toggle-icon{
@@ -126,12 +105,11 @@
     .row{
       display:flex;
       flex-direction:column;
-      gap:8px;          /* weniger vertikaler Abstand */
-      margin-top:8px;   /* vorher 12px */
+      gap:8px;
+      margin-top:8px;
       width:100%;
     }
 
-    /* alles außer Titel ausblenden, wenn collapsed */
     .panel.collapsed .muted,
     .panel.collapsed .row,
     .panel.collapsed .stat,
@@ -141,23 +119,22 @@
 
     .input-button-group{
       width:100%;
-      max-width: 240px;     /* Desktop: kompakter */
+      max-width: 240px;
       display:flex;
       flex-direction: column;
-      gap: 12px;            /* Golden Ratio spacing */
+      gap: 12px;
       align-items:center;
       margin: 0 auto;
     }
 
     .button-group{
       width:100%;
-      max-width: 240px;     /* Desktop: kompakter */
+      max-width: 240px;
       display:flex;
-      gap: 10px;            /* Golden Ratio spacing */
+      gap: 10px;
       margin: 0 auto;
     }
 
-    /* ===== Golden Ratio (Desktop) ===== */
     input{
       width:100%;
       background: rgba(17,24,37,0.28);
@@ -180,7 +157,7 @@
       background: rgba(199,223,58,0.78);
       color: var(--accentText);
       font-weight: 650;
-      height: 20px;          /* 32/φ */
+      height: 32px;
       padding: 0 14px;
       border-radius: 999px;
       font-size: 12.5px;
@@ -201,10 +178,9 @@
     }
     button:active{ transform: translateY(1px); }
 
-    /* ✅ Wunsch: Button "Alle" wie Driver-ID Feld */
     button.secondary{
-      background: rgba(17,24,37,0.28);                 /* wie input */
-      border: 1px solid rgba(199,223,58,0.18);         /* wie input */
+      background: rgba(17,24,37,0.28);
+      border: 1px solid rgba(199,223,58,0.18);
       color: #e5e7eb;
       backdrop-filter: blur(10px);
       box-shadow: 0 10px 22px rgba(0,0,0,.16);
@@ -213,7 +189,6 @@
       filter: brightness(1.05);
     }
 
-    /* ✅ Wunsch: Statuszeile schwarz + ruhiger */
     .stat{
       margin-top:8px;
       font-size:12.5px;
@@ -223,13 +198,6 @@
       gap:8px;
       opacity:0.85;
     }
-    .stat span,
-    #lastTxt,
-    #countTxt,
-    #rtTxt{
-      color: var(--ink);
-    }
-
     .dot{
       display:inline-block;
       width:10px;
@@ -259,11 +227,6 @@
     }
     .hint.show{ display:block; }
 
-    code{
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    }
-
-    /* Popup */
     .mapboxgl-popup-content{
       background: #ffffff !important;
       color: #0b0f14 !important;
@@ -291,7 +254,6 @@
     .er-row{ display:flex; gap:8px; align-items:center; margin-top:4px; }
     .er-row b{ font-weight:900; }
 
-    /* Mobile */
     @media (max-width: 900px){
       .panel{
         left:12px;
@@ -327,14 +289,11 @@
 
     <div class="row">
       <div class="input-button-group">
-        <!-- ✅ Wunsch: nur "Driver ID" -->
         <input id="driverFilter" placeholder="Driver ID" />
       </div>
 
       <div class="button-group">
         <button id="btnApply">Anwenden</button>
-        <!-- ✅ Optional: Text so, dass klar ist: Alle = leer
-             Wenn du nur "Alle" willst: einfach "Alle (leer)" -> "Alle" -->
         <button id="btnAll" class="secondary">Alle</button>
       </div>
     </div>
@@ -353,7 +312,7 @@
   </div>
 
   <script>
-    /***** 1) HIER EINTRAGEN *****/
+    /***** 1) Konfiguration *****/
     const MAPBOX_TOKEN = "MAPBOX_TOKEN_PLACEHOLDER";
     const SUPABASE_URL = "https://ihpszsoivqcrkkiucjvv.supabase.co";
     const SUPABASE_ANON_KEY = "SUPABASE_KEY_PLACEHOLDER";
@@ -367,47 +326,62 @@
     const driverFilter = $("driverFilter");
     const hintBox = $("hint");
 
-    function showHint(msg){
+    function showHint(msg) {
       hintBox.textContent = msg;
       hintBox.classList.add("show");
     }
-    function hideHint(){
+    function hideHint() {
       hintBox.classList.remove("show");
       hintBox.textContent = "";
     }
-    function setRealtime(on){
+    function setRealtime(on) {
       rtDot.classList.toggle("on", on);
       rtTxt.textContent = "Realtime: " + (on ? "AN" : "AUS");
     }
-    function setLast(){
+    function setLast() {
       lastTxt.textContent = new Date().toLocaleString("de-DE");
     }
-    function setCount(n){
+    function setCount(n) {
       countTxt.textContent = "Marker: " + n;
     }
-    function escapeHtml(str){
+    function escapeHtml(str) {
       return String(str ?? "").replace(/[&<>"']/g, s => ({
         "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
       }[s]));
     }
-    function getFilterFromURL(){
+    function getFilterFromURL() {
       const u = new URL(location.href);
       return (u.searchParams.get("driverId") || "").trim();
     }
-    function setURLFilter(f){
+    function setURLFilter(f) {
       const u = new URL(location.href);
       if (f) u.searchParams.set("driverId", f);
       else u.searchParams.delete("driverId");
       history.replaceState(null, "", u.toString());
     }
-
-    // Robust: normalisierte ID (verhindert Filter/Marker-Mismatch durch Leerzeichen/Case)
-    function normId(v){
+    function normId(v) {
       return String(v ?? "").trim().toLowerCase();
     }
 
-    /***** 3) Supabase Client *****/
-    if (!window.supabase || !window.supabase.createClient){
+    /***** 3) Fallback für Turf.js *****/
+    function simpleDistance([lng1, lat1], [lng2, lat2]) {
+      const R = 6371e3; // Erdradius in Metern
+      const φ1 = lat1 * Math.PI / 180;
+      const φ2 = lat2 * Math.PI / 180;
+      const Δφ = (lat2 - lat1) * Math.PI / 180;
+      const Δλ = (lng2 - lng1) * Math.PI / 180;
+      const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ/2) * Math.sin(Δλ/2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    /***** 4) Easing-Funktionen *****/
+    const easeOutQuad = (t) => t * (2 - t);
+    const easeInOutQuad = (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+
+    /***** 5) Supabase Client *****/
+    if (!window.supabase || !window.supabase.createClient) {
       showHint("Supabase SDK lädt nicht. Prüfe Netzwerk/Adblocker.");
       console.error("Supabase SDK missing");
     }
@@ -415,86 +389,90 @@
       auth: { persistSession: false }
     });
 
-    /***** 4) Panel Toggle *****/
+    /***** 6) Panel Toggle *****/
     const panel = document.querySelector(".panel");
     const panelTitle = document.getElementById("panelTitle");
-    if (panel && panelTitle){
+    if (panel && panelTitle) {
       panelTitle.addEventListener("click", () => {
         panel.classList.toggle("collapsed");
       });
     }
 
-    /***** 5) Map + Live State *****/
+    /***** 7) Map + Live State *****/
     let map;
     let channel = null;
 
-    // Wichtig: Marker-Key = normierte Driver-ID
+    // Marker-State
     const markers = new Map(); // driverKey -> Marker
+    const anim = new Map(); // driverKey -> {from, to, t0, dur, easing}
+    const positionHistory = new Map(); // driverKey -> Array von [lng, lat]
     const lastSeen = new Map(); // driverKey -> timestamp(ms)
 
     let currentFilter = "";
     let currentFilterKey = "";
-
-    // Follow Fahrer (auto wenn Filter gesetzt)
     let followDriverKey = "";
     const FOLLOW_ZOOM = 15;
     const FOLLOW_DURATION = 650;
-
-    function followIfNeeded(driverKey, pos){
-      if (!map) return;
-      if (!followDriverKey) return;
-      if (driverKey !== followDriverKey) return;
-      if (!Array.isArray(pos) || pos.length !== 2) return;
-
-      map.easeTo({
-        center: pos,
-        zoom: Math.max(map.getZoom(), FOLLOW_ZOOM),
-        duration: FOLLOW_DURATION
-      });
-    }
-
-    // TTL / Cleanup
     const TTL_MS = 20000;
 
-    // Marker Animation
-    const anim = new Map(); // driverKey -> {from,to,t0,dur}
-    const ANIM_MS = 700;
+    function followIfNeeded(driverKey, pos) {
+      if (!map || !followDriverKey || driverKey !== followDriverKey) return;
+      if (!Array.isArray(pos) || pos.length !== 2) return;
 
-    function clearMarkers(){
+      // Nutze die glatte Position aus dem Positionsverlauf
+      const history = positionHistory.get(driverKey);
+      if (history && history.length >= 2) {
+        const smoothedPos = history.reduce(
+          (acc, p) => [acc[0] + p[0] / history.length, acc[1] + p[1] / history.length],
+          [0, 0]
+        );
+        map.easeTo({
+          center: smoothedPos,
+          zoom: Math.max(map.getZoom(), FOLLOW_ZOOM),
+          duration: FOLLOW_DURATION,
+        });
+      } else {
+        map.easeTo({
+          center: pos,
+          zoom: Math.max(map.getZoom(), FOLLOW_ZOOM),
+          duration: FOLLOW_DURATION,
+        });
+      }
+    }
+
+    function clearMarkers() {
       for (const m of markers.values()) m.remove();
       markers.clear();
+      anim.clear();
+      positionHistory.clear();
       lastSeen.clear();
       setCount(0);
     }
 
-    function upsertMarker(row){
+    function upsertMarker(row) {
       if (!row || row.lat == null || row.lng == null) return;
 
       const driverIdRaw = row.driver_id ?? "";
       const driverKey = normId(driverIdRaw);
       if (!driverKey) return;
 
-      // Filter
       if (currentFilterKey && driverKey !== currentFilterKey) return;
 
-      const pos = [Number(row.lng), Number(row.lat)];
-      if (!Number.isFinite(pos[0]) || !Number.isFinite(pos[1])) return;
+      const newPos = [Number(row.lng), Number(row.lat)];
+      if (!Number.isFinite(newPos[0]) || !Number.isFinite(newPos[1])) return;
 
-      const displayId = String(driverIdRaw || "unknown").trim();
-
+      // Marker erstellen, falls nicht vorhanden
       let m = markers.get(driverKey);
-
-      if (!m){
+      if (!m) {
         const el = document.createElement("div");
         el.className = "marker";
-
         m = new mapboxgl.Marker({ element: el })
-          .setLngLat(pos)
+          .setLngLat(newPos)
           .setPopup(new mapboxgl.Popup({ offset: 18 }).setHTML(`
             <div class="er-popup">
               <span class="er-tag">LIVE</span>
-              <div class="er-row">👤 Fahrer: <b>${escapeHtml(displayId)}</b></div>
-              <div class="er-row">📍 Position: ${Number(row.lat).toFixed(5)}, ${Number(row.lng).toFixed(5)}</div>
+              <div class="er-row">👤 Fahrer: <b>${escapeHtml(driverIdRaw)}</b></div>
+              <div class="er-row">📍 Position: ${newPos[1].toFixed(5)}, ${newPos[0].toFixed(5)}</div>
               <div class="er-row">⏱️ Letztes Update: ${
                 row.updated_at
                   ? new Date(row.updated_at).toLocaleTimeString("de-DE", {
@@ -508,67 +486,110 @@
             </div>
           `))
           .addTo(map);
-
         markers.set(driverKey, m);
         setCount(markers.size);
-
-      } else {
-        const cur = m.getLngLat();
-        anim.set(driverKey, {
-          from: [cur.lng, cur.lat],
-          to: pos,
-          t0: performance.now(),
-          dur: ANIM_MS
-        });
-        requestAnimationFrame(tickAnim);
       }
 
+      // Vorherige Position holen
+      const prevPos = m.getLngLat();
+      const fromPos = [prevPos.lng, prevPos.lat];
+
+      // Distanz berechnen (mit Fallback)
+      const distance = typeof turf !== 'undefined'
+        ? turf.distance(fromPos, newPos, { units: 'meters' })
+        : simpleDistance(fromPos, newPos);
+
+      // Dynamische Animationsdauer: 500ms + 0.5ms pro Meter (max. 1500ms)
+      const animDuration = Math.min(500 + distance * 0.5, 1500);
+
+      // Easing-Funktion basierend auf Distanz wählen
+      const easingFn = distance > 500 ? easeInOutQuad : easeOutQuad;
+
+      // Animation starten
+      anim.set(driverKey, {
+        from: fromPos,
+        to: newPos,
+        t0: performance.now(),
+        dur: animDuration,
+        easing: easingFn,
+      });
+
+      // Positionsverlauf speichern
+      if (!positionHistory.has(driverKey)) {
+        positionHistory.set(driverKey, []);
+      }
+      const history = positionHistory.get(driverKey);
+      history.push(newPos);
+      if (history.length > 3) history.shift();
+
+      // Letztes Update speichern
       const t = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
-      lastSeen.set(driverKey, Number.isFinite(t) ? t : Date.now());
+      lastSeen.set(driverKey, t);
 
       setLast();
-      followIfNeeded(driverKey, pos);
+      followIfNeeded(driverKey, newPos);
+      requestAnimationFrame(tickAnim);
     }
 
-    function tickAnim(){
+    function tickAnim() {
       const now = performance.now();
       let active = false;
 
-      for (const [driverKey, a] of anim.entries()){
+      for (const [driverKey, a] of anim.entries()) {
         const m = markers.get(driverKey);
         if (!m) { anim.delete(driverKey); continue; }
 
         const t = Math.min(1, (now - a.t0) / a.dur);
-        const lng = a.from[0] + (a.to[0] - a.from[0]) * t;
-        const lat = a.from[1] + (a.to[1] - a.from[1]) * t;
+        const progress = a.easing(t);
 
-        m.setLngLat([lng, lat]);
+        // Glättung: Nutze den Durchschnitt der letzten 3 Positionen
+        const history = positionHistory.get(driverKey) || [];
+        let targetPos = a.to;
+        if (history.length >= 3) {
+          const smoothedPos = history.reduce(
+            (acc, pos) => [acc[0] + pos[0] / history.length, acc[1] + pos[1] / history.length],
+            [0, 0]
+          );
+          targetPos = [
+            a.from[0] + (smoothedPos[0] - a.from[0]) * progress,
+            a.from[1] + (smoothedPos[1] - a.from[1]) * progress,
+          ];
+        } else {
+          targetPos = [
+            a.from[0] + (a.to[0] - a.from[0]) * progress,
+            a.from[1] + (a.to[1] - a.from[1]) * progress,
+          ];
+        }
 
-        if (t >= 1) anim.delete(driverKey);
-        else active = true;
+        m.setLngLat(targetPos);
+
+        if (t < 1) active = true;
+        else anim.delete(driverKey);
       }
+
       if (active) requestAnimationFrame(tickAnim);
     }
 
-    function removeMarker(driverKey){
+    function removeMarker(driverKey) {
       const m = markers.get(driverKey);
       if (!m) return;
       m.remove();
       markers.delete(driverKey);
-      lastSeen.delete(driverKey);
       anim.delete(driverKey);
+      positionHistory.delete(driverKey);
+      lastSeen.delete(driverKey);
       setCount(markers.size);
       setLast();
     }
 
     setInterval(() => {
       const now = Date.now();
-      for (const [driverKey, ts] of lastSeen.entries()){
+      for (const [driverKey, ts] of lastSeen.entries()) {
         if ((now - ts) > TTL_MS) removeMarker(driverKey);
       }
     }, 3000);
 
-    async function fetchLatest(){
+    async function fetchLatest() {
       clearMarkers();
 
       let q = sb
@@ -577,21 +598,19 @@
         .order("updated_at", { ascending: false })
         .limit(200);
 
-      // Wichtig: hier nutzen wir currentFilter (raw), weil Supabase eq case-sensitiv sein kann.
       if (currentFilter) q = q.eq("driver_id", currentFilter);
 
       const { data, error } = await q;
 
-      if (error){
+      if (error) {
         console.error("Supabase fetch error:", error);
-        showHint("Supabase: Fehler beim Laden. (RLS/Policy?) Siehe Konsole.");
+        showHint("Fehler beim Laden der Daten. (Netzwerk/RLS?)");
         return;
       }
       hideHint();
 
-      // Pro Driver nur der neueste Datensatz (norm-key)
       const seen = new Set();
-      for (const row of (data || [])){
+      for (const row of (data || [])) {
         const k = normId(row.driver_id);
         if (!k) continue;
         if (seen.has(k)) continue;
@@ -599,20 +618,20 @@
         upsertMarker(row);
       }
 
-      // Auto-Zoom / Follow-Zentrierung
-      if (followDriverKey && markers.has(followDriverKey)){
+      // Auto-Zoom
+      if (followDriverKey && markers.has(followDriverKey)) {
         const p = markers.get(followDriverKey).getLngLat();
         map.easeTo({
           center: [p.lng, p.lat],
           zoom: Math.max(map.getZoom(), FOLLOW_ZOOM),
-          duration: FOLLOW_DURATION
+          duration: FOLLOW_DURATION,
         });
-      } else if (markers.size === 1){
+      } else if (markers.size === 1) {
         const only = [...markers.values()][0].getLngLat();
         map.flyTo({ center: [only.lng, only.lat], zoom: 14 });
-      } else if (markers.size > 1){
+      } else if (markers.size > 1) {
         const bounds = new mapboxgl.LngLatBounds();
-        for (const m of markers.values()){
+        for (const m of markers.values()) {
           const p = m.getLngLat();
           bounds.extend([p.lng, p.lat]);
         }
@@ -622,21 +641,21 @@
       setLast();
     }
 
-    function unsubscribe(){
-      if (channel){
+    function unsubscribe() {
+      if (channel) {
         sb.removeChannel(channel);
         channel = null;
       }
       setRealtime(false);
     }
 
-    function subscribe(){
+    function subscribe() {
       unsubscribe();
 
       channel = sb
         .channel("live_positions_map")
         .on("postgres_changes", { event: "*", schema: "public", table: "live_positions" }, (payload) => {
-          if (payload.eventType === "DELETE"){
+          if (payload.eventType === "DELETE") {
             const oldRow = payload.old || {};
             const k = normId(oldRow.driver_id);
             if (k) removeMarker(k);
@@ -652,21 +671,21 @@
         });
     }
 
-    function initMap(){
+    function initMap() {
       mapboxgl.accessToken = MAPBOX_TOKEN;
 
       map = new mapboxgl.Map({
         container: "map",
         style: "mapbox://styles/mapbox/streets-v12",
         center: [8.8, 53.1], // Bremen
-        zoom: 10
+        zoom: 10,
       });
 
       map.addControl(new mapboxgl.NavigationControl(), "bottom-right");
 
       map.on("error", (e) => {
         console.error("Mapbox error:", e?.error || e);
-        showHint("Mapbox lädt nicht. Prüfe Token + URL-Restriction + Adblock. (Konsole öffnen)");
+        showHint("Mapbox lädt nicht. Prüfe Token + Adblocker. (Konsole)");
       });
 
       map.on("load", async () => {
@@ -674,9 +693,7 @@
 
         currentFilter = getFilterFromURL();
         currentFilterKey = normId(currentFilter);
-
         driverFilter.value = currentFilter;
-
         followDriverKey = currentFilterKey;
 
         await fetchLatest();
@@ -687,11 +704,8 @@
     $("btnApply").addEventListener("click", async () => {
       currentFilter = driverFilter.value.trim();
       currentFilterKey = normId(currentFilter);
-
       setURLFilter(currentFilter);
-
       followDriverKey = currentFilterKey;
-
       await fetchLatest();
     });
 
@@ -700,9 +714,7 @@
       currentFilter = "";
       currentFilterKey = "";
       setURLFilter("");
-
       followDriverKey = "";
-
       await fetchLatest();
     });
 
@@ -710,4 +722,3 @@
   </script>
 </body>
 </html>
-
