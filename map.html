@@ -204,10 +204,11 @@
       });
 
       document.getElementById("btnAll").addEventListener("click", async () => {
-  document.getElementById("driverFilter")?.value = "";  // ✅ Korrekt: Innerhalb eines Codeblocks
-  currentFilter = "";
-  currentFilterKey = "";
-  await fetchLatest();
+  const df = document.getElementById("driverFilter");
+if (df) df.value = "";
+currentFilter = "";
+currentFilterKey = "";
+await fetchLatest();
 });
 
       // Initiales Laden (auch ohne Realtime)
@@ -354,6 +355,7 @@
   </script>
 </body>
 </html>
+
 
 
 
