@@ -120,7 +120,7 @@
 
     // --- 3. Mapbox-Initialisierung (kapselt alle Map-Logik) ---
     function initMapbox() {
-      if (!MAPBOX_TOKEN || MAPBOX_TOKEN.includes("DEIN_MAPBOX_TOKEN")) {
+      if (!MAPBOX_TOKEN || MAPBOX_TOKEN.includes("MAPBOX_TOKEN_PLACEHOLDER")) {
         showHint("Mapbox Token fehlt. Bitte MAPBOX_TOKEN in map.html setzen.");
         logError("MAPBOX_TOKEN ist nicht gesetzt.");
         return null;
@@ -355,4 +355,5 @@
   </script>
 </body>
 </html>
+
 
