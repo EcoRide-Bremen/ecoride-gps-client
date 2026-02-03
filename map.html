@@ -43,16 +43,8 @@
     .dot { display:inline-block; width:10px; height:10px; border-radius:50%; background:#ef4444; margin-right:6px; }
     .dot.on { background:#22c55e; }
     .marker { width:18px; height:18px; border-radius:50%; background: rgba(199,223,58,0.92); border: 2px solid rgba(199,223,58,0.35); box-shadow: 0 10px 22px rgba(0,0,0,.35), 0 0 18px rgba(199,223,58,0.36); }
-    .hint {
-  margin-top: 10px;
-  padding: 10px;
-  border-radius: 12px;
-  border: 1px dashed var(--line);
-  color: #00FF00; /* Electric Green */
-  font-size: 12px;
-  text-align: center;   /* ← DAS ist alles */
-  display: none;
-}
+    .marker.stale { opacity: 0.6 !important; background: rgba(199,223,58,0.4) !important; }
+    .hint { margin-top: 10px; padding: 10px; border-radius: 12px; border: 1px dashed var(--line); color: var(--muted); font-size: 12px; display:none; }
     .hint.show { display:block; }
     @media (max-width: 900px) {
       .panel { left:12px; top:12px; right:12px; width:auto; }
@@ -77,6 +69,7 @@
         <button id="btnApply">Anwenden</button>
         <button id="btnAll" class="secondary">Alle</button>
         <button id="btnToggleRoutes" class="secondary">Routen</button>
+        <button id="btnActiveOnly" class="secondary">Nur aktive</button>
       </div>
     </div>
 
@@ -102,13 +95,11 @@
     const SUPABASE_URL = "https://ihpszsoivqcrkkiucjvv.supabase.co";
     const SUPABASE_ANON_KEY = "SUPABASE_KEY_PLACEHOLDER";
 
-    // Active-only TTL / Pruning (Phase 1)
-    const STALE_MS = 120_000;        // 2 Minuten: Fahrer ohne Update -> weg
-    const PRUNE_EVERY_MS = 10_000;   // alle 10 Sekunden prüfen
-
-    // --- Phase 2.1: Routes / History ---
-    const ROUTE_MS = 10 * 60_000;    // 10 Minuten Route anzeigen
-    const MAX_POINTS = 200;          // max Punkte pro Fahrer (Performance)
+    // --- Mittelweg: 5 Minuten für STALE_MS ---
+    const STALE_MS = 5 * 60_000;        // 5 Minuten: Balance zwischen Aktualität und Stabilität
+    const PRUNE_EVERY_MS = 10_000;       // Alle 10 Sekunden prüfen
+    const ROUTE_MS = 10 * 60_000;        // 10 Minuten Route anzeigen
+    const MAX_POINTS = 200;              // Max. Punkte pro Fahrer
 
     // --- Phase 2.1: Farben für Routen (stabil) ---
     const ROUTE_COLORS = ["#c7df3a", "#3bb2d0", "#ff6b6b", "#a55eea", "#4dabf7", "#f06595", "#ffd43b", "#7bed9f"];
@@ -134,6 +125,13 @@
     function hideHint() {
       const hintBox = document.getElementById("hint");
       if (hintBox) hintBox.classList.remove("show");
+    }
+
+    // --- Konsistenz: cutoffOverride normalisieren (ms oder ISO -> ISO) ---
+    function normalizeCutoff(cutoffOverride, fallbackIso) {
+      if (!cutoffOverride) return fallbackIso;
+      if (typeof cutoffOverride === "number") return new Date(cutoffOverride).toISOString();
+      return String(cutoffOverride);
     }
 
     // --- Phase 2.1: Farbe pro Fahrer (stabil) ---
@@ -180,7 +178,11 @@
             id: "er-routes-line",
             type: "line",
             source: "er-routes",
-            layout: { "line-join": "round", "line-cap": "round" },
+            layout: {
+              "line-join": "round",
+              "line-cap": "round",
+              "visibility": routesVisible ? "visible" : "none"
+            },
             paint: {
               "line-width": 4,
               "line-opacity": 0.75,
@@ -188,12 +190,7 @@
             }
           });
 
-          // --- Patch 2: Sichtbarkeit + Button-Text beim Load korrekt setzen ---
-          map.setLayoutProperty("er-routes-line", "visibility", routesVisible ? "visible" : "none");
-          const btn = document.getElementById("btnToggleRoutes");
-          if (btn) btn.textContent = routesVisible ? "Routen ausblenden" : "Routen anzeigen";
-
-          // --- Phase 2.1: Route Popups ---
+          // --- Route Popups ---
           map.on("click", "er-routes-line", (e) => {
             const driverKey = e.features[0].properties.driverKey;
             new mapboxgl.Popup()
@@ -209,6 +206,10 @@
             map.getCanvas().style.cursor = "";
           });
         }
+
+        // Button-Text initial setzen
+        const btn = document.getElementById("btnToggleRoutes");
+        if (btn) btn.textContent = routesVisible ? "Routen ausblenden" : "Routen anzeigen";
 
         routesReady = true;
         refreshRoutesSource();
@@ -267,8 +268,6 @@
       markers.clear();
       lastSeen.clear();
       setCount(0);
-
-      // routes too
       routePoints.clear();
       refreshRoutesSource();
     }
@@ -299,7 +298,7 @@
       if (src) src.setData({ type: "FeatureCollection", features });
 
       if (features.length === 0 && currentFilterKey) {
-        showHint("Keine Route verfügbar (zu wenige Daten oder Filter aktiv).");
+        showHint("Keine Routen verfügbar (zu wenige Datenpunkte oder Filter aktiv).");
       } else {
         hideHint();
       }
@@ -318,7 +317,6 @@
         const df = document.getElementById("driverFilter");
         currentFilter = df?.value?.trim() || "";
         currentFilterKey = normId(currentFilter);
-
         await fetchLatest();
         await fetchRouteHistory();
       });
@@ -328,12 +326,11 @@
         if (df) df.value = "";
         currentFilter = "";
         currentFilterKey = "";
-
         await fetchLatest();
         await fetchRouteHistory();
       });
 
-      // --- Phase 2.1: Toggle Routes Button (sicher) ---
+      // --- Toggle Routes Button ---
       document.getElementById("btnToggleRoutes")?.addEventListener("click", () => {
         routesVisible = !routesVisible;
         if (map && map.getLayer("er-routes-line")) {
@@ -343,7 +340,15 @@
         if (btn) btn.textContent = routesVisible ? "Routen ausblenden" : "Routen anzeigen";
       });
 
-      // initial
+      // --- Optimiert: Nur aktive Fahrer anzeigen (2 Minuten) ---
+      document.getElementById("btnActiveOnly")?.addEventListener("click", async () => {
+        const cutoffIso = new Date(Date.now() - 2 * 60_000).toISOString(); // 2 Minuten für maximale Aktualität
+        showHint("Nur aktive Fahrer (letzte 2 Minuten) werden angezeigt.");
+        await fetchLatest(cutoffIso);
+        await fetchRouteHistory(cutoffIso);
+      });
+
+      // Initial laden
       fetchLatest().catch(e => logError("Initial fetchLatest() fehlgeschlagen:", e));
       fetchRouteHistory().catch(e => logError("Initial fetchRouteHistory() fehlgeschlagen:", e));
 
@@ -351,14 +356,15 @@
     }
 
     // --- 7. Initial Load: nur aktive Fahrer (Marker) ---
-    async function fetchLatest() {
+    async function fetchLatest(cutoffOverride) {
       const now = Date.now();
-      const cutoff = new Date(now - STALE_MS).toISOString();
+      const fallbackIso = new Date(now - STALE_MS).toISOString();
+      const cutoffIso = normalizeCutoff(cutoffOverride, fallbackIso);
 
       const { data, error } = await sb
         .from("live_positions")
         .select("driver_id, lat, lng, updated_at")
-        .gte("updated_at", cutoff)
+        .gte("updated_at", cutoffIso)
         .order("updated_at", { ascending: false })
         .limit(200);
 
@@ -378,12 +384,12 @@
         newMarkers.set(driverKey, row);
       }
 
-      // remove markers that are no longer active
+      // Marker entfernen, die nicht mehr aktiv sind
       for (const [driverKey] of markers.entries()) {
         if (!newMarkers.has(driverKey)) removeMarker(driverKey);
       }
 
-      // upsert
+      // Marker aktualisieren/erstellen
       for (const [, row] of newMarkers.entries()) {
         upsertMarker(row);
       }
@@ -391,21 +397,18 @@
       setLast();
     }
 
-    // --- Phase 2.1: History Load (mit SQL-Filter + JS-Fallback) ---
-    async function fetchRouteHistory() {
+    // --- Phase 2.1: History Load (ohne SQL-Filter, nur JS-Filter) ---
+    async function fetchRouteHistory(cutoffOverride) {
       const now = Date.now();
-      const cutoff = new Date(now - ROUTE_MS).toISOString();
+      const fallbackIso = new Date(now - ROUTE_MS).toISOString();
+      const cutoffIso = normalizeCutoff(cutoffOverride, fallbackIso);
 
-      let query = sb.from("live_positions")
+      const { data, error } = await sb
+        .from("live_positions")
         .select("driver_id, lat, lng, updated_at")
-        .gte("updated_at", cutoff)
+        .gte("updated_at", cutoffIso)
         .order("driver_id", { ascending: true })
         .order("updated_at", { ascending: true });
-
-      // --- Patch 1: Kein SQL-Filter wegen Case-Sensitivity, Filter stabil in JS ---
-      // (SQL-Filter entfernt)
-
-      const { data, error } = await query;
 
       if (error) {
         logError("Route-History Fehler:", error.message);
@@ -417,8 +420,6 @@
       for (const row of data || []) {
         const driverKey = normId(row?.driver_id);
         if (!driverKey) continue;
-
-        // JS-Fallback für normierte IDs
         if (currentFilterKey && driverKey !== currentFilterKey) continue;
 
         const lat = Number(row.lat);
@@ -478,28 +479,25 @@
       setRealtime(false);
     }
 
-    // --- 9. Marker-Logik + Route Update (stale Updates ignorieren) ---
+    // --- 9. Marker-Logik + Route Update (mit visuellen Hinweisen und automatischem Zoomen) ---
     function upsertMarker(row) {
       if (!map || !row?.driver_id) return;
 
       const driverKey = normId(row.driver_id);
       if (!driverKey) return;
-
-      // UI-Filter
       if (currentFilterKey && driverKey !== currentFilterKey) return;
 
       const lat = Number(row.lat);
       const lng = Number(row.lng);
-
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
         logError("Ungültige Koordinaten für Driver:", driverKey, row);
         return;
       }
 
       const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
+      const age = Date.now() - ts;
 
-      // Stale Updates ignorieren, aber Marker NICHT löschen
-      if (Date.now() - ts > STALE_MS) {
+      if (age > STALE_MS) {
         logDebug(`Stale Update für ${driverKey} ignoriert (kein Löschen).`);
         return;
       }
@@ -522,8 +520,20 @@
           `))
           .addTo(map);
         markers.set(driverKey, marker);
+
+        // Automatisch zoomen, wenn ein neuer Fahrer ausgewählt wird
+        if (currentFilterKey === driverKey) {
+          map.flyTo({ center: [lng, lat], zoom: 15 });
+        }
       } else {
         marker.setLngLat([lng, lat]);
+      }
+
+      // Visuelle Hinweise für "stale" Daten (älter als 2 Minuten)
+      if (age > 2 * 60_000) {
+        marker.getElement().classList.add("stale");
+      } else {
+        marker.getElement().classList.remove("stale");
       }
 
       lastSeen.set(driverKey, ts);
@@ -544,30 +554,25 @@
     // --- Marker entfernen (nur bei Inaktivität) ---
     function removeMarker(driverKey) {
       if (!driverKey) return;
-
       const marker = markers.get(driverKey);
       if (marker) {
         marker.remove();
         markers.delete(driverKey);
       }
-
       lastSeen.delete(driverKey);
       routePoints.delete(driverKey);
       refreshRoutesSource();
       setCount(markers.size);
     }
 
-    // --- 10. TTL-Check / Pruning (nur für wirklich inaktive Fahrer) ---
+    // --- 10. TTL-Check / Pruning ---
     setInterval(() => {
       if (lastSeen.size === 0) return;
-
       const now = Date.now();
       const staleKeys = [];
-
       for (const [driverKey, ts] of lastSeen.entries()) {
         if (now - ts > STALE_MS) staleKeys.push(driverKey);
       }
-
       staleKeys.forEach(driverKey => removeMarker(driverKey));
     }, PRUNE_EVERY_MS);
 
@@ -576,8 +581,3 @@
   </script>
 </body>
 </html>
-
-
-
-
-
