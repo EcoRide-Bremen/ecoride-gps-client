@@ -26,48 +26,136 @@
     }
     html, body { height:100%; margin:0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
     #map { position:absolute; inset:0; }
-    .panel { position:absolute; left:20px; top:20px; z-index:5; background: linear-gradient(180deg, var(--panelA), var(--panelB)); backdrop-filter: blur(18px); border: 1px solid var(--line); border-radius: 16px; padding: 12px; width: min(360px, calc(100vw - 40px)); box-shadow: 0 16px 40px rgba(0,0,0,.35); max-height: 460px; transition: max-height .3s ease; }
+
+    .panel {
+      position:absolute; left:20px; top:20px; z-index:5;
+      background: linear-gradient(180deg, var(--panelA), var(--panelB));
+      backdrop-filter: blur(18px);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 12px;
+      width: min(360px, calc(100vw - 40px));
+      box-shadow: 0 16px 40px rgba(0,0,0,.35);
+      max-height: 460px;
+      transition: max-height .3s ease;
+    }
     .panel.collapsed { max-height: 54px; padding: 10px 12px; }
-    .title { font-weight: 600; color: var(--ink); margin: 0; padding: 6px 0; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; }
+
+    .title {
+      font-weight: 600;
+      color: var(--ink);
+      margin: 0;
+      padding: 6px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+    }
     .toggle-icon { font-size: 12px; margin-left: 10px; transition: transform .25s ease; }
     .panel.collapsed .toggle-icon { transform: rotate(180deg); }
-    .muted { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
-    .row { display:flex; flex-direction:column; gap:8px; margin-top:8px; width:100%; }
-    .panel.collapsed .muted, .panel.collapsed .row { display:none; }
-    .input-button-group { width:100%; max-width: 240px; display:flex; flex-direction: column; gap: 12px; align-items:center; margin: 0 auto; }
 
-    /* ✅ PATCH 1: Buttons zentrieren */
-    .button-group {
-      width: 100%;
-      max-width: 260px;
-      display: flex;
-      gap: 10px;
-      justify-content: center;
+    .muted { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
+
+    .row {
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      margin-top:8px;
+      width:100%;
+    }
+
+    /* Collapsed: nur Titel sichtbar (Row + Stats + Hint ausblenden) */
+    .panel.collapsed .muted,
+    .panel.collapsed .row,
+    .panel.collapsed .stat,
+    .panel.collapsed .hint { display:none !important; }
+
+    .input-button-group {
+      width:100%;
+      max-width: 240px;
+      display:flex;
+      flex-direction: column;
+      gap: 12px;
+      align-items:center;
       margin: 0 auto;
     }
 
-    input { width:100%; background: rgba(17,24,37,0.28); border: 1px solid rgba(199,223,58,0.18); height: 32px; padding: 0 14px; border-radius: 999px; font-size: 14px; color: #e5e7eb; text-align: center; }
-    button { background: rgba(199,223,58,0.78); color: var(--accentText); height: 32px; padding: 0 14px; border-radius: 999px; font-size: 12.5px; border: none; cursor:pointer; flex:1; }
-    button.secondary { background: rgba(17,24,37,0.28); border: 1px solid rgba(199,223,58,0.18); color: #e5e7eb; backdrop-filter: blur(10px); }
-    .stat { margin-top:8px; font-size:12.5px; color: var(--ink); display:flex; justify-content:space-between; gap:8px; opacity:0.85; }
+    /* Buttons zentrieren (auch wenn viele Buttons) */
+    .button-group {
+      width:100%;
+      max-width: 240px;
+      display:flex;
+      gap: 10px;
+      margin: 0 auto;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .button-group button { flex: 0 0 auto; }
+
+    input {
+      width:100%;
+      background: rgba(17,24,37,0.28);
+      border: 1px solid rgba(199,223,58,0.18);
+      height: 32px;
+      padding: 0 14px;
+      border-radius: 999px;
+      font-size: 14px;
+      color: #e5e7eb;
+      text-align: center;
+    }
+
+    button {
+      background: rgba(199,223,58,0.78);
+      color: var(--accentText);
+      height: 32px;
+      padding: 0 14px;
+      border-radius: 999px;
+      font-size: 12.5px;
+      border: none;
+      cursor:pointer;
+    }
+    button.secondary {
+      background: rgba(17,24,37,0.28);
+      border: 1px solid rgba(199,223,58,0.18);
+      color: #e5e7eb;
+      backdrop-filter: blur(10px);
+    }
+
+    .stat {
+      margin-top:8px;
+      font-size:12.5px;
+      color: var(--ink);
+      display:flex;
+      justify-content:space-between;
+      gap:8px;
+      opacity:0.85;
+    }
+
     .dot { display:inline-block; width:10px; height:10px; border-radius:50%; background:#ef4444; margin-right:6px; }
     .dot.on { background:#22c55e; }
-    .marker { width:18px; height:18px; border-radius:50%; background: rgba(199,223,58,0.92); border: 2px solid rgba(199,223,58,0.35); box-shadow: 0 10px 22px rgba(0,0,0,.35), 0 0 18px rgba(199,223,58,0.36); }
+
+    .marker {
+      width:18px; height:18px; border-radius:50%;
+      background: rgba(199,223,58,0.92);
+      border: 2px solid rgba(199,223,58,0.35);
+      box-shadow: 0 10px 22px rgba(0,0,0,.35), 0 0 18px rgba(199,223,58,0.36);
+    }
     .marker.stale { opacity: 0.6 !important; background: rgba(199,223,58,0.4) !important; }
 
-    /* ✅ PATCH 2: Hint-Text Electric Green + zentriert */
+    /* Hint: Electric Green + zentriert */
     .hint {
       margin-top: 10px;
       padding: 10px;
       border-radius: 12px;
       border: 1px dashed var(--line);
-      color: #00FF00;
+      color: #00FF00;                 /* Electric Green */
       font-size: 12px;
-      text-align: center;
+      text-align: center;             /* zentriert */
       display:none;
     }
-
     .hint.show { display:block; }
+
     @media (max-width: 900px) {
       .panel { left:12px; top:12px; right:12px; width:auto; }
       input { height: 40px; font-size: 15px; }
@@ -118,12 +206,12 @@
     const SUPABASE_ANON_KEY = "SUPABASE_KEY_PLACEHOLDER";
 
     // --- Klare Zeitfenster ---
-    const ACTIVE_ONLY_MS = 2 * 60_000;   // 2 Min. für "Nur aktive"
-    const STALE_VISUAL_MS = 2 * 60_000;  // 2 Min. für visuelle Hinweise
-    const STALE_MS = 5 * 60_000;         // 5 Min. für Marker/Routen-Lebensdauer
-    const PRUNE_EVERY_MS = 10_000;       // Alle 10 Sekunden prüfen
-    const ROUTE_MS = 10 * 60_000;        // 10 Minuten Route anzeigen
-    const MAX_POINTS = 200;              // Max. Punkte pro Fahrer
+    const ACTIVE_ONLY_MS = 2 * 60_000;  // 2 Min. für "Nur aktive"
+    const STALE_VISUAL_MS = 2 * 60_000; // 2 Min. für visuelle Hinweise
+    const STALE_MS = 5 * 60_000;        // 5 Min. für Marker/Routen-Lebensdauer
+    const PRUNE_EVERY_MS = 10_000;      // Alle 10 Sekunden prüfen
+    const ROUTE_MS = 10 * 60_000;       // 10 Minuten Route anzeigen
+    const MAX_POINTS = 200;             // Max. Punkte pro Fahrer
 
     // --- Phase 2.1: Farben für Routen (stabil) ---
     const ROUTE_COLORS = ["#c7df3a", "#3bb2d0", "#ff6b6b", "#a55eea", "#4dabf7", "#f06595", "#ffd43b", "#7bed9f"];
@@ -138,7 +226,13 @@
     function logDebug(...args) { if (DEBUG) console.log("[DEBUG]", ...args); }
     function logError(...args) { console.error("[ERROR]", ...args); }
 
+    function isPanelOpen() {
+      const panel = document.querySelector(".panel");
+      return panel && !panel.classList.contains("collapsed");
+    }
+
     function showHint(msg) {
+      if (!isPanelOpen()) return; // im collapsed Zustand nie anzeigen
       const hintBox = document.getElementById("hint");
       if (hintBox) {
         hintBox.textContent = msg;
@@ -258,14 +352,14 @@
     let map;
     let channel = null;
 
-    const markers = new Map();     // driverKey -> mapboxgl.Marker
-    const lastSeen = new Map();    // driverKey -> timestamp(ms)
+    const markers = new Map();    // driverKey -> mapboxgl.Marker
+    const lastSeen = new Map();   // driverKey -> timestamp(ms)
 
     // Phase 2.1: route points per driver
     const routePoints = new Map(); // driverKey -> Array<{lng,lat,ts}>
     let routesReady = false;
-    let routesVisible = true;      // Toggle-Status
-    let activeOnlyMode = false;    // Zustand für "Nur aktive"-Modus
+    let routesVisible = true;     // Toggle-Status
+    let activeOnlyMode = false;   // Zustand für "Nur aktive"-Modus
 
     let currentFilter = "";
     let currentFilterKey = "";
@@ -295,6 +389,7 @@
       setCount(0);
       routePoints.clear();
       refreshRoutesSource();
+      hideHint();
     }
 
     // --- Phase 2.1: write routes to map source ---
@@ -322,8 +417,11 @@
       const src = map.getSource("er-routes");
       if (src) src.setData({ type: "FeatureCollection", features });
 
+      // Präzisere Hinweise (nur wenn Panel offen ist)
+      if (!isPanelOpen()) return;
+
       if (features.length === 0 && currentFilterKey && routePoints.size === 0) {
-        showHint("Keine Routen für diesen Fahrer verfügbar.");
+        showHint("Keine Route für diesen Fahrer.");
       } else if (features.length === 0) {
         showHint("Keine Routen verfügbar (zu wenige Datenpunkte).");
       } else {
@@ -337,7 +435,9 @@
       if (!map) return;
 
       document.getElementById("panelTitle")?.addEventListener("click", () => {
-        document.querySelector(".panel")?.classList.toggle("collapsed");
+        const panel = document.querySelector(".panel");
+        panel?.classList.toggle("collapsed");
+        if (panel?.classList.contains("collapsed")) hideHint();
       });
 
       document.getElementById("btnApply")?.addEventListener("click", async () => {
@@ -373,9 +473,8 @@
         const btn = document.getElementById("btnActiveOnly");
         if (btn) btn.textContent = activeOnlyMode ? "Alle anzeigen" : "Nur aktive";
 
-        showHint(activeOnlyMode
-          ? "Nur aktive Fahrer (letzte 2 Min.) werden angezeigt."
-          : "Alle Fahrer werden angezeigt.");
+        if (activeOnlyMode) showHint("Nur aktive Fahrer (letzte 2 Min.).");
+        else showHint("Alle Fahrer werden angezeigt.");
 
         await fetchLatest();
         await fetchRouteHistory();
@@ -417,10 +516,12 @@
         newMarkers.set(driverKey, row);
       }
 
+      // Marker entfernen, die nicht mehr aktiv sind
       for (const [driverKey] of markers.entries()) {
         if (!newMarkers.has(driverKey)) removeMarker(driverKey);
       }
 
+      // Marker aktualisieren/erstellen
       for (const [, row] of newMarkers.entries()) {
         upsertMarker(row);
       }
@@ -465,6 +566,7 @@
         routePoints.set(driverKey, arr);
       }
 
+      // Pruning (stale Routen entfernen)
       for (const [driverKey, arr] of routePoints.entries()) {
         const minTs = now - ROUTE_MS;
         while (arr.length && arr[0].ts < minTs) arr.shift();
@@ -554,12 +656,14 @@
         marker.setLngLat([lng, lat]);
       }
 
+      // Visuelle Hinweise für "stale" Daten
       if (age > STALE_VISUAL_MS) {
         marker.getElement().classList.add("stale");
       } else {
         marker.getElement().classList.remove("stale");
       }
 
+      // Auto-Follow für ausgewählte Fahrer (nur bei Filter)
       if (currentFilterKey === driverKey && map.getZoom() > 12) {
         map.easeTo({ center: [lng, lat], duration: 600 });
       }
@@ -568,6 +672,7 @@
       setCount(markers.size);
       setLast();
 
+      // Route-Logik
       const now = Date.now();
       const minTs = now - ROUTE_MS;
       const arr = routePoints.get(driverKey) ?? [];
@@ -575,9 +680,11 @@
       while (arr.length && arr[0].ts < minTs) arr.shift();
       if (arr.length > MAX_POINTS) arr.splice(0, arr.length - MAX_POINTS);
       routePoints.set(driverKey, arr);
+
       refreshRoutesSource();
     }
 
+    // --- Marker entfernen (nur bei Inaktivität) ---
     function removeMarker(driverKey) {
       if (!driverKey) return;
       const marker = markers.get(driverKey);
@@ -591,6 +698,7 @@
       setCount(markers.size);
     }
 
+    // --- 10. TTL-Check / Pruning ---
     setInterval(() => {
       if (lastSeen.size === 0) return;
       const now = Date.now();
@@ -601,6 +709,7 @@
       staleKeys.forEach(driverKey => removeMarker(driverKey));
     }, PRUNE_EVERY_MS);
 
+    // --- 11. Start ---
     document.addEventListener("DOMContentLoaded", initMap);
   </script>
 </body>
