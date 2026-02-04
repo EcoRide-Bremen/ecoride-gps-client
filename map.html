@@ -35,7 +35,17 @@
     .row { display:flex; flex-direction:column; gap:8px; margin-top:8px; width:100%; }
     .panel.collapsed .muted, .panel.collapsed .row { display:none; }
     .input-button-group { width:100%; max-width: 240px; display:flex; flex-direction: column; gap: 12px; align-items:center; margin: 0 auto; }
-    .button-group { width:100%; max-width: 240px; display:flex; gap: 10px; margin: 0 auto; }
+
+    /* ✅ PATCH 1: Buttons zentrieren */
+    .button-group {
+      width: 100%;
+      max-width: 260px;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin: 0 auto;
+    }
+
     input { width:100%; background: rgba(17,24,37,0.28); border: 1px solid rgba(199,223,58,0.18); height: 32px; padding: 0 14px; border-radius: 999px; font-size: 14px; color: #e5e7eb; text-align: center; }
     button { background: rgba(199,223,58,0.78); color: var(--accentText); height: 32px; padding: 0 14px; border-radius: 999px; font-size: 12.5px; border: none; cursor:pointer; flex:1; }
     button.secondary { background: rgba(17,24,37,0.28); border: 1px solid rgba(199,223,58,0.18); color: #e5e7eb; backdrop-filter: blur(10px); }
@@ -44,7 +54,19 @@
     .dot.on { background:#22c55e; }
     .marker { width:18px; height:18px; border-radius:50%; background: rgba(199,223,58,0.92); border: 2px solid rgba(199,223,58,0.35); box-shadow: 0 10px 22px rgba(0,0,0,.35), 0 0 18px rgba(199,223,58,0.36); }
     .marker.stale { opacity: 0.6 !important; background: rgba(199,223,58,0.4) !important; }
-    .hint { margin-top: 10px; padding: 10px; border-radius: 12px; border: 1px dashed var(--line); color: var(--muted); font-size: 12px; display:none; }
+
+    /* ✅ PATCH 2: Hint-Text Electric Green + zentriert */
+    .hint {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 12px;
+      border: 1px dashed var(--line);
+      color: #00FF00;
+      font-size: 12px;
+      text-align: center;
+      display:none;
+    }
+
     .hint.show { display:block; }
     @media (max-width: 900px) {
       .panel { left:12px; top:12px; right:12px; width:auto; }
@@ -236,14 +258,14 @@
     let map;
     let channel = null;
 
-    const markers = new Map();    // driverKey -> mapboxgl.Marker
-    const lastSeen = new Map();   // driverKey -> timestamp(ms)
+    const markers = new Map();     // driverKey -> mapboxgl.Marker
+    const lastSeen = new Map();    // driverKey -> timestamp(ms)
 
     // Phase 2.1: route points per driver
     const routePoints = new Map(); // driverKey -> Array<{lng,lat,ts}>
     let routesReady = false;
-    let routesVisible = true;     // Toggle-Status
-    let activeOnlyMode = false;   // Zustand für "Nur aktive"-Modus
+    let routesVisible = true;      // Toggle-Status
+    let activeOnlyMode = false;    // Zustand für "Nur aktive"-Modus
 
     let currentFilter = "";
     let currentFilterKey = "";
@@ -300,7 +322,6 @@
       const src = map.getSource("er-routes");
       if (src) src.setData({ type: "FeatureCollection", features });
 
-      // Präzisere Hinweise
       if (features.length === 0 && currentFilterKey && routePoints.size === 0) {
         showHint("Keine Routen für diesen Fahrer verfügbar.");
       } else if (features.length === 0) {
@@ -396,12 +417,10 @@
         newMarkers.set(driverKey, row);
       }
 
-      // Marker entfernen, die nicht mehr aktiv sind
       for (const [driverKey] of markers.entries()) {
         if (!newMarkers.has(driverKey)) removeMarker(driverKey);
       }
 
-      // Marker aktualisieren/erstellen
       for (const [, row] of newMarkers.entries()) {
         upsertMarker(row);
       }
@@ -446,10 +465,8 @@
         routePoints.set(driverKey, arr);
       }
 
-      // Pruning (stale Routen entfernen)  ✅ FIX: Fenster konsistent zum Modus
-      const routeWindowMs = activeOnlyMode ? ACTIVE_ONLY_MS : ROUTE_MS;
       for (const [driverKey, arr] of routePoints.entries()) {
-        const minTs = now - routeWindowMs;               // ✅ FIX
+        const minTs = now - ROUTE_MS;
         while (arr.length && arr[0].ts < minTs) arr.shift();
         if (arr.length > MAX_POINTS) arr.splice(0, arr.length - MAX_POINTS);
 
@@ -537,15 +554,13 @@
         marker.setLngLat([lng, lat]);
       }
 
-      // Visuelle Hinweise für "stale" Daten (älter als 2 Minuten)
       if (age > STALE_VISUAL_MS) {
         marker.getElement().classList.add("stale");
       } else {
         marker.getElement().classList.remove("stale");
       }
 
-      // Auto-Follow für ausgewählte Fahrer (nur bei Filter)  ✅ FIX: nicht mehr zoom-abhängig
-      if (currentFilterKey === driverKey) {
+      if (currentFilterKey === driverKey && map.getZoom() > 12) {
         map.easeTo({ center: [lng, lat], duration: 600 });
       }
 
@@ -553,7 +568,6 @@
       setCount(markers.size);
       setLast();
 
-      // Route-Logik
       const now = Date.now();
       const minTs = now - ROUTE_MS;
       const arr = routePoints.get(driverKey) ?? [];
@@ -564,7 +578,6 @@
       refreshRoutesSource();
     }
 
-    // --- Marker entfernen (nur bei Inaktivität) ---
     function removeMarker(driverKey) {
       if (!driverKey) return;
       const marker = markers.get(driverKey);
@@ -578,7 +591,6 @@
       setCount(markers.size);
     }
 
-    // --- 10. TTL-Check / Pruning ---
     setInterval(() => {
       if (lastSeen.size === 0) return;
       const now = Date.now();
@@ -589,7 +601,6 @@
       staleKeys.forEach(driverKey => removeMarker(driverKey));
     }, PRUNE_EVERY_MS);
 
-    // --- 11. Start ---
     document.addEventListener("DOMContentLoaded", initMap);
   </script>
 </body>
