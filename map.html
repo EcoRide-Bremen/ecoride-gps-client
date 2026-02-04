@@ -95,8 +95,10 @@
     const SUPABASE_URL = "https://ihpszsoivqcrkkiucjvv.supabase.co";
     const SUPABASE_ANON_KEY = "SUPABASE_KEY_PLACEHOLDER";
 
-    // --- Mittelweg: 5 Minuten für STALE_MS ---
-    const STALE_MS = 5 * 60_000;        // 5 Minuten: Balance zwischen Aktualität und Stabilität
+    // --- Klare Zeitfenster ---
+    const ACTIVE_ONLY_MS = 2 * 60_000;   // 2 Min. für "Nur aktive"
+    const STALE_VISUAL_MS = 2 * 60_000;  // 2 Min. für visuelle Hinweise
+    const STALE_MS = 5 * 60_000;         // 5 Min. für Marker/Routen-Lebensdauer
     const PRUNE_EVERY_MS = 10_000;       // Alle 10 Sekunden prüfen
     const ROUTE_MS = 10 * 60_000;        // 10 Minuten Route anzeigen
     const MAX_POINTS = 200;              // Max. Punkte pro Fahrer
@@ -127,7 +129,7 @@
       if (hintBox) hintBox.classList.remove("show");
     }
 
-    // --- Konsistenz: cutoffOverride normalisieren (ms oder ISO -> ISO) ---
+    // --- Konsistenz: cutoffOverride normalisieren ---
     function normalizeCutoff(cutoffOverride, fallbackIso) {
       if (!cutoffOverride) return fallbackIso;
       if (typeof cutoffOverride === "number") return new Date(cutoffOverride).toISOString();
@@ -241,6 +243,7 @@
     const routePoints = new Map(); // driverKey -> Array<{lng,lat,ts}>
     let routesReady = false;
     let routesVisible = true;     // Toggle-Status
+    let activeOnlyMode = false;   // Zustand für "Nur aktive"-Modus
 
     let currentFilter = "";
     let currentFilterKey = "";
@@ -297,8 +300,11 @@
       const src = map.getSource("er-routes");
       if (src) src.setData({ type: "FeatureCollection", features });
 
-      if (features.length === 0 && currentFilterKey) {
-        showHint("Keine Routen verfügbar (zu wenige Datenpunkte oder Filter aktiv).");
+      // Präzisere Hinweise
+      if (features.length === 0 && currentFilterKey && routePoints.size === 0) {
+        showHint("Keine Routen für diesen Fahrer verfügbar.");
+      } else if (features.length === 0) {
+        showHint("Keine Routen verfügbar (zu wenige Datenpunkte).");
       } else {
         hideHint();
       }
@@ -340,12 +346,18 @@
         if (btn) btn.textContent = routesVisible ? "Routen ausblenden" : "Routen anzeigen";
       });
 
-      // --- Optimiert: Nur aktive Fahrer anzeigen (2 Minuten) ---
+      // --- "Nur aktive"-Button als Zustand ---
       document.getElementById("btnActiveOnly")?.addEventListener("click", async () => {
-        const cutoffIso = new Date(Date.now() - 2 * 60_000).toISOString(); // 2 Minuten für maximale Aktualität
-        showHint("Nur aktive Fahrer (letzte 2 Minuten) werden angezeigt.");
-        await fetchLatest(cutoffIso);
-        await fetchRouteHistory(cutoffIso);
+        activeOnlyMode = !activeOnlyMode;
+        const btn = document.getElementById("btnActiveOnly");
+        if (btn) btn.textContent = activeOnlyMode ? "Alle anzeigen" : "Nur aktive";
+
+        showHint(activeOnlyMode
+          ? "Nur aktive Fahrer (letzte 2 Min.) werden angezeigt."
+          : "Alle Fahrer werden angezeigt.");
+
+        await fetchLatest();
+        await fetchRouteHistory();
       });
 
       // Initial laden
@@ -358,7 +370,7 @@
     // --- 7. Initial Load: nur aktive Fahrer (Marker) ---
     async function fetchLatest(cutoffOverride) {
       const now = Date.now();
-      const fallbackIso = new Date(now - STALE_MS).toISOString();
+      const fallbackIso = new Date(now - (activeOnlyMode ? ACTIVE_ONLY_MS : STALE_MS)).toISOString();
       const cutoffIso = normalizeCutoff(cutoffOverride, fallbackIso);
 
       const { data, error } = await sb
@@ -400,7 +412,7 @@
     // --- Phase 2.1: History Load (ohne SQL-Filter, nur JS-Filter) ---
     async function fetchRouteHistory(cutoffOverride) {
       const now = Date.now();
-      const fallbackIso = new Date(now - ROUTE_MS).toISOString();
+      const fallbackIso = new Date(now - (activeOnlyMode ? ACTIVE_ONLY_MS : ROUTE_MS)).toISOString();
       const cutoffIso = normalizeCutoff(cutoffOverride, fallbackIso);
 
       const { data, error } = await sb
@@ -434,9 +446,10 @@
         routePoints.set(driverKey, arr);
       }
 
-      // Pruning (stale Routen entfernen)
+      // Pruning (stale Routen entfernen)  ✅ FIX: Fenster konsistent zum Modus
+      const routeWindowMs = activeOnlyMode ? ACTIVE_ONLY_MS : ROUTE_MS;
       for (const [driverKey, arr] of routePoints.entries()) {
-        const minTs = now - ROUTE_MS;
+        const minTs = now - routeWindowMs;               // ✅ FIX
         while (arr.length && arr[0].ts < minTs) arr.shift();
         if (arr.length > MAX_POINTS) arr.splice(0, arr.length - MAX_POINTS);
 
@@ -479,7 +492,7 @@
       setRealtime(false);
     }
 
-    // --- 9. Marker-Logik + Route Update (mit visuellen Hinweisen und automatischem Zoomen) ---
+    // --- 9. Marker-Logik + Route Update (mit visuellen Hinweisen und Auto-Follow) ---
     function upsertMarker(row) {
       if (!map || !row?.driver_id) return;
 
@@ -520,20 +533,20 @@
           `))
           .addTo(map);
         markers.set(driverKey, marker);
-
-        // Automatisch zoomen, wenn ein neuer Fahrer ausgewählt wird
-        if (currentFilterKey === driverKey) {
-          map.flyTo({ center: [lng, lat], zoom: 15 });
-        }
       } else {
         marker.setLngLat([lng, lat]);
       }
 
       // Visuelle Hinweise für "stale" Daten (älter als 2 Minuten)
-      if (age > 2 * 60_000) {
+      if (age > STALE_VISUAL_MS) {
         marker.getElement().classList.add("stale");
       } else {
         marker.getElement().classList.remove("stale");
+      }
+
+      // Auto-Follow für ausgewählte Fahrer (nur bei Filter)  ✅ FIX: nicht mehr zoom-abhängig
+      if (currentFilterKey === driverKey) {
+        map.easeTo({ center: [lng, lat], duration: 600 });
       }
 
       lastSeen.set(driverKey, ts);
