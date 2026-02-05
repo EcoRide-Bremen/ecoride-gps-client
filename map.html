@@ -360,7 +360,7 @@
         }
 
         const btn = document.getElementById("btnToggleRoutes");
-        if (btn) btn.textContent = routesVisible ? "Routen einblenden" : "Ausblenden";
+        if (btn) btn.textContent = routesVisible ? "Einblenden" : "Ausblenden";
 
         routesReady = true;
         refreshRoutesSource();
@@ -468,7 +468,7 @@
           map.setLayoutProperty("er-routes-line", "visibility", routesVisible ? "visible" : "none");
         }
         const btn = document.getElementById("btnToggleRoutes");
-        if (btn) btn.textContent = routesVisible ? "Routen einblenden" : "Ausblenden";
+        if (btn) btn.textContent = routesVisible ? "Einblenden" : "Ausblenden";
       });
 
       document.getElementById("btnActiveOnly")?.addEventListener("click", async () => {
@@ -476,8 +476,8 @@
         const btn = document.getElementById("btnActiveOnly");
         if (btn) btn.textContent = activeOnlyMode ? "Alle anzeigen" : "Aktive";
 
-        if (activeOnlyMode) showHint("Nur aktive Fahrer.");
-        else showHint("Alle Fahrer.");
+        if (activeOnlyMode) showHint("Alle Fahrer.");
+        else showHint("Nur aktive Fahrer.");
 
         await fetchLatest();
         await fetchRouteHistory();
