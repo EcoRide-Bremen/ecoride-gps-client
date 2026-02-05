@@ -61,6 +61,8 @@
       gap:10px;
       margin-top:10px;
       width:100%;
+      padding: 0 10px; /* Innenabstand für die Filtermaske */
+      box-sizing: border-box;
     }
 
     /* Collapsed: nur Titel sichtbar */
@@ -91,17 +93,17 @@
       text-align: center;
     }
 
-    /* Buttons zentriert und gleichmäßig verteilt */
+    /* Buttons zentriert mit Luft nach links und rechts */
     .button-group {
       width:100%;
       display:flex;
-      justify-content: center; /* Zentriert die Buttons */
-      align-items:center;
-      gap: 8px;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
       flex-wrap: nowrap;
-      overflow-x: visible;
-      padding-bottom: 2px;
-      margin: 0 auto; /* Zentriert die Button-Gruppe im Panel */
+      padding: 0 20px; /* Innenabstand für Luft nach links und rechts */
+      box-sizing: border-box;
+      margin: 0 auto;
     }
     .button-group::-webkit-scrollbar { height: 0px; }
 
@@ -109,14 +111,14 @@
       background: rgba(199,223,58,0.78);
       color: var(--accentText);
       height: 32px;
-      min-width: 80px; /* Feste Mindestbreite für alle Buttons */
-      padding: 0 12px;
+      min-width: 80px;
+      padding: 0 14px;
       border-radius: 999px;
       font-size: 12.5px;
       border: none;
-      cursor:pointer;
+      cursor: pointer;
       white-space: nowrap;
-      flex: 0 0 auto;
+      text-align: center;
     }
     button.secondary {
       background: rgba(17,24,37,0.28);
@@ -135,6 +137,8 @@
       grid-template-columns: auto 1fr auto;
       align-items: center;
       column-gap: 10px;
+      padding: 0 10px;
+      box-sizing: border-box;
     }
     .stat .left {
       justify-self: start;
@@ -161,6 +165,8 @@
       display:flex;
       justify-content:space-between;
       gap:8px;
+      padding: 0 10px;
+      box-sizing: border-box;
     }
 
     .dot { display:inline-block; width:10px; height:10px; border-radius:50%; background:#ef4444; }
