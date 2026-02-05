@@ -35,7 +35,7 @@
       border-radius: 16px;
       padding: 12px;
       width: min(360px, calc(100vw - 40px));
-      min-width: 320px; /* Mindestbreite für Buttons */
+      min-width: 320px;
       max-height: 460px;
       transition: max-height .3s ease;
     }
@@ -80,7 +80,7 @@
 
     input {
       width:100%;
-      max-width: 180px; /* Eingabefeld begrenzen */
+      max-width: 180px;
       background: rgba(17,24,37,0.28);
       border: 1px solid rgba(199,223,58,0.18);
       height: 32px;
@@ -95,11 +95,11 @@
     .button-group {
       width:100%;
       display:flex;
-      justify-content:flex-start; /* Linksbündig */
+      justify-content:flex-start;
       align-items:center;
       gap: 8px;
       flex-wrap: nowrap;
-      overflow-x: visible; /* Kein Scroll */
+      overflow-x: visible;
       padding-bottom: 2px;
     }
     .button-group::-webkit-scrollbar { height: 0px; }
@@ -108,7 +108,7 @@
       background: rgba(199,223,58,0.78);
       color: var(--accentText);
       height: 32px;
-      min-width: fit-content; /* Buttons behalten ihre Breite */
+      min-width: fit-content;
       padding: 0 12px;
       border-radius: 999px;
       font-size: 12.5px;
@@ -130,18 +130,26 @@
       font-size:12.5px;
       color: var(--ink);
       opacity:0.85;
-      display:grid;
+      display: grid;
       grid-template-columns: auto 1fr auto;
-      align-items:center;
+      align-items: center;
       column-gap: 10px;
     }
-    .stat .left { justify-self:start; display:flex; align-items:center; gap:6px; }
-    .stat .mid {
-      justify-self:center;
-      text-align:center;
-      grid-column: 1 / -1; /* Hint zentriert und vollbreit */
+    .stat .left {
+      justify-self: start;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
-    .stat .right{ justify-self:end; }
+    .stat .mid {
+      justify-self: center;
+      text-align: center;
+      color: #00FF00;
+      font-weight: 600;
+    }
+    .stat .right {
+      justify-self: end;
+    }
 
     /* Zweite Statuszeile (Letztes Update) */
     .stat2 {
