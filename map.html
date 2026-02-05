@@ -61,7 +61,7 @@
       gap:10px;
       margin-top:10px;
       width:100%;
-      padding: 0 10px; /* Innenabstand für die Filtermaske */
+      padding: 0 10px;
       box-sizing: border-box;
     }
 
@@ -101,7 +101,7 @@
       align-items: center;
       gap: 10px;
       flex-wrap: nowrap;
-      padding: 0 20px; /* Innenabstand für Luft nach links und rechts */
+      padding: 0 20px;
       box-sizing: border-box;
       margin: 0 auto;
     }
@@ -214,8 +214,8 @@
       <div class="button-group">
         <button id="btnApply">Anwenden</button>
         <button id="btnAll" class="secondary">Alle</button>
-        <button id="btnToggleRoutes" class="secondary">Routen</button>
-        <button id="btnActiveOnly" class="secondary">Nur aktive</button>
+        <button id="btnToggleRoutes" class="secondary">Ausblenden</button>
+        <button id="btnActiveOnly" class="secondary">Aktive</button>
       </div>
     </div>
 
@@ -360,7 +360,7 @@
         }
 
         const btn = document.getElementById("btnToggleRoutes");
-        if (btn) btn.textContent = routesVisible ? "Routen ausblenden" : "Routen anzeigen";
+        if (btn) btn.textContent = routesVisible ? "Routen einblenden" : "Ausblenden";
 
         routesReady = true;
         refreshRoutesSource();
@@ -468,13 +468,13 @@
           map.setLayoutProperty("er-routes-line", "visibility", routesVisible ? "visible" : "none");
         }
         const btn = document.getElementById("btnToggleRoutes");
-        if (btn) btn.textContent = routesVisible ? "Routen ausblenden" : "Routen anzeigen";
+        if (btn) btn.textContent = routesVisible ? "Routen einblenden" : "Ausblenden";
       });
 
       document.getElementById("btnActiveOnly")?.addEventListener("click", async () => {
         activeOnlyMode = !activeOnlyMode;
         const btn = document.getElementById("btnActiveOnly");
-        if (btn) btn.textContent = activeOnlyMode ? "Alle anzeigen" : "Nur aktive";
+        if (btn) btn.textContent = activeOnlyMode ? "Alle anzeigen" : "Aktive";
 
         if (activeOnlyMode) showHint("Nur aktive Fahrer.");
         else showHint("Alle Fahrer.");
