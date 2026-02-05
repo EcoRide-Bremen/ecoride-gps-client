@@ -42,33 +42,40 @@
     .panel.collapsed { max-height: 54px; padding: 10px 12px; }
 
     .title {
-      font-weight: 600; color: var(--ink);
-      margin: 0; padding: 6px 0;
-      display: flex; align-items: center; justify-content: center; gap: 8px;
+      font-weight: 600;
+      color: var(--ink);
+      margin: 0;
+      padding: 6px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
       cursor: pointer;
     }
     .toggle-icon { font-size: 12px; margin-left: 10px; transition: transform .25s ease; }
     .panel.collapsed .toggle-icon { transform: rotate(180deg); }
 
-    .muted { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
-    .row { display:flex; flex-direction:column; gap:8px; margin-top:8px; width:100%; }
-    .panel.collapsed .muted, .panel.collapsed .row { display:none; }
-
-    .input-button-group {
-      width:100%; max-width: 240px;
-      display:flex; flex-direction: column; gap: 12px;
-      align-items:center; margin: 0 auto;
+    .row {
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      margin-top:10px;
+      width:100%;
     }
 
-    /* Buttons in einer Reihe + zentriert */
-    .button-group {
+    /* Collapsed: nur Titel sichtbar */
+    .panel.collapsed .row,
+    .panel.collapsed .stat,
+    .panel.collapsed .stat2 { display:none !important; }
+
+    .input-button-group {
       width:100%;
+      max-width: 260px;
       display:flex;
-      justify-content:center;
-      align-items:center;
+      flex-direction: column;
       gap: 10px;
+      align-items:center;
       margin: 0 auto;
-      flex-wrap: nowrap;
     }
 
     input {
@@ -83,6 +90,20 @@
       text-align: center;
     }
 
+    /* ✅ Buttons: EINE Reihe, zentriert, KEIN Umbruch */
+    .button-group {
+      width:100%;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      gap: 10px;
+      flex-wrap: nowrap;     /* WICHTIG: kein Wrap */
+      overflow-x: auto;      /* falls zu eng: horizontal scroll statt umbrechen */
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 2px;
+    }
+    .button-group::-webkit-scrollbar { height: 0px; }
+
     button {
       background: rgba(199,223,58,0.78);
       color: var(--accentText);
@@ -92,8 +113,8 @@
       font-size: 12.5px;
       border: none;
       cursor:pointer;
-      flex: 0 0 auto;
       white-space: nowrap;
+      flex: 0 0 auto;
     }
     button.secondary {
       background: rgba(17,24,37,0.28);
@@ -102,17 +123,34 @@
       backdrop-filter: blur(10px);
     }
 
+    /* ✅ Stat-Zeile: links Realtime, Mitte Hint, rechts Marker */
     .stat {
+      margin-top:10px;
+      font-size:12.5px;
+      color: var(--ink);
+      opacity:0.85;
+
+      display:grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items:center;
+      column-gap: 10px;
+    }
+    .stat .left { justify-self:start; display:flex; align-items:center; gap:6px; }
+    .stat .mid  { justify-self:center; text-align:center; }
+    .stat .right{ justify-self:end; }
+
+    /* Zweite Stat-Zeile (Letztes Update) */
+    .stat2 {
       margin-top:8px;
       font-size:12.5px;
       color: var(--ink);
+      opacity:0.85;
       display:flex;
       justify-content:space-between;
       gap:8px;
-      opacity:0.85;
     }
 
-    .dot { display:inline-block; width:10px; height:10px; border-radius:50%; background:#ef4444; margin-right:6px; }
+    .dot { display:inline-block; width:10px; height:10px; border-radius:50%; background:#ef4444; }
     .dot.on { background:#22c55e; }
 
     .marker {
@@ -123,41 +161,17 @@
     }
     .marker.stale { opacity: 0.6 !important; background: rgba(199,223,58,0.4) !important; }
 
-    /* HINT (zweizeilig split) */
-    .stat-top { align-items: center; }
-.hint-top {
-  flex: 1;
-  text-align: center;
-  color: #00FF00;
-  font-size: 11.5px;      /* kleiner, ruhiger */
-  font-weight: 500;       /* weniger dominant */
-  line-height: 1.2;
-  padding: 0 8px;
-  display: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-    .hint-top.show { display:block; }
-
-.hint-bottom {
-  margin-top: 4px;        /* etwas enger */
-  text-align: center;
-  color: #00FF00;
-  font-size: 11.5px;      /* identisch zu hint-top */
-  font-weight: 500;
-  line-height: 1.3;
-  display: none;
-}
-    .hint-bottom.show { display:block; }
-
-    /* Eingeklappt: Hint + letztes Update NICHT sichtbar */
-    .panel.collapsed .hint-top,
-    .panel.collapsed .hint-bottom,
-    .panel.collapsed #lastRow {
-      display: none !important;
+    /* ✅ Hint (zwischen Realtime & Marker) */
+    .hint-inline {
+      display:none;
+      color:#00FF00;       /* Electric Green */
+      font-size:12px;
+      line-height:1.2;
+      font-weight:600;
+      text-shadow: 0 1px 0 rgba(0,0,0,.18);
+      white-space: nowrap;
     }
+    .hint-inline.show { display:block; }
 
     @media (max-width: 900px) {
       .panel { left:12px; top:12px; right:12px; width:auto; }
@@ -186,21 +200,23 @@
       </div>
     </div>
 
-    <!-- Realtime / Hint (oben) / Marker -->
-    <div class="stat stat-top">
-      <div><span id="rtDot" class="dot"></span><span id="rtTxt">Realtime: AUS</span></div>
+    <!-- ✅ Realtime | Hint (center) | Marker -->
+    <div class="stat">
+      <div class="left">
+        <span id="rtDot" class="dot"></span>
+        <span id="rtTxt">Realtime: AUS</span>
+      </div>
 
-      <!-- Hint Zeile 1 (kurz, in der Realtime-Zeile) -->
-      <div id="hintTop" class="hint-top"></div>
+      <div class="mid">
+        <span id="hintInline" class="hint-inline"></span>
+      </div>
 
-      <div><span id="countTxt">Marker: 0</span></div>
+      <div class="right">
+        <span id="countTxt">Marker: 0</span>
+      </div>
     </div>
 
-    <!-- Hint Zeile 2 (lang, zwischen Realtime/Marker und Letztes Update) -->
-    <div id="hintBottom" class="hint-bottom"></div>
-
-    <!-- Letztes Update -->
-    <div class="stat" id="lastRow">
+    <div class="stat2">
       <div>Letztes Update:</div>
       <div id="lastTxt">–</div>
     </div>
@@ -215,76 +231,65 @@
     const SUPABASE_URL = "https://ihpszsoivqcrkkiucjvv.supabase.co";
     const SUPABASE_ANON_KEY = "SUPABASE_KEY_PLACEHOLDER";
 
-    // --- Klare Zeitfenster ---
-    const ACTIVE_ONLY_MS = 2 * 60_000;   // 2 Min. für "Nur aktive"
-    const STALE_VISUAL_MS = 2 * 60_000;  // 2 Min. für visuelle Hinweise
-    const STALE_MS = 5 * 60_000;         // 5 Min. für Marker/Routen-Lebensdauer
-    const PRUNE_EVERY_MS = 10_000;       // Alle 10 Sekunden prüfen
-    const ROUTE_MS = 10 * 60_000;        // 10 Minuten Route anzeigen
-    const MAX_POINTS = 200;              // Max. Punkte pro Fahrer
+    // --- Zeitfenster ---
+    const ACTIVE_ONLY_MS = 2 * 60_000;
+    const STALE_VISUAL_MS = 2 * 60_000;
+    const STALE_MS = 5 * 60_000;
+    const PRUNE_EVERY_MS = 10_000;
+    const ROUTE_MS = 10 * 60_000;
+    const MAX_POINTS = 200;
 
     // --- Phase 2.1: Farben für Routen (stabil) ---
     const ROUTE_COLORS = ["#c7df3a", "#3bb2d0", "#ff6b6b", "#a55eea", "#4dabf7", "#f06595", "#ffd43b", "#7bed9f"];
 
-    // --- 2. Helper-Funktionen ---
+    // --- Helper ---
     function setSafeTextContent(id, text) {
       const el = document.getElementById(id);
       if (el) el.textContent = text ?? "";
       else if (DEBUG) console.warn(`[DEBUG] Element #${id} nicht gefunden!`);
     }
-
     function logDebug(...args) { if (DEBUG) console.log("[DEBUG]", ...args); }
     function logError(...args) { console.error("[ERROR]", ...args); }
 
-    // --- Hint split (oben kurz / unten lang) ---
+    function isPanelOpen() {
+      const panel = document.querySelector(".panel");
+      return panel && !panel.classList.contains("collapsed");
+    }
+
+    // ✅ Hint in die Mitte der Stat-Zeile (Realtime | Hint | Marker)
     function showHint(msg) {
-      const top = document.getElementById("hintTop");
-      const bottom = document.getElementById("hintBottom");
-      if (!top || !bottom) return;
-
-      const s = String(msg || "").trim();
-      if (!s) return;
-
-      // Split: alles vor erster "(" nach oben, Rest nach unten
-      const i = s.indexOf("(");
-      const topText = (i >= 0 ? s.slice(0, i).trim() : s);
-      const bottomText = (i >= 0 ? s.slice(i).trim() : "");
-
-      top.textContent = topText;
-      bottom.textContent = bottomText;
-
-      top.classList.toggle("show", !!topText);
-      bottom.classList.toggle("show", !!bottomText);
+      if (!isPanelOpen()) return;
+      const el = document.getElementById("hintInline");
+      if (!el) return;
+      el.textContent = msg;
+      el.classList.add("show");
     }
-
     function hideHint() {
-      const top = document.getElementById("hintTop");
-      const bottom = document.getElementById("hintBottom");
-      if (top) { top.classList.remove("show"); top.textContent = ""; }
-      if (bottom) { bottom.classList.remove("show"); bottom.textContent = ""; }
+      const el = document.getElementById("hintInline");
+      if (!el) return;
+      el.classList.remove("show");
+      el.textContent = "";
     }
 
-    // --- Konsistenz: cutoffOverride normalisieren ---
     function normalizeCutoff(cutoffOverride, fallbackIso) {
       if (!cutoffOverride) return fallbackIso;
       if (typeof cutoffOverride === "number") return new Date(cutoffOverride).toISOString();
       return String(cutoffOverride);
     }
 
-    // --- Phase 2.1: Farbe pro Fahrer (stabil) ---
+    function normId(v) { return String(v ?? "").trim().toLowerCase(); }
+
     function getColorForDriver(driverKey) {
       let hash = 0;
-      for (let i = 0; i < driverKey.length; i++) {
-        hash = driverKey.charCodeAt(i) + ((hash << 5) - hash);
-      }
+      for (let i = 0; i < driverKey.length; i++) hash = driverKey.charCodeAt(i) + ((hash << 5) - hash);
       const index = Math.abs(hash) % ROUTE_COLORS.length;
       return ROUTE_COLORS[index];
     }
 
-    // --- 3. Mapbox-Initialisierung ---
+    // --- Mapbox ---
     function initMapbox() {
       if (!MAPBOX_TOKEN || MAPBOX_TOKEN.includes("DEIN_MAPBOX_TOKEN")) {
-        showHint("Mapbox Token fehlt. Bitte MAPBOX_TOKEN in map.html setzen.");
+        showHint("Mapbox Token fehlt.");
         logError("MAPBOX_TOKEN ist nicht gesetzt.");
         return null;
       }
@@ -294,14 +299,13 @@
       const map = new mapboxgl.Map({
         container: "map",
         style: "mapbox://styles/mapbox/streets-v12",
-        center: [8.8, 53.1], // Bremen
+        center: [8.8, 53.1],
         zoom: 10,
       });
 
       map.addControl(new mapboxgl.NavigationControl(), "bottom-right");
 
       map.on("load", () => {
-        logDebug("Karte erfolgreich geladen");
         hideHint();
 
         if (!map.getSource("er-routes")) {
@@ -347,15 +351,15 @@
 
       map.on("error", (e) => {
         logError("Mapbox-Fehler:", e?.error || e);
-        showHint("Karte konnte nicht geladen werden. Prüfe Token/Internetverbindung.");
+        showHint("Karte konnte nicht geladen werden.");
       });
 
       return map;
     }
 
-    // --- 4. Supabase-Client & Globale Variablen ---
+    // --- Supabase + State ---
     if (!SUPABASE_URL || SUPABASE_URL.includes("DEINE_SUPABASE_URL") || !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.includes("DEIN_SUPABASE_ANON_KEY")) {
-      showHint("Supabase Config fehlt. Bitte SUPABASE_URL & SUPABASE_ANON_KEY in map.html setzen.");
+      showHint("Supabase Config fehlt.");
       logError("SUPABASE_URL / SUPABASE_ANON_KEY sind nicht gesetzt.");
     }
 
@@ -364,10 +368,10 @@
     let map;
     let channel = null;
 
-    const markers = new Map();    // driverKey -> mapboxgl.Marker
-    const lastSeen = new Map();   // driverKey -> timestamp(ms)
+    const markers = new Map();
+    const lastSeen = new Map();
+    const routePoints = new Map();
 
-    const routePoints = new Map(); // driverKey -> Array<{lng,lat,ts}>
     let routesReady = false;
     let routesVisible = true;
     let activeOnlyMode = false;
@@ -375,25 +379,16 @@
     let currentFilter = "";
     let currentFilterKey = "";
 
-    // --- 5. UI-Funktionen ---
+    // --- UI ---
     function setRealtime(on) {
       const rtDot = document.getElementById("rtDot");
       const rtTxt = document.getElementById("rtTxt");
       if (rtDot) rtDot.classList.toggle("on", on);
       if (rtTxt) rtTxt.textContent = "Realtime: " + (on ? "AN" : "AUS");
     }
+    function setLast() { setSafeTextContent("lastTxt", new Date().toLocaleString("de-DE")); }
+    function setCount(n) { setSafeTextContent("countTxt", "Marker: " + n); }
 
-    function setLast() {
-      setSafeTextContent("lastTxt", new Date().toLocaleString("de-DE"));
-    }
-
-    function setCount(n) {
-      setSafeTextContent("countTxt", "Marker: " + n);
-    }
-
-    function normId(v) { return String(v ?? "").trim().toLowerCase(); }
-
-    // --- Phase 2.1: write routes to map source ---
     function refreshRoutesSource() {
       if (!map || !routesReady || !map.getSource("er-routes")) return;
 
@@ -404,36 +399,33 @@
 
         features.push({
           type: "Feature",
-          properties: {
-            driverKey,
-            color: getColorForDriver(driverKey)
-          },
-          geometry: {
-            type: "LineString",
-            coordinates: pts.map(p => [p.lng, p.lat])
-          }
+          properties: { driverKey, color: getColorForDriver(driverKey) },
+          geometry: { type: "LineString", coordinates: pts.map(p => [p.lng, p.lat]) }
         });
       }
 
-      const src = map.getSource("er-routes");
-      if (src) src.setData({ type: "FeatureCollection", features });
+      map.getSource("er-routes").setData({ type: "FeatureCollection", features });
 
-      if (features.length === 0 && currentFilterKey && routePoints.size === 0) {
-        showHint("Keine Route für diesen Fahrer (zu wenige Datenpunkte).");
+      if (!isPanelOpen()) return;
+
+      if (features.length === 0 && currentFilterKey) {
+        showHint("Keine Route für diesen Fahrer.");
       } else if (features.length === 0) {
-        showHint("Keine Routen verfügbar (zu wenige Datenpunkte).");
+        showHint("Keine Routen verfügbar.");
       } else {
         hideHint();
       }
     }
 
-    // --- 6. Initialisierung ---
+    // --- Init ---
     function initMap() {
       map = initMapbox();
       if (!map) return;
 
       document.getElementById("panelTitle")?.addEventListener("click", () => {
-        document.querySelector(".panel")?.classList.toggle("collapsed");
+        const panel = document.querySelector(".panel");
+        panel?.classList.toggle("collapsed");
+        if (panel?.classList.contains("collapsed")) hideHint();
       });
 
       document.getElementById("btnApply")?.addEventListener("click", async () => {
@@ -467,9 +459,8 @@
         const btn = document.getElementById("btnActiveOnly");
         if (btn) btn.textContent = activeOnlyMode ? "Alle anzeigen" : "Nur aktive";
 
-        showHint(activeOnlyMode
-          ? "Nur aktive Fahrer werden angezeigt (letzte 2 Minuten)."
-          : "Alle Fahrer werden angezeigt.");
+        if (activeOnlyMode) showHint("Nur aktive Fahrer.");
+        else showHint("Alle Fahrer.");
 
         await fetchLatest();
         await fetchRouteHistory();
@@ -481,7 +472,7 @@
       subscribe();
     }
 
-    // --- 7. Initial Load: nur aktive Fahrer (Marker) ---
+    // --- Fetch Latest ---
     async function fetchLatest(cutoffOverride) {
       const now = Date.now();
       const fallbackIso = new Date(now - (activeOnlyMode ? ACTIVE_ONLY_MS : STALE_MS)).toISOString();
@@ -496,7 +487,7 @@
 
       if (error) {
         logError("Supabase-Fehler:", error.message);
-        showHint("Fehler beim Laden der Daten (bitte Seite neu laden).");
+        showHint("Fehler beim Laden.");
         return;
       }
 
@@ -514,14 +505,12 @@
         if (!newMarkers.has(driverKey)) removeMarker(driverKey);
       }
 
-      for (const [, row] of newMarkers.entries()) {
-        upsertMarker(row);
-      }
+      for (const [, row] of newMarkers.entries()) upsertMarker(row);
 
       setLast();
     }
 
-    // --- Phase 2.1: History Load (ohne SQL-Filter, nur JS-Filter) ---
+    // --- Fetch Route History ---
     async function fetchRouteHistory(cutoffOverride) {
       const now = Date.now();
       const fallbackIso = new Date(now - (activeOnlyMode ? ACTIVE_ONLY_MS : ROUTE_MS)).toISOString();
@@ -564,24 +553,18 @@
         if (arr.length > MAX_POINTS) arr.splice(0, arr.length - MAX_POINTS);
 
         const last = arr[arr.length - 1];
-        if (!last || (now - last.ts > STALE_MS) || arr.length < 2) {
-          routePoints.delete(driverKey);
-        }
+        if (!last || (now - last.ts > STALE_MS) || arr.length < 2) routePoints.delete(driverKey);
       }
 
       refreshRoutesSource();
     }
 
-    // --- 8. Realtime: patch statt reset ---
+    // --- Realtime subscribe ---
     function subscribe() {
       if (channel) sb.removeChannel(channel);
 
       channel = sb.channel("live_positions_map")
-        .on("postgres_changes", {
-          event: "*",
-          schema: "public",
-          table: "live_positions"
-        }, (payload) => {
+        .on("postgres_changes", { event: "*", schema: "public", table: "live_positions" }, (payload) => {
           if (payload?.eventType === "INSERT" || payload?.eventType === "UPDATE") {
             upsertMarker(payload.new);
           } else if (payload?.eventType === "DELETE") {
@@ -594,7 +577,7 @@
         });
     }
 
-    // --- 9. Marker-Logik + Route Update (mit visuellen Hinweisen und Auto-Follow) ---
+    // --- Marker ---
     function upsertMarker(row) {
       if (!map || !row?.driver_id) return;
 
@@ -604,36 +587,18 @@
 
       const lat = Number(row.lat);
       const lng = Number(row.lng);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-        logError("Ungültige Koordinaten für Driver:", driverKey, row);
-        return;
-      }
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
       const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
       const age = Date.now() - ts;
 
-      if (age > STALE_MS) {
-        logDebug(`Stale Update für ${driverKey} ignoriert (kein Löschen).`);
-        return;
-      }
-
-      const timeStr = row.updated_at ? new Date(row.updated_at).toLocaleTimeString("de-DE") : "–";
+      if (age > STALE_MS) return;
 
       let marker = markers.get(driverKey);
       if (!marker) {
         const el = document.createElement("div");
         el.className = "marker";
-        marker = new mapboxgl.Marker({ element: el })
-          .setLngLat([lng, lat])
-          .setPopup(new mapboxgl.Popup({ offset: 18 }).setHTML(`
-            <div class="er-popup">
-              <span class="er-tag">LIVE</span>
-              <div class="er-row">👤 Fahrer: <b>${row.driver_id}</b></div>
-              <div class="er-row">📍 Position: ${lat.toFixed(5)}, ${lng.toFixed(5)}</div>
-              <div class="er-row">⏱️ Letztes Update: ${timeStr}</div>
-            </div>
-          `))
-          .addTo(map);
+        marker = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
         markers.set(driverKey, marker);
       } else {
         marker.setLngLat([lng, lat]);
@@ -642,7 +607,6 @@
       if (age > STALE_VISUAL_MS) marker.getElement().classList.add("stale");
       else marker.getElement().classList.remove("stale");
 
-      // Auto-Follow für ausgewählten Fahrer
       if (currentFilterKey === driverKey && map.getZoom() > 12) {
         map.easeTo({ center: [lng, lat], duration: 600 });
       }
@@ -651,7 +615,6 @@
       setCount(markers.size);
       setLast();
 
-      // Route-Logik
       const now = Date.now();
       const minTs = now - ROUTE_MS;
       const arr = routePoints.get(driverKey) ?? [];
@@ -659,6 +622,7 @@
       while (arr.length && arr[0].ts < minTs) arr.shift();
       if (arr.length > MAX_POINTS) arr.splice(0, arr.length - MAX_POINTS);
       routePoints.set(driverKey, arr);
+
       refreshRoutesSource();
     }
 
@@ -675,7 +639,7 @@
       setCount(markers.size);
     }
 
-    // --- 10. TTL-Check / Pruning ---
+    // --- Prune ---
     setInterval(() => {
       if (lastSeen.size === 0) return;
       const now = Date.now();
@@ -683,10 +647,9 @@
       for (const [driverKey, ts] of lastSeen.entries()) {
         if (now - ts > STALE_MS) staleKeys.push(driverKey);
       }
-      staleKeys.forEach(driverKey => removeMarker(driverKey));
+      staleKeys.forEach(removeMarker);
     }, PRUNE_EVERY_MS);
 
-    // --- 11. Start ---
     document.addEventListener("DOMContentLoaded", initMap);
   </script>
 </body>
