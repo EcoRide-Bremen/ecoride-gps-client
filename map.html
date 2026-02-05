@@ -524,7 +524,17 @@
         if (!newMarkers.has(driverKey)) removeMarker(driverKey);
       }
 
-      for (const [, row] of newMarkers.entries()) upsertMarker(row);
+      for (const [, row] of newMarkers.entries()) {
+        upsertMarker(row);
+        // Zentriere die Karte auf den ausgewählten Fahrer
+        if (currentFilterKey && currentFilterKey === normId(row.driver_id)) {
+          const lat = Number(row.lat);
+          const lng = Number(row.lng);
+          if (Number.isFinite(lat) && Number.isFinite(lng)) {
+            map.easeTo({ center: [lng, lat], zoom: 14, duration: 600 });
+          }
+        }
+      }
 
       setLast();
     }
@@ -625,10 +635,6 @@
 
       if (age > STALE_VISUAL_MS) marker.getElement().classList.add("stale");
       else marker.getElement().classList.remove("stale");
-
-      if (currentFilterKey === driverKey && map.getZoom() > 12) {
-        map.easeTo({ center: [lng, lat], duration: 600 });
-      }
 
       lastSeen.set(driverKey, ts);
       setCount(markers.size);
