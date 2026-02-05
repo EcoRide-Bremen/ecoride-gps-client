@@ -125,18 +125,20 @@
 
     /* HINT (zweizeilig split) */
     .stat-top { align-items: center; }
-    .hint-top {
-      flex: 1;
-      text-align: center;
-      color: #00FF00;
-      font-size: 12.5px;
-      font-weight: 600;
-      padding: 0 8px;
-      display: none;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
+.hint-top {
+  flex: 1;
+  text-align: center;
+  color: #00FF00;
+  font-size: 11.5px;      /* kleiner, ruhiger */
+  font-weight: 500;       /* weniger dominant */
+  line-height: 1.2;
+  padding: 0 8px;
+  display: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
     .hint-top.show { display:block; }
 
     .hint-bottom {
