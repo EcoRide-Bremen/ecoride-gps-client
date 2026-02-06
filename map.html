@@ -68,7 +68,8 @@
     /* Collapsed: nur Titel sichtbar */
     .panel.collapsed .row,
     .panel.collapsed .stat,
-    .panel.collapsed .stat2 { display:none !important; }
+    .panel.collapsed .stat2,
+    .panel.collapsed .stat3 { display:none !important; }
 
     .input-button-group {
       width:100%;
@@ -171,6 +172,20 @@
       box-sizing: border-box;
     }
 
+    /* Phase 3: Impact-Zeile */
+    .stat3{
+      margin-top:8px;
+      font-size:12.5px;
+      color: var(--ink);
+      opacity:0.85;
+      display:flex;
+      justify-content:space-between;
+      gap:8px;
+      padding: 0 10px;
+      box-sizing: border-box;
+      flex-wrap: nowrap;
+    }
+
     .dot { display:inline-block; width:10px; height:10px; border-radius:50%; background:#ef4444; }
     .dot.on { background:#22c55e; }
 
@@ -240,6 +255,13 @@
       <div>Letztes Update:</div>
       <div id="lastTxt">–</div>
     </div>
+
+    <!-- Phase 3: Live-Impact -->
+    <div class="stat3">
+      <div>Aktiv: <span id="impactActive">–</span></div>
+      <div>Punkte 10m: <span id="impactPoints10">–</span></div>
+      <div>Marker: <span id="impactMarkers">0</span></div>
+    </div>
   </div>
 
   <script>
@@ -305,6 +327,114 @@
       return ROUTE_COLORS[index];
     }
 
+    // --- Supabase + State ---
+    if (!SUPABASE_URL || SUPABASE_URL.includes("DEINE_SUPABASE_URL") || !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.includes("DEIN_SUPABASE_ANON_KEY")) {
+      showHint("Supabase Config fehlt.");
+      logError("SUPABASE_URL / SUPABASE_ANON_KEY sind nicht gesetzt.");
+    }
+
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let map;
+    let channel = null;
+
+    const markers = new Map();
+    const lastSeen = new Map();
+    const routePoints = new Map();
+
+    let routesReady = false;
+    let routesVisible = true;
+    let activeOnlyMode = false;
+
+    let currentFilter = "";
+    let currentFilterKey = "";
+
+    // --- UI ---
+    function setRealtime(on) {
+      const rtDot = document.getElementById("rtDot");
+      const rtTxt = document.getElementById("rtTxt");
+      if (rtDot) rtDot.classList.toggle("on", on);
+      if (rtTxt) rtTxt.textContent = "Realtime: " + (on ? "AN" : "AUS");
+    }
+    function setLast() { setSafeTextContent("lastTxt", new Date().toLocaleString("de-DE")); }
+    function setCount(n) { setSafeTextContent("countTxt", "Marker: " + n); }
+
+    // Phase 3.1: Marker-Impact aus lokalem State
+    function setImpactMarkers() {
+      setSafeTextContent("impactMarkers", String(markers.size));
+    }
+
+    // Phase 3.1: Live-Impact aus Supabase
+    async function fetchImpact() {
+      if (!isPanelOpen()) return;
+
+      const now = Date.now();
+      const iso2m = new Date(now - ACTIVE_ONLY_MS).toISOString(); // 2 Minuten
+      const iso10m = new Date(now - ROUTE_MS).toISOString();      // 10 Minuten
+
+      // 1) Aktive Fahrer (distinct)
+      const { data: activeRows, error: errActive } = await sb
+        .from("live_positions")
+        .select("driver_id, updated_at")
+        .gte("updated_at", iso2m)
+        .order("updated_at", { ascending: false })
+        .limit(2000);
+
+      if (errActive) {
+        logError("Impact active error:", errActive.message);
+      } else {
+        const set = new Set();
+        for (const r of activeRows || []) {
+          const k = normId(r?.driver_id);
+          if (k) set.add(k);
+        }
+        setSafeTextContent("impactActive", String(set.size));
+      }
+
+      // 2) Positionspunkte letzte 10 Minuten (Count)
+      const { count: points10, error: errPoints } = await sb
+        .from("live_positions")
+        .select("*", { count: "exact", head: true })
+        .gte("updated_at", iso10m);
+
+      if (errPoints) {
+        logError("Impact points10 error:", errPoints.message);
+      } else {
+        setSafeTextContent("impactPoints10", String(points10 ?? 0));
+      }
+
+      // 3) Marker (lokal)
+      setImpactMarkers();
+    }
+
+    function refreshRoutesSource() {
+      if (!map || !routesReady || !map.getSource("er-routes")) return;
+
+      const features = [];
+      for (const [driverKey, pts] of routePoints.entries()) {
+        if (!pts || pts.length < 2) continue;
+        if (currentFilterKey && driverKey !== currentFilterKey) continue;
+
+        features.push({
+          type: "Feature",
+          properties: { driverKey, color: getColorForDriver(driverKey) },
+          geometry: { type: "LineString", coordinates: pts.map(p => [p.lng, p.lat]) }
+        });
+      }
+
+      map.getSource("er-routes").setData({ type: "FeatureCollection", features });
+
+      if (!isPanelOpen()) return;
+
+      if (features.length === 0 && currentFilterKey) {
+        showHint("Keine Route für diesen Fahrer.");
+      } else if (features.length === 0) {
+        showHint("Keine Routen verfügbar.");
+      } else {
+        hideHint();
+      }
+    }
+
     // --- Mapbox ---
     function initMapbox() {
       if (!MAPBOX_TOKEN || MAPBOX_TOKEN.includes("DEIN_MAPBOX_TOKEN")) {
@@ -361,11 +491,15 @@
           map.on("mouseleave", "er-routes-line", () => { map.getCanvas().style.cursor = ""; });
         }
 
+        // ✅ FIX: Text-Logik korrekt
         const btn = document.getElementById("btnToggleRoutes");
-if (btn) btn.textContent = routesVisible ? "Ausblenden" : "Einblenden";
+        if (btn) btn.textContent = routesVisible ? "Ausblenden" : "Einblenden";
 
         routesReady = true;
         refreshRoutesSource();
+
+        // Phase 3: Impact direkt nach Map-Load einmal ziehen
+        fetchImpact().catch(e => logError("fetchImpact after load failed:", e));
       });
 
       map.on("error", (e) => {
@@ -374,66 +508,6 @@ if (btn) btn.textContent = routesVisible ? "Ausblenden" : "Einblenden";
       });
 
       return map;
-    }
-
-    // --- Supabase + State ---
-    if (!SUPABASE_URL || SUPABASE_URL.includes("DEINE_SUPABASE_URL") || !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.includes("DEIN_SUPABASE_ANON_KEY")) {
-      showHint("Supabase Config fehlt.");
-      logError("SUPABASE_URL / SUPABASE_ANON_KEY sind nicht gesetzt.");
-    }
-
-    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    let map;
-    let channel = null;
-
-    const markers = new Map();
-    const lastSeen = new Map();
-    const routePoints = new Map();
-
-    let routesReady = false;
-    let routesVisible = true;
-    let activeOnlyMode = false;
-
-    let currentFilter = "";
-    let currentFilterKey = "";
-
-    // --- UI ---
-    function setRealtime(on) {
-      const rtDot = document.getElementById("rtDot");
-      const rtTxt = document.getElementById("rtTxt");
-      if (rtDot) rtDot.classList.toggle("on", on);
-      if (rtTxt) rtTxt.textContent = "Realtime: " + (on ? "AN" : "AUS");
-    }
-    function setLast() { setSafeTextContent("lastTxt", new Date().toLocaleString("de-DE")); }
-    function setCount(n) { setSafeTextContent("countTxt", "Marker: " + n); }
-
-    function refreshRoutesSource() {
-      if (!map || !routesReady || !map.getSource("er-routes")) return;
-
-      const features = [];
-      for (const [driverKey, pts] of routePoints.entries()) {
-        if (!pts || pts.length < 2) continue;
-        if (currentFilterKey && driverKey !== currentFilterKey) continue;
-
-        features.push({
-          type: "Feature",
-          properties: { driverKey, color: getColorForDriver(driverKey) },
-          geometry: { type: "LineString", coordinates: pts.map(p => [p.lng, p.lat]) }
-        });
-      }
-
-      map.getSource("er-routes").setData({ type: "FeatureCollection", features });
-
-      if (!isPanelOpen()) return;
-
-      if (features.length === 0 && currentFilterKey) {
-        showHint("Keine Route für diesen Fahrer.");
-      } else if (features.length === 0) {
-        showHint("Keine Routen verfügbar.");
-      } else {
-        hideHint();
-      }
     }
 
     // --- Init ---
@@ -445,6 +519,7 @@ if (btn) btn.textContent = routesVisible ? "Ausblenden" : "Einblenden";
         const panel = document.querySelector(".panel");
         panel?.classList.toggle("collapsed");
         if (panel?.classList.contains("collapsed")) hideHint();
+        else fetchImpact().catch(e => logError("fetchImpact on open failed:", e));
       });
 
       document.getElementById("btnApply")?.addEventListener("click", async () => {
@@ -453,6 +528,7 @@ if (btn) btn.textContent = routesVisible ? "Ausblenden" : "Einblenden";
         currentFilterKey = normId(currentFilter);
         await fetchLatest();
         await fetchRouteHistory();
+        fetchImpact().catch(e => logError("fetchImpact after apply failed:", e));
       });
 
       document.getElementById("btnAll")?.addEventListener("click", async () => {
@@ -462,6 +538,7 @@ if (btn) btn.textContent = routesVisible ? "Ausblenden" : "Einblenden";
         currentFilterKey = "";
         await fetchLatest();
         await fetchRouteHistory();
+        fetchImpact().catch(e => logError("fetchImpact after all failed:", e));
       });
 
       document.getElementById("btnToggleRoutes")?.addEventListener("click", () => {
@@ -469,8 +546,9 @@ if (btn) btn.textContent = routesVisible ? "Ausblenden" : "Einblenden";
         if (map && map.getLayer("er-routes-line")) {
           map.setLayoutProperty("er-routes-line", "visibility", routesVisible ? "visible" : "none");
         }
+        // ✅ FIX: Text-Logik korrekt
         const btn = document.getElementById("btnToggleRoutes");
-if (btn) btn.textContent = routesVisible ? "Einblenden" : "Ausblenden";
+        if (btn) btn.textContent = routesVisible ? "Ausblenden" : "Einblenden";
       });
 
       document.getElementById("btnActiveOnly")?.addEventListener("click", async () => {
@@ -483,12 +561,19 @@ if (btn) btn.textContent = routesVisible ? "Einblenden" : "Ausblenden";
 
         await fetchLatest();
         await fetchRouteHistory();
+        fetchImpact().catch(e => logError("fetchImpact after activeOnly failed:", e));
       });
 
       fetchLatest().catch(e => logError("Initial fetchLatest() fehlgeschlagen:", e));
       fetchRouteHistory().catch(e => logError("Initial fetchRouteHistory() fehlgeschlagen:", e));
 
       subscribe();
+
+      // Phase 3: Impact initial + alle 15s aktualisieren
+      fetchImpact().catch(e => logError("fetchImpact init failed:", e));
+      setInterval(() => {
+        fetchImpact().catch(e => logError("fetchImpact interval failed:", e));
+      }, 15000);
     }
 
     // --- Fetch Latest ---
@@ -537,6 +622,7 @@ if (btn) btn.textContent = routesVisible ? "Einblenden" : "Ausblenden";
       }
 
       setLast();
+      setImpactMarkers();
     }
 
     // --- Fetch Route History ---
@@ -649,6 +735,9 @@ if (btn) btn.textContent = routesVisible ? "Einblenden" : "Ausblenden";
       routePoints.set(driverKey, arr);
 
       refreshRoutesSource();
+
+      // Phase 3: Marker-Impact sofort aktualisieren
+      setImpactMarkers();
     }
 
     function removeMarker(driverKey) {
@@ -662,6 +751,9 @@ if (btn) btn.textContent = routesVisible ? "Einblenden" : "Ausblenden";
       routePoints.delete(driverKey);
       refreshRoutesSource();
       setCount(markers.size);
+
+      // Phase 3: Marker-Impact sofort aktualisieren
+      setImpactMarkers();
     }
 
     // --- Prune ---
