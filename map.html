@@ -359,51 +359,30 @@
     function setLast() { setSafeTextContent("lastTxt", new Date().toLocaleString("de-DE")); }
     function setCount(n) { setSafeTextContent("countTxt", "Marker: " + n); }
 
-    // Phase 3.1: Marker-Impact aus lokalem State
+    // Phase 3.2: Marker-Impact aus lokalem State
     function setImpactMarkers() {
       setSafeTextContent("impactMarkers", String(markers.size));
     }
 
-    // Phase 3.1: Live-Impact aus Supabase
+    // Phase 3.2: Live-Impact NUR per RPC (kein clientseitiges distinct/count mehr)
     async function fetchImpact() {
       if (!isPanelOpen()) return;
 
-      const now = Date.now();
-      const iso2m = new Date(now - ACTIVE_ONLY_MS).toISOString(); // 2 Minuten
-      const iso10m = new Date(now - ROUTE_MS).toISOString();      // 10 Minuten
+      const { data, error } = await sb.rpc("get_live_impact", {
+        active_minutes: 2,
+        points_minutes: 10
+      });
 
-      // 1) Aktive Fahrer (distinct)
-      const { data: activeRows, error: errActive } = await sb
-        .from("live_positions")
-        .select("driver_id, updated_at")
-        .gte("updated_at", iso2m)
-        .order("updated_at", { ascending: false })
-        .limit(2000);
-
-      if (errActive) {
-        logError("Impact active error:", errActive.message);
-      } else {
-        const set = new Set();
-        for (const r of activeRows || []) {
-          const k = normId(r?.driver_id);
-          if (k) set.add(k);
-        }
-        setSafeTextContent("impactActive", String(set.size));
+      if (error) {
+        logError("RPC impact error:", error.message);
+        return;
       }
 
-      // 2) Positionspunkte letzte 10 Minuten (Count)
-      const { count: points10, error: errPoints } = await sb
-        .from("live_positions")
-        .select("*", { count: "exact", head: true })
-        .gte("updated_at", iso10m);
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row) return;
 
-      if (errPoints) {
-        logError("Impact points10 error:", errPoints.message);
-      } else {
-        setSafeTextContent("impactPoints10", String(points10 ?? 0));
-      }
-
-      // 3) Marker (lokal)
+      setSafeTextContent("impactActive", String(row.active_drivers ?? 0));
+      setSafeTextContent("impactPoints10", String(row.points_window ?? 0));
       setImpactMarkers();
     }
 
@@ -491,14 +470,14 @@
           map.on("mouseleave", "er-routes-line", () => { map.getCanvas().style.cursor = ""; });
         }
 
-        // ✅ FIX: Text-Logik korrekt
+        // ✅ Text-Logik korrekt: sichtbar => Ausblenden / unsichtbar => Einblenden
         const btn = document.getElementById("btnToggleRoutes");
         if (btn) btn.textContent = routesVisible ? "Ausblenden" : "Einblenden";
 
         routesReady = true;
         refreshRoutesSource();
 
-        // Phase 3: Impact direkt nach Map-Load einmal ziehen
+        // Phase 3.2: Impact einmal nach Map-Load ziehen
         fetchImpact().catch(e => logError("fetchImpact after load failed:", e));
       });
 
@@ -546,7 +525,7 @@
         if (map && map.getLayer("er-routes-line")) {
           map.setLayoutProperty("er-routes-line", "visibility", routesVisible ? "visible" : "none");
         }
-        // ✅ FIX: Text-Logik korrekt
+        // ✅ Text-Logik korrekt
         const btn = document.getElementById("btnToggleRoutes");
         if (btn) btn.textContent = routesVisible ? "Ausblenden" : "Einblenden";
       });
@@ -556,6 +535,7 @@
         const btn = document.getElementById("btnActiveOnly");
         if (btn) btn.textContent = activeOnlyMode ? "Alle anzeigen" : "Aktive";
 
+        // (Text ist kosmetisch, Funktionalität zählt)
         if (activeOnlyMode) showHint("Alle Fahrer.");
         else showHint("Nur aktive Fahrer.");
 
@@ -569,7 +549,7 @@
 
       subscribe();
 
-      // Phase 3: Impact initial + alle 15s aktualisieren
+      // Phase 3.2: Impact initial + alle 15s aktualisieren
       fetchImpact().catch(e => logError("fetchImpact init failed:", e));
       setInterval(() => {
         fetchImpact().catch(e => logError("fetchImpact interval failed:", e));
@@ -736,7 +716,7 @@
 
       refreshRoutesSource();
 
-      // Phase 3: Marker-Impact sofort aktualisieren
+      // Phase 3.2: Marker sofort aktualisieren (RPC bleibt im Intervall)
       setImpactMarkers();
     }
 
@@ -752,7 +732,7 @@
       refreshRoutesSource();
       setCount(markers.size);
 
-      // Phase 3: Marker-Impact sofort aktualisieren
+      // Phase 3.2: Marker sofort aktualisieren
       setImpactMarkers();
     }
 
