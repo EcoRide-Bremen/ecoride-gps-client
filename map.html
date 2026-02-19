@@ -36,7 +36,7 @@
       padding: 12px;
       width: min(360px, calc(100vw - 40px));
       min-width: 320px;
-      max-height: 460px;
+      max-height: 520px;
       transition: max-height .3s ease;
     }
     .panel.collapsed { max-height: 54px; padding: 10px 12px; }
@@ -94,7 +94,6 @@
       text-align: center;
     }
 
-    /* Buttons zentriert mit Luft nach links und rechts */
     .button-group {
       width:100%;
       display:flex;
@@ -143,21 +142,9 @@
       padding: 0 10px;
       box-sizing: border-box;
     }
-    .stat .left {
-      justify-self: start;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .stat .mid {
-      justify-self: center;
-      text-align: center;
-      color: #00FF00;
-      font-weight: 600;
-    }
-    .stat .right {
-      justify-self: end;
-    }
+    .stat .left { justify-self: start; display:flex; align-items:center; gap:6px; }
+    .stat .mid { justify-self: center; text-align:center; color:#00FF00; font-weight:600; }
+    .stat .right { justify-self: end; }
 
     /* Zweite Statuszeile (Letztes Update) */
     .stat2 {
@@ -170,7 +157,31 @@
       gap:8px;
       padding: 0 10px;
       box-sizing: border-box;
+      align-items: center;
     }
+    .last-left { display:flex; align-items:center; gap:8px; }
+
+    /* Mini Loader */
+    .sync {
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      border: 1px solid rgba(199,223,58,0.22);
+      color: rgba(199,223,58,0.95);
+      font-size: 12px;
+      opacity: 0.0;
+      transform: rotate(0deg);
+      transition: opacity .15s ease;
+      user-select: none;
+    }
+    .sync.on {
+      opacity: 1.0;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     /* Phase 3: Impact-Zeile */
     .stat3{
@@ -186,6 +197,17 @@
       flex-wrap: nowrap;
     }
 
+    /* sanfter Update-Pulse */
+    .pulse {
+      display:inline-block;
+      padding: 0 6px;
+      border-radius: 999px;
+      transition: background-color .35s ease;
+    }
+    .pulse.flash {
+      background: rgba(199,223,58,0.22);
+    }
+
     .dot { display:inline-block; width:10px; height:10px; border-radius:50%; background:#ef4444; }
     .dot.on { background:#22c55e; }
 
@@ -197,7 +219,6 @@
     }
     .marker.stale { opacity: 0.6 !important; background: rgba(199,223,58,0.4) !important; }
 
-    /* Hint in der Statuszeile */
     .hint-inline {
       display:none;
       color:#00FF00;
@@ -252,15 +273,17 @@
     </div>
 
     <div class="stat2">
-      <div>Letztes Update:</div>
+      <div class="last-left">
+        <span>Letztes Update:</span>
+        <span id="syncIcon" class="sync" title="Aktualisiere…">⟳</span>
+      </div>
       <div id="lastTxt">–</div>
     </div>
 
-    <!-- Phase 3: Live-Impact -->
     <div class="stat3">
-      <div>Aktiv: <span id="impactActive">–</span></div>
-      <div>Punkte 10m: <span id="impactPoints10">–</span></div>
-      <div>Marker: <span id="impactMarkers">0</span></div>
+      <div>Aktiv: <span id="impactActive" class="pulse">–</span></div>
+      <div>Punkte 10m: <span id="impactPoints10" class="pulse">–</span></div>
+      <div>Marker: <span id="impactMarkers" class="pulse">0</span></div>
     </div>
   </div>
 
@@ -284,6 +307,12 @@
     // --- Phase 2.1: Farben für Routen (stabil) ---
     const ROUTE_COLORS = ["#c7df3a", "#3bb2d0", "#ff6b6b", "#a55eea", "#4dabf7", "#f06595", "#ffd43b", "#7bed9f"];
 
+    // --- Impact Polling / Backoff ---
+    const IMPACT_OK_MS = 10_000;     // normaler Poll
+    const IMPACT_MIN_MS = 5_000;     // wenn manuell getriggert
+    const IMPACT_MAX_MS = 60_000;    // Backoff-Deckel
+    const IMPACT_BACKOFF = [5_000, 10_000, 20_000, 40_000, 60_000];
+
     // --- Helper ---
     function setSafeTextContent(id, text) {
       const el = document.getElementById(id);
@@ -296,6 +325,12 @@
     function isPanelOpen() {
       const panel = document.querySelector(".panel");
       return panel && !panel.classList.contains("collapsed");
+    }
+    function isTabVisible() {
+      return document.visibilityState === "visible";
+    }
+    function shouldPollImpact() {
+      return isPanelOpen() && isTabVisible();
     }
 
     function showHint(msg) {
@@ -327,6 +362,28 @@
       return ROUTE_COLORS[index];
     }
 
+    function setRealtime(on) {
+      const rtDot = document.getElementById("rtDot");
+      const rtTxt = document.getElementById("rtTxt");
+      if (rtDot) rtDot.classList.toggle("on", on);
+      if (rtTxt) rtTxt.textContent = "Realtime: " + (on ? "AN" : "AUS");
+    }
+    function setLast(ts = new Date()) { setSafeTextContent("lastTxt", ts.toLocaleString("de-DE")); }
+    function setCount(n) { setSafeTextContent("countTxt", "Marker: " + n); }
+
+    function setSync(on) {
+      const el = document.getElementById("syncIcon");
+      if (!el) return;
+      el.classList.toggle("on", !!on);
+    }
+
+    function pulse(id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.add("flash");
+      setTimeout(() => el.classList.remove("flash"), 420);
+    }
+
     // --- Supabase + State ---
     if (!SUPABASE_URL || SUPABASE_URL.includes("DEINE_SUPABASE_URL") || !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.includes("DEIN_SUPABASE_ANON_KEY")) {
       showHint("Supabase Config fehlt.");
@@ -349,41 +406,105 @@
     let currentFilter = "";
     let currentFilterKey = "";
 
-    // --- UI ---
-    function setRealtime(on) {
-      const rtDot = document.getElementById("rtDot");
-      const rtTxt = document.getElementById("rtTxt");
-      if (rtDot) rtDot.classList.toggle("on", on);
-      if (rtTxt) rtTxt.textContent = "Realtime: " + (on ? "AN" : "AUS");
-    }
-    function setLast() { setSafeTextContent("lastTxt", new Date().toLocaleString("de-DE")); }
-    function setCount(n) { setSafeTextContent("countTxt", "Marker: " + n); }
+    // --- Impact state ---
+    let impactTimer = null;
+    let impactInFlight = false;
+    let impactBackoffIdx = 0;
+    let lastImpactOkAt = 0;
+    let lastImpactSnapshot = { active_drivers: null, points_window: null, server_time: null };
 
-    // Phase 3.2: Marker-Impact aus lokalem State
     function setImpactMarkers() {
       setSafeTextContent("impactMarkers", String(markers.size));
+      pulse("impactMarkers");
     }
 
-    // Phase 3.2: Live-Impact NUR per RPC (kein clientseitiges distinct/count mehr)
-    async function fetchImpact() {
-      if (!isPanelOpen()) return;
+    async function fetchImpactOnce(reason = "timer") {
+      if (!shouldPollImpact()) return;
 
-      const { data, error } = await sb.rpc("get_live_impact", {
-        active_minutes: 2,
-        points_minutes: 10
-      });
+      if (impactInFlight) return; // keine parallelen RPCs
+      impactInFlight = true;
+      setSync(true);
 
-      if (error) {
-        logError("RPC impact error:", error.message);
-        return;
+      try {
+        const { data, error } = await sb.rpc("get_live_impact", {
+          active_minutes: 2,
+          points_minutes: 10
+        });
+
+        if (error) throw error;
+
+        const row = Array.isArray(data) ? data[0] : data;
+        if (!row) throw new Error("RPC returned no rows");
+
+        // Werte nur aktualisieren, wenn wirklich geliefert (sonst letzten Snapshot behalten)
+        const active = (row.active_drivers ?? 0);
+        const points = (row.points_window ?? 0);
+
+        // sanftes Update (Pulse)
+        setSafeTextContent("impactActive", String(active));
+        setSafeTextContent("impactPoints10", String(points));
+        pulse("impactActive");
+        pulse("impactPoints10");
+
+        // Marker kommen aus lokalem State
+        setSafeTextContent("impactMarkers", String(markers.size));
+
+        // Snapshot merken
+        lastImpactSnapshot = {
+          active_drivers: active,
+          points_window: points,
+          server_time: row.server_time ?? null
+        };
+
+        lastImpactOkAt = Date.now();
+        impactBackoffIdx = 0; // Backoff reset
+        setLast(new Date());
+      } catch (e) {
+        // Robust: NICHT auf 0 setzen, sondern letzte Werte stehen lassen
+        logError("RPC impact error:", e?.message || e);
+
+        // optional: Hinweis nur wenn Panel offen (ist es), aber nicht nervig
+        showHint("Impact temporär nicht verfügbar.");
+
+        // Backoff hochfahren
+        impactBackoffIdx = Math.min(impactBackoffIdx + 1, IMPACT_BACKOFF.length - 1);
+      } finally {
+        impactInFlight = false;
+        setSync(false);
       }
 
-      const row = Array.isArray(data) ? data[0] : data;
-      if (!row) return;
+      scheduleImpactPoll();
+    }
 
-      setSafeTextContent("impactActive", String(row.active_drivers ?? 0));
-      setSafeTextContent("impactPoints10", String(row.points_window ?? 0));
-      setImpactMarkers();
+    function clearImpactTimer() {
+      if (impactTimer) {
+        clearTimeout(impactTimer);
+        impactTimer = null;
+      }
+    }
+
+    function scheduleImpactPoll(immediate = false) {
+      clearImpactTimer();
+      if (!shouldPollImpact()) return;
+
+      const base = IMPACT_OK_MS;
+      const backoff = IMPACT_BACKOFF[impactBackoffIdx] ?? IMPACT_MAX_MS;
+      const nextMs = immediate ? IMPACT_MIN_MS : Math.max(base, backoff);
+
+      impactTimer = setTimeout(() => {
+        fetchImpactOnce("timer").catch(() => {});
+      }, nextMs);
+    }
+
+    function onVisibilityOrPanelChange() {
+      if (shouldPollImpact()) {
+        // Panel offen & Tab sichtbar -> sofortiger Refresh, dann normales Scheduling
+        fetchImpactOnce("resume").catch(() => {});
+        scheduleImpactPoll(false);
+      } else {
+        // Pause
+        clearImpactTimer();
+      }
     }
 
     function refreshRoutesSource() {
@@ -405,18 +526,14 @@
 
       if (!isPanelOpen()) return;
 
-      if (features.length === 0 && currentFilterKey) {
-        showHint("Keine Route für diesen Fahrer.");
-      } else if (features.length === 0) {
-        showHint("Keine Routen verfügbar.");
-      } else {
-        hideHint();
-      }
+      if (features.length === 0 && currentFilterKey) showHint("Keine Route für diesen Fahrer.");
+      else if (features.length === 0) showHint("Keine Routen verfügbar.");
+      else hideHint();
     }
 
     // --- Mapbox ---
     function initMapbox() {
-      if (!MAPBOX_TOKEN || MAPBOX_TOKEN.includes("DEIN_MAPBOX_TOKEN")) {
+      if (!MAPBOX_TOKEN || MAPBOX_TOKEN.includes("DEIN_MAPBOX_TOKEN") || MAPBOX_TOKEN.includes("REPLACE_WITH_YOUR_TOKEN")) {
         showHint("Mapbox Token fehlt.");
         logError("MAPBOX_TOKEN ist nicht gesetzt.");
         return null;
@@ -437,10 +554,7 @@
         hideHint();
 
         if (!map.getSource("er-routes")) {
-          map.addSource("er-routes", {
-            type: "geojson",
-            data: { type: "FeatureCollection", features: [] }
-          });
+          map.addSource("er-routes", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
 
           map.addLayer({
             id: "er-routes-line",
@@ -470,15 +584,12 @@
           map.on("mouseleave", "er-routes-line", () => { map.getCanvas().style.cursor = ""; });
         }
 
-        // ✅ Text-Logik korrekt: sichtbar => Ausblenden / unsichtbar => Einblenden
+        // Text korrekt: sichtbar => Ausblenden / unsichtbar => Einblenden
         const btn = document.getElementById("btnToggleRoutes");
         if (btn) btn.textContent = routesVisible ? "Ausblenden" : "Einblenden";
 
         routesReady = true;
         refreshRoutesSource();
-
-        // Phase 3.2: Impact einmal nach Map-Load ziehen
-        fetchImpact().catch(e => logError("fetchImpact after load failed:", e));
       });
 
       map.on("error", (e) => {
@@ -498,7 +609,7 @@
         const panel = document.querySelector(".panel");
         panel?.classList.toggle("collapsed");
         if (panel?.classList.contains("collapsed")) hideHint();
-        else fetchImpact().catch(e => logError("fetchImpact on open failed:", e));
+        onVisibilityOrPanelChange();
       });
 
       document.getElementById("btnApply")?.addEventListener("click", async () => {
@@ -507,7 +618,7 @@
         currentFilterKey = normId(currentFilter);
         await fetchLatest();
         await fetchRouteHistory();
-        fetchImpact().catch(e => logError("fetchImpact after apply failed:", e));
+        onVisibilityOrPanelChange();
       });
 
       document.getElementById("btnAll")?.addEventListener("click", async () => {
@@ -517,7 +628,7 @@
         currentFilterKey = "";
         await fetchLatest();
         await fetchRouteHistory();
-        fetchImpact().catch(e => logError("fetchImpact after all failed:", e));
+        onVisibilityOrPanelChange();
       });
 
       document.getElementById("btnToggleRoutes")?.addEventListener("click", () => {
@@ -525,7 +636,6 @@
         if (map && map.getLayer("er-routes-line")) {
           map.setLayoutProperty("er-routes-line", "visibility", routesVisible ? "visible" : "none");
         }
-        // ✅ Text-Logik korrekt
         const btn = document.getElementById("btnToggleRoutes");
         if (btn) btn.textContent = routesVisible ? "Ausblenden" : "Einblenden";
       });
@@ -535,13 +645,16 @@
         const btn = document.getElementById("btnActiveOnly");
         if (btn) btn.textContent = activeOnlyMode ? "Alle anzeigen" : "Aktive";
 
-        // (Text ist kosmetisch, Funktionalität zählt)
         if (activeOnlyMode) showHint("Alle Fahrer.");
         else showHint("Nur aktive Fahrer.");
 
         await fetchLatest();
         await fetchRouteHistory();
-        fetchImpact().catch(e => logError("fetchImpact after activeOnly failed:", e));
+        onVisibilityOrPanelChange();
+      });
+
+      document.addEventListener("visibilitychange", () => {
+        onVisibilityOrPanelChange();
       });
 
       fetchLatest().catch(e => logError("Initial fetchLatest() fehlgeschlagen:", e));
@@ -549,11 +662,11 @@
 
       subscribe();
 
-      // Phase 3.2: Impact initial + alle 15s aktualisieren
-      fetchImpact().catch(e => logError("fetchImpact init failed:", e));
-      setInterval(() => {
-        fetchImpact().catch(e => logError("fetchImpact interval failed:", e));
-      }, 15000);
+      // Marker impact sofort setzen (0)
+      setImpactMarkers();
+
+      // Polling startet erst, wenn Panel offen & Tab sichtbar
+      onVisibilityOrPanelChange();
     }
 
     // --- Fetch Latest ---
@@ -591,7 +704,6 @@
 
       for (const [, row] of newMarkers.entries()) {
         upsertMarker(row);
-        // Zentriere die Karte auf den ausgewählten Fahrer
         if (currentFilterKey && currentFilterKey === normId(row.driver_id)) {
           const lat = Number(row.lat);
           const lng = Number(row.lng);
@@ -601,7 +713,7 @@
         }
       }
 
-      setLast();
+      setLast(new Date());
       setImpactMarkers();
     }
 
@@ -686,7 +798,6 @@
 
       const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
       const age = Date.now() - ts;
-
       if (age > STALE_MS) return;
 
       let marker = markers.get(driverKey);
@@ -704,7 +815,7 @@
 
       lastSeen.set(driverKey, ts);
       setCount(markers.size);
-      setLast();
+      setLast(new Date());
 
       const now = Date.now();
       const minTs = now - ROUTE_MS;
@@ -716,8 +827,12 @@
 
       refreshRoutesSource();
 
-      // Phase 3.2: Marker sofort aktualisieren (RPC bleibt im Intervall)
       setImpactMarkers();
+      // Impact RPC nicht bei jedem Event triggern, nur wenn Panel offen/Tab sichtbar und nicht zu oft:
+      const sinceOk = Date.now() - (lastImpactOkAt || 0);
+      if (shouldPollImpact() && sinceOk > 3000) {
+        fetchImpactOnce("event").catch(() => {});
+      }
     }
 
     function removeMarker(driverKey) {
@@ -731,8 +846,6 @@
       routePoints.delete(driverKey);
       refreshRoutesSource();
       setCount(markers.size);
-
-      // Phase 3.2: Marker sofort aktualisieren
       setImpactMarkers();
     }
 
