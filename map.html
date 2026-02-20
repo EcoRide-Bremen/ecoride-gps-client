@@ -220,43 +220,53 @@
     .marker.stale { opacity: 0.6 !important; background: rgba(199,223,58,0.4) !important; }
 
     /* ===== EcoRide Pin ===== */
-    .marker-pin{
-      width:34px;
-      height:46px;
-      transform:translateY(-2px);
-      filter:drop-shadow(0 10px 18px rgba(0,0,0,.35));
-      cursor:pointer;
+    .marker-pin {
+      width: 34px;
+      height: 46px;
+      transform: translateY(-2px);
+      filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.35));
+      cursor: pointer;
     }
-    .marker-pin svg{width:100%;height:100%;display:block;}
-    .marker-pin .pin-body{
-      fill:rgba(199,223,58,0.95);
-      stroke:rgba(199,223,58,0.28);
-      stroke-width:2;
+    .marker-pin svg {
+      width: 100%;
+      height: 100%;
+      display: block;
     }
-    .marker-pin .pin-inner{fill:white; stroke: rgba(11,15,20,0.1); stroke-width: 1;}
-    .marker-pin .pin-icon{fill:#0b0f14;}
-    .marker-pin.stale{
-      opacity:.65;
-      filter:drop-shadow(0 8px 14px rgba(0,0,0,.25));
+    .marker-pin .pin-body {
+      fill: #7CB342; /* Grünton wie im Beispiel */
+      stroke: rgba(124, 179, 66, 0.28);
+      stroke-width: 2;
     }
-    .marker-pin.stale .pin-body{
-      fill:rgba(199,223,58,0.45);
-      stroke:rgba(199,223,58,0.18);
+    .marker-pin .pin-inner {
+      fill: white;
+      stroke: rgba(11, 15, 20, 0.1);
+      stroke-width: 1;
     }
-    .marker-pin:hover{
-      transform:translateY(-4px);
-      transition:transform .15s ease;
+    .marker-pin .pin-icon {
+      fill: #0b0f14;
+    }
+    .marker-pin.stale {
+      opacity: 0.65;
+      filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.25));
+    }
+    .marker-pin.stale .pin-body {
+      fill: rgba(124, 179, 66, 0.45);
+      stroke: rgba(124, 179, 66, 0.18);
+    }
+    .marker-pin:hover {
+      transform: translateY(-4px);
+      transition: transform 0.15s ease;
     }
     .hint-inline {
-      display:none;
-      color:#00FF00;
-      font-size:12px;
-      line-height:1.2;
-      font-weight:600;
-      text-shadow: 0 1px 0 rgba(0,0,0,.18);
+      display: none;
+      color: #00FF00;
+      font-size: 12px;
+      line-height: 1.2;
+      font-weight: 600;
+      text-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
       white-space: nowrap;
     }
-    .hint-inline.show { display:block; }
+    .hint-inline.show { display: block; }
 
     @media (max-width: 900px) {
       .panel { left:12px; top:12px; right:12px; width:auto; min-width: 280px; }
@@ -819,7 +829,7 @@
         <svg viewBox="0 0 64 80" xmlns="http://www.w3.org/2000/svg">
           <path class="pin-body" d="M32 2C20 2 10 12 10 24C10 43 32 78 32 78C32 78 54 43 54 24C54 12 44 2 32 2Z" />
           <circle class="pin-inner" cx="32" cy="26" r="16" />
-          <path class="pin-icon" d="M22 28h20v8H22zM26 24h12v4H26zM28 36h8v4H28z" />
+          <path class="pin-icon" d="M22 24h20v12H22zM25 20h14v4H25zM28 36h8v4h-8z" />
         </svg>
       `;
       return el;
