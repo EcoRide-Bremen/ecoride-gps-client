@@ -849,14 +849,23 @@ function createEcoRidePin(stale=false){
       if (age > STALE_MS) return;
 
       let marker = markers.get(driverKey);
-      if (!marker) {
-        const el = document.createElement("div");
-        el.className = "marker";
-        marker = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
-        markers.set(driverKey, marker);
-      } else {
-        marker.setLngLat([lng, lat]);
-      }
+      let marker = markers.get(driverKey);
+
+if (!marker) {
+  const el = createEcoRidePin(false);
+
+  marker = new mapboxgl.Marker({
+    element: el,
+    anchor: "bottom"
+  })
+  .setLngLat([lng, lat])
+  .addTo(map);
+
+  markers.set(driverKey, marker);
+
+} else {
+  marker.setLngLat([lng, lat]);
+}
 
       if (age > STALE_VISUAL_MS) marker.getElement().classList.add("stale");
       else marker.getElement().classList.remove("stale");
