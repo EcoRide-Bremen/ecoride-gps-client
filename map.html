@@ -204,53 +204,21 @@
       border-radius: 999px;
       transition: background-color .35s ease;
     }
-    .pulse.flash { background: rgba(199,223,58,0.22); }
+    .pulse.flash {
+      background: rgba(199,223,58,0.22);
+    }
 
     .dot { display:inline-block; width:10px; height:10px; border-radius:50%; background:#ef4444; }
     .dot.on { background:#22c55e; }
 
-    /* ---------- EcoRide Pin (Ziel-Design) ---------- */
-    .marker-pin svg {
-  width:100%;
-  height:100%;
-  display:block;
-}
-
-/* HIER EINFÜGEN 👇 */
-.pin-icon { fill: #111; }
-.pin-window { fill: rgba(255,255,255,0.65); }
-.pin-wheel { fill: #111; }
-    .marker-pin svg{ width:100%; height:100%; display:block; }
-
-    .marker-pin .pin-body{
-      fill: rgba(199,223,58,0.98);
-      stroke: rgba(255,255,255,0.65);
-      stroke-width: 1.25;
+    .marker {
+      width:18px; height:18px; border-radius:50%;
+      background: rgba(199,223,58,0.92);
+      border: 2px solid rgba(199,223,58,0.35);
+      box-shadow: 0 10px 22px rgba(0,0,0,.35), 0 0 18px rgba(199,223,58,0.36);
     }
+    .marker.stale { opacity: 0.6 !important; background: rgba(199,223,58,0.4) !important; }
 
-    /* großer Kreis wie im Referenz-Pin */
-    .marker-pin .pin-outer{
-      fill: rgba(235,240,255,0.96);
-      stroke: rgba(0,0,0,0.10);
-      stroke-width: 1.2;
-    }
-
-    .marker-pin .pin-inner{
-      fill: rgba(199,223,58,0.98);
-      stroke: rgba(255,255,255,0.70);
-      stroke-width: 2.0;
-    }
-
-    .marker-pin .pin-icon{
-      fill: rgba(17,17,17,0.92);
-    }
-
-    .marker-pin.stale{
-      opacity: 0.62;
-      filter: drop-shadow(0 10px 18px rgba(0,0,0,.18)) grayscale(35%);
-    }
-
-    /* Hint in der Statuszeile */
     .hint-inline {
       display:none;
       color:#00FF00;
@@ -416,57 +384,6 @@
       setTimeout(() => el.classList.remove("flash"), 420);
     }
 
-    // --- EcoRide Pin Helper (Ziel-Design) ---
-    function createEcoRidePin(stale=false){
-      const el = document.createElement("div");
-      el.className = "marker-pin" + (stale ? " stale" : "");
-      el.innerHTML = `
-        <svg viewBox="0 0 64 80" aria-hidden="true">
-          <!-- Pin body -->
-          <path class="pin-body"
-  d="M32 2C20 2 10 12 10 24
-     C10 40 32 72 32 72
-     C32 72 54 40 54 24
-     C54 12 44 2 32 2Z" />
-
-          <!-- Outer big circle (like reference) -->
-          <circle class="pin-outer" cx="32" cy="26" r="19"/>
-
-          <!-- Inner circle -->
-          <circle class="pin-inner" cx="32" cy="26" r="15"/>
-
-          <!-- Car icon (side view – clean target style) -->
-<g transform="translate(0,-9) scale(0.72)" transform-origin="32px 32px">
-
-  <!-- body -->
-  <path class="pin-icon"
-        d="M20 38
-           C20 34 23 32 28 31
-           H38
-           C43 32 46 34 46 38
-           V41
-           C46 42.7 44.7 44 43 44
-           H23
-           C21.3 44 20 42.7 20 41
-           Z" />
-
-  <!-- window (cut-out look by drawing with bg color via CSS or by opacity) -->
-  <path class="pin-window"
-        d="M28 33.2
-           H37.2
-           C40.1 33.2 41.5 34.2 42.3 35.8
-           H28
-           Z" />
-
-  <!-- wheels -->
-  <circle class="pin-wheel" cx="26.5" cy="44" r="2.3" />
-  <circle class="pin-wheel" cx="39.5" cy="44" r="2.3" />
-
-</g>
-        </svg>`;
-      return el;
-    }
-
     // --- Supabase + State ---
     if (!SUPABASE_URL || SUPABASE_URL.includes("DEINE_SUPABASE_URL") || !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.includes("DEIN_SUPABASE_ANON_KEY")) {
       showHint("Supabase Config fehlt.");
@@ -504,7 +421,7 @@
     async function fetchImpactOnce(reason = "timer") {
       if (!shouldPollImpact()) return;
 
-      if (impactInFlight) return;
+      if (impactInFlight) return; // keine parallelen RPCs
       impactInFlight = true;
       setSync(true);
 
@@ -519,16 +436,20 @@
         const row = Array.isArray(data) ? data[0] : data;
         if (!row) throw new Error("RPC returned no rows");
 
+        // Werte nur aktualisieren, wenn wirklich geliefert (sonst letzten Snapshot behalten)
         const active = (row.active_drivers ?? 0);
         const points = (row.points_window ?? 0);
 
+        // sanftes Update (Pulse)
         setSafeTextContent("impactActive", String(active));
         setSafeTextContent("impactPoints10", String(points));
         pulse("impactActive");
         pulse("impactPoints10");
 
+        // Marker kommen aus lokalem State
         setSafeTextContent("impactMarkers", String(markers.size));
 
+        // Snapshot merken
         lastImpactSnapshot = {
           active_drivers: active,
           points_window: points,
@@ -536,11 +457,16 @@
         };
 
         lastImpactOkAt = Date.now();
-        impactBackoffIdx = 0;
+        impactBackoffIdx = 0; // Backoff reset
         setLast(new Date());
       } catch (e) {
+        // Robust: NICHT auf 0 setzen, sondern letzte Werte stehen lassen
         logError("RPC impact error:", e?.message || e);
+
+        // optional: Hinweis nur wenn Panel offen (ist es), aber nicht nervig
         showHint("Impact temporär nicht verfügbar.");
+
+        // Backoff hochfahren
         impactBackoffIdx = Math.min(impactBackoffIdx + 1, IMPACT_BACKOFF.length - 1);
       } finally {
         impactInFlight = false;
@@ -572,9 +498,11 @@
 
     function onVisibilityOrPanelChange() {
       if (shouldPollImpact()) {
+        // Panel offen & Tab sichtbar -> sofortiger Refresh, dann normales Scheduling
         fetchImpactOnce("resume").catch(() => {});
         scheduleImpactPoll(false);
       } else {
+        // Pause
         clearImpactTimer();
       }
     }
@@ -656,6 +584,7 @@
           map.on("mouseleave", "er-routes-line", () => { map.getCanvas().style.cursor = ""; });
         }
 
+        // Text korrekt: sichtbar => Ausblenden / unsichtbar => Einblenden
         const btn = document.getElementById("btnToggleRoutes");
         if (btn) btn.textContent = routesVisible ? "Ausblenden" : "Einblenden";
 
@@ -733,7 +662,10 @@
 
       subscribe();
 
+      // Marker impact sofort setzen (0)
       setImpactMarkers();
+
+      // Polling startet erst, wenn Panel offen & Tab sichtbar
       onVisibilityOrPanelChange();
     }
 
@@ -869,23 +801,17 @@
       if (age > STALE_MS) return;
 
       let marker = markers.get(driverKey);
-
       if (!marker) {
-        const isStale = age > STALE_VISUAL_MS;
-        const el = createEcoRidePin(isStale);
-
-        marker = new mapboxgl.Marker({
-          element: el,
-          anchor: "bottom"
-        }).setLngLat([lng, lat]).addTo(map);
-
+        const el = document.createElement("div");
+        el.className = "marker";
+        marker = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
         markers.set(driverKey, marker);
       } else {
         marker.setLngLat([lng, lat]);
-        const el = marker.getElement();
-        const isStale = age > STALE_VISUAL_MS;
-        el.classList.toggle("stale", isStale);
       }
+
+      if (age > STALE_VISUAL_MS) marker.getElement().classList.add("stale");
+      else marker.getElement().classList.remove("stale");
 
       lastSeen.set(driverKey, ts);
       setCount(markers.size);
@@ -902,6 +828,7 @@
       refreshRoutesSource();
 
       setImpactMarkers();
+      // Impact RPC nicht bei jedem Event triggern, nur wenn Panel offen/Tab sichtbar und nicht zu oft:
       const sinceOk = Date.now() - (lastImpactOkAt || 0);
       if (shouldPollImpact() && sinceOk > 3000) {
         fetchImpactOnce("event").catch(() => {});
