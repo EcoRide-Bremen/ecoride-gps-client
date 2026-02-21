@@ -432,49 +432,33 @@
           <!-- Inner circle -->
           <circle class="pin-inner" cx="32" cy="26" r="15"/>
 
-          <!-- Car icon (centered) -->
-          <g transform="translate(0,-11) scale(0.80)" transform-origin="32px 32px">
-<!-- Body -->
-<!-- Car icon (side view) -->
-<g transform="translate(0,-11) scale(0.80)" transform-origin="32px 32px">
-  <!-- Body -->
+          <!-- Car icon (side view – clean target style) -->
+<g transform="translate(0,-9) scale(0.72)" transform-origin="32px 32px">
+
+  <!-- body -->
   <path class="pin-icon"
-        d="M18 36
-           H46
-           C48 36 49 37 49 39
+        d="M20 38
+           C20 34 23 32 28 31
+           H38
+           C43 32 46 34 46 38
            V41
-           C49 42.6 47.8 44 46 44
-           H18
-           C16.2 44 15 42.6 15 41
-           V39
-           C15 37 16 36 18 36
+           C46 42.7 44.7 44 43 44
+           H23
+           C21.3 44 20 42.7 20 41
            Z" />
 
-  <!-- Roof / Cabin -->
-  <path class="pin-icon"
-        d="M22 36
-           L26 30.8
-           C26.8 29.8 28 29.2 29.4 29.2
-           H38.6
-           C40 29.2 41.2 29.8 42 30.8
-           L46 36
+  <!-- window (cut-out look by drawing with bg color via CSS or by opacity) -->
+  <path class="pin-window"
+        d="M28 33.2
+           H37.2
+           C40.1 33.2 41.5 34.2 42.3 35.8
+           H28
            Z" />
 
-  <!-- Window cut (gives “side” feel) -->
-  <path class="pin-icon"
-        d="M28.2 31.4
-           H37.8
-           C38.6 31.4 39.3 31.8 39.8 32.4
-           L42.8 36
-           H27.2
-           L30.2 32.4
-           C30.7 31.8 31.4 31.4 32.2 31.4
-           Z"
-        opacity="0.25" />
+  <!-- wheels -->
+  <circle class="pin-wheel" cx="26.5" cy="44" r="2.3" />
+  <circle class="pin-wheel" cx="39.5" cy="44" r="2.3" />
 
-  <!-- Wheels -->
-  <circle class="pin-icon" cx="24" cy="44" r="2.6" />
-  <circle class="pin-icon" cx="40" cy="44" r="2.6" />
 </g>
         </svg>`;
       return el;
