@@ -268,6 +268,72 @@
     }
     .hint-inline.show { display:block; }
 
+    /* ✅ C-M3 Popup Styling */
+    .mapboxgl-popup-content {
+      background: rgba(17,24,37,0.92);
+      color: #eaf0ff;
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 14px;
+      box-shadow: 0 18px 44px rgba(0,0,0,.40);
+      padding: 10px 10px 8px;
+      backdrop-filter: blur(10px);
+      min-width: 210px;
+    }
+    .mapboxgl-popup-tip {
+      border-top-color: rgba(17,24,37,0.92) !important;
+      border-bottom-color: rgba(17,24,37,0.92) !important;
+    }
+    .er-pop-title {
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: 0.2px;
+      margin: 0 0 6px;
+      display:flex;
+      align-items:center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .er-pop-sub {
+      font-size: 12px;
+      color: rgba(234,240,255,0.78);
+      margin: 0 0 8px;
+      display:flex;
+      align-items:center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .er-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.06);
+      white-space: nowrap;
+    }
+    .er-badge.ok { border-color: rgba(34,197,94,0.35); }
+    .er-badge.stale { border-color: rgba(239,68,68,0.35); }
+
+    .er-pop-actions {
+      display:flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .er-pop-btn {
+      flex:1;
+      height: 30px;
+      border-radius: 999px;
+      border: 1px solid rgba(199,223,58,0.18);
+      background: rgba(17,24,37,0.35);
+      color: #eaf0ff;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .er-pop-btn.primary {
+      background: rgba(199,223,58,0.85);
+      color: #0b0f14;
+      border: none;
+    }
+
     @media (max-width: 900px) {
       .panel { left:12px; top:12px; right:12px; width:auto; min-width: 280px; }
       input { height: 40px; font-size: 15px; }
@@ -343,7 +409,7 @@
     const ROUTE_MS = 10 * 60_000;
     const MAX_POINTS = 200;
 
-    // ✅ Default View (für Aufheben)
+    // Default View (für Aufheben)
     const DEFAULT_CENTER = [8.8, 53.1];
     const DEFAULT_ZOOM = 10;
 
@@ -423,6 +489,42 @@
       setTimeout(() => el.classList.remove("flash"), 420);
     }
 
+    // ✅ C-M3: relative Zeit
+    function formatAge(ms) {
+      const s = Math.max(0, Math.floor(ms / 1000));
+      if (s < 60) return `vor ${s} Sek.`;
+      const m = Math.floor(s / 60);
+      if (m < 60) return `vor ${m} Min.`;
+      const h = Math.floor(m / 60);
+      if (h < 48) return `vor ${h} Std.`;
+      const d = Math.floor(h / 24);
+      return `vor ${d} Tg.`;
+    }
+
+    async function copyText(text) {
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(text);
+          return true;
+        }
+      } catch (_) {}
+      // Fallback
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand("copy");
+        ta.remove();
+        return ok;
+      } catch (_) {
+        return false;
+      }
+    }
+
     // --- Supabase + State ---
     if (!SUPABASE_URL || SUPABASE_URL.includes("DEINE_SUPABASE_URL") || !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.includes("DEIN_SUPABASE_ANON_KEY")) {
       showHint("Supabase Config fehlt.");
@@ -435,8 +537,8 @@
     let channel = null;
 
     const markers = new Map();
-    const lastSeen = new Map();
-    const routePoints = new Map();
+    const lastSeen = new Map();      // driverKey -> ts(ms)
+    const routePoints = new Map();   // driverKey -> [{lng,lat,ts}]
 
     let routesReady = false;
     let routesVisible = true;
@@ -451,6 +553,9 @@
     let impactBackoffIdx = 0;
     let lastImpactOkAt = 0;
 
+    // ✅ C-M3: global Popup (reused)
+    let markerPopup = null;
+
     function setImpactMarkers() {
       setSafeTextContent("impactMarkers", String(markers.size));
       pulse("impactMarkers");
@@ -460,6 +565,96 @@
       for (const [k, m] of markers.entries()) {
         m.getElement().classList.toggle("selected", !!driverKey && k === driverKey);
       }
+    }
+
+    function openMarkerPopup(driverKey, rawId, markerInstance) {
+      if (!map || !markerInstance) return;
+
+      const ts = lastSeen.get(driverKey) ?? Date.now();
+      const ageMs = Date.now() - ts;
+
+      const isStale = ageMs > STALE_VISUAL_MS;
+      const badgeClass = isStale ? "stale" : "ok";
+      const badgeText = isStale ? "Stale" : "Aktiv";
+
+      const root = document.createElement("div");
+
+      const title = document.createElement("div");
+      title.className = "er-pop-title";
+      title.innerHTML = `<span>Fahrer</span><span class="er-badge ${badgeClass}">${badgeText}</span>`;
+
+      const sub = document.createElement("div");
+      sub.className = "er-pop-sub";
+      sub.innerHTML = `<span style="font-weight:700;">${rawId}</span><span>${formatAge(ageMs)}</span>`;
+
+      const actions = document.createElement("div");
+      actions.className = "er-pop-actions";
+
+      const btnRoute = document.createElement("button");
+      btnRoute.className = "er-pop-btn primary";
+      btnRoute.type = "button";
+      btnRoute.textContent = "Route anzeigen";
+
+      const btnCopy = document.createElement("button");
+      btnCopy.className = "er-pop-btn";
+      btnCopy.type = "button";
+      btnCopy.textContent = "Kopieren";
+
+      actions.appendChild(btnRoute);
+      actions.appendChild(btnCopy);
+
+      root.appendChild(title);
+      root.appendChild(sub);
+      root.appendChild(actions);
+
+      // Events: Route / Copy
+      btnRoute.addEventListener("click", async (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+
+        // Route sichtbar machen
+        if (!routesVisible) {
+          routesVisible = true;
+          if (map && map.getLayer("er-routes-line")) {
+            map.setLayoutProperty("er-routes-line", "visibility", "visible");
+          }
+          const btn = document.getElementById("btnToggleRoutes");
+          if (btn) btn.textContent = "Ausblenden";
+        }
+
+        // Filter setzen + selektieren
+        const df = document.getElementById("driverFilter");
+        if (df) df.value = rawId;
+
+        currentFilter = rawId.trim();
+        currentFilterKey = normId(currentFilter);
+        setSelectedMarker(currentFilterKey);
+
+        // Zoom auf Marker
+        const ll = markerInstance.getLngLat();
+        map.easeTo({ center: [ll.lng, ll.lat], zoom: 14, duration: 550 });
+
+        await fetchLatest().catch(() => {});
+        await fetchRouteHistory().catch(() => {});
+        onVisibilityOrPanelChange();
+      });
+
+      btnCopy.addEventListener("click", async (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const ok = await copyText(rawId);
+        showHint(ok ? "Driver ID kopiert." : "Kopieren nicht möglich.");
+        setTimeout(() => hideHint(), 1200);
+      });
+
+      // Popup setzen
+      const ll = markerInstance.getLngLat();
+
+      if (markerPopup) markerPopup.remove();
+      markerPopup = new mapboxgl.Popup({ closeButton: true, closeOnClick: true, offset: 18 })
+        .setLngLat([ll.lng, ll.lat])
+        .setDOMContent(root)
+        .addTo(map);
     }
 
     async function fetchImpactOnce() {
@@ -629,6 +824,11 @@
       map = initMapbox();
       if (!map) return;
 
+      // optional: Popup schließen, wenn man auf die Karte klickt
+      map.on("click", () => {
+        if (markerPopup) markerPopup.remove();
+      });
+
       document.getElementById("panelTitle")?.addEventListener("click", () => {
         const panel = document.querySelector(".panel");
         panel?.classList.toggle("collapsed");
@@ -656,7 +856,10 @@
 
         setSelectedMarker("");
 
-        // ✅ Zoom zurück zur Übersicht
+        // Popup schließen
+        if (markerPopup) markerPopup.remove();
+
+        // Zoom zurück zur Übersicht
         if (map) {
           map.easeTo({ center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM, duration: 650 });
         }
@@ -821,7 +1024,8 @@
     function upsertMarker(row) {
       if (!map || !row?.driver_id) return;
 
-      const driverKey = normId(row.driver_id);
+      const rawId = (row.driver_id ?? "").toString();
+      const driverKey = normId(rawId);
       if (!driverKey) return;
 
       if (currentFilterKey && driverKey !== currentFilterKey) return;
@@ -847,11 +1051,11 @@
 
         markers.set(driverKey, marker);
 
+        // ✅ C-M1 + C-M3: Click = folgen + zoom + popup
         marker.getElement().addEventListener("click", async (ev) => {
           ev.preventDefault();
           ev.stopPropagation();
 
-          const rawId = (row.driver_id ?? "").toString();
           const df = document.getElementById("driverFilter");
           if (df) df.value = rawId;
 
@@ -865,6 +1069,9 @@
             map.easeTo({ center: [ll.lng, ll.lat], zoom: 14, duration: 650 });
           }
 
+          // Popup mit Info
+          openMarkerPopup(driverKey, rawId, marker);
+
           await fetchLatest().catch(() => {});
           await fetchRouteHistory().catch(() => {});
           onVisibilityOrPanelChange();
@@ -874,13 +1081,16 @@
         marker.setLngLat([lng, lat]);
       }
 
+      // lastSeen immer aktualisieren (für Popup „vor x“)
+      lastSeen.set(driverKey, ts);
+
+      // stale + selected setzen
       const el = marker.getElement();
       if (age > STALE_VISUAL_MS) el.classList.add("stale");
       else el.classList.remove("stale");
 
       el.classList.toggle("selected", !!currentFilterKey && driverKey === currentFilterKey);
 
-      lastSeen.set(driverKey, ts);
       setCount(markers.size);
       setLast(new Date());
 
@@ -895,6 +1105,7 @@
       refreshRoutesSource();
 
       setImpactMarkers();
+
       const sinceOk = Date.now() - (lastImpactOkAt || 0);
       if (shouldPollImpact() && sinceOk > 3000) {
         fetchImpactOnce().catch(() => {});
