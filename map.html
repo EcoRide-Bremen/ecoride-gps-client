@@ -144,7 +144,7 @@
     }
     .stat .left { justify-self: start; display:flex; align-items:center; gap:6px; }
 
-    /* ✅ MID wirklich zentriert + erlaubt 2 Zeilen */
+    /* MID wirklich zentriert & 2 Zeilen möglich */
     .stat .mid {
       justify-self: center;
       text-align:center;
@@ -221,6 +221,9 @@
     .dot { display:inline-block; width:10px; height:10px; border-radius:50%; background:#ef4444; }
     .dot.on { background:#22c55e; }
 
+    /* ✅ Pointer events absichern (Mapbox + Marker) */
+    .mapboxgl-marker { pointer-events: auto; }
+
     /* ✅ Marker States: normal / stale / selected */
     .marker {
       width:18px; height:18px; border-radius:50%;
@@ -228,6 +231,7 @@
       border: 2px solid rgba(199,223,58,0.35);
       box-shadow: 0 10px 22px rgba(0,0,0,.35), 0 0 18px rgba(199,223,58,0.36);
       cursor: pointer;
+      pointer-events: auto;
       transform: translateZ(0);
     }
     .marker:hover { transform: scale(1.08); }
@@ -419,13 +423,6 @@
       setTimeout(() => el.classList.remove("flash"), 420);
     }
 
-    // ✅ Selected Marker zentral setzen
-    function setSelectedMarker(driverKey) {
-      for (const [k, m] of markers.entries()) {
-        m.getElement().classList.toggle("selected", !!driverKey && k === driverKey);
-      }
-    }
-
     // --- Supabase + State ---
     if (!SUPABASE_URL || SUPABASE_URL.includes("DEINE_SUPABASE_URL") || !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.includes("DEIN_SUPABASE_ANON_KEY")) {
       showHint("Supabase Config fehlt.");
@@ -460,10 +457,17 @@
       pulse("impactMarkers");
     }
 
+    // ✅ Selected Marker zentral setzen
+    function setSelectedMarker(driverKey) {
+      for (const [k, m] of markers.entries()) {
+        m.getElement().classList.toggle("selected", !!driverKey && k === driverKey);
+      }
+    }
+
     async function fetchImpactOnce(reason = "timer") {
       if (!shouldPollImpact()) return;
 
-      if (impactInFlight) return; // keine parallelen RPCs
+      if (impactInFlight) return;
       impactInFlight = true;
       setSync(true);
 
@@ -681,7 +685,7 @@
         const btn = document.getElementById("btnActiveOnly");
         if (btn) btn.textContent = activeOnlyMode ? "Alle anzeigen" : "Aktive";
 
-        // Fix: Texte logisch
+        // logische Texte
         if (activeOnlyMode) showHint("Nur aktive Fahrer.");
         else showHint("Alle Fahrer.");
 
@@ -700,6 +704,8 @@
       subscribe();
 
       setImpactMarkers();
+
+      // Polling startet erst, wenn Panel offen & Tab sichtbar
       onVisibilityOrPanelChange();
     }
 
@@ -738,6 +744,8 @@
 
       for (const [, row] of newMarkers.entries()) {
         upsertMarker(row);
+
+        // Wenn wir folgen: nach Latest refresh nochmal sauber hinzentrieren
         if (currentFilterKey && currentFilterKey === normId(row.driver_id)) {
           const lat = Number(row.lat);
           const lng = Number(row.lng);
@@ -824,6 +832,8 @@
 
       const driverKey = normId(row.driver_id);
       if (!driverKey) return;
+
+      // Wenn ein Filter aktiv ist, zeigen wir nur diesen Fahrer
       if (currentFilterKey && driverKey !== currentFilterKey) return;
 
       const lat = Number(row.lat);
@@ -839,13 +849,21 @@
       if (!marker) {
         const el = document.createElement("div");
         el.className = "marker";
+        el.style.pointerEvents = "auto";
 
-        // ✅ Marker Klick = folgen
-        el.addEventListener("click", async (ev) => {
+        marker = new mapboxgl.Marker({ element: el })
+          .setLngLat([lng, lat])
+          .addTo(map);
+
+        markers.set(driverKey, marker);
+
+        // ✅ ROBUST: Click Handler NACH addTo + nutzt aktuelle Marker-Position
+        marker.getElement().addEventListener("click", async (ev) => {
+          ev.preventDefault();
           ev.stopPropagation();
 
-          const df = document.getElementById("driverFilter");
           const rawId = (row.driver_id ?? "").toString();
+          const df = document.getElementById("driverFilter");
           if (df) df.value = rawId;
 
           currentFilter = rawId.trim();
@@ -853,15 +871,20 @@
 
           setSelectedMarker(currentFilterKey);
 
-          map.easeTo({ center: [lng, lat], zoom: 14, duration: 650 });
+          const ll = marker.getLngLat();
+          if (map && ll) {
+            map.easeTo({
+              center: [ll.lng, ll.lat],
+              zoom: 14,
+              duration: 650
+            });
+          }
 
           await fetchLatest().catch(() => {});
           await fetchRouteHistory().catch(() => {});
           onVisibilityOrPanelChange();
         });
 
-        marker = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
-        markers.set(driverKey, marker);
       } else {
         marker.setLngLat([lng, lat]);
       }
@@ -870,6 +893,7 @@
       const el = marker.getElement();
       if (age > STALE_VISUAL_MS) el.classList.add("stale");
       else el.classList.remove("stale");
+
       el.classList.toggle("selected", !!currentFilterKey && driverKey === currentFilterKey);
 
       lastSeen.set(driverKey, ts);
@@ -887,6 +911,8 @@
       refreshRoutesSource();
 
       setImpactMarkers();
+
+      // Impact RPC nicht bei jedem Event triggern:
       const sinceOk = Date.now() - (lastImpactOkAt || 0);
       if (shouldPollImpact() && sinceOk > 3000) {
         fetchImpactOnce("event").catch(() => {});
