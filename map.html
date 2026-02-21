@@ -144,7 +144,6 @@
     }
     .stat .left { justify-self: start; display:flex; align-items:center; gap:6px; }
 
-    /* MID zentriert & 2 Zeilen möglich */
     .stat .mid {
       justify-self: center;
       text-align:center;
@@ -220,38 +219,6 @@
 
     .dot { display:inline-block; width:10px; height:10px; border-radius:50%; background:#ef4444; }
     .dot.on { background:#22c55e; }
-
-    /* Pointer Events absichern */
-    .mapboxgl-marker { pointer-events: auto; }
-
-    /* Marker States */
-    .marker {
-      width:18px; height:18px; border-radius:50%;
-      background: rgba(199,223,58,0.92);
-      border: 2px solid rgba(199,223,58,0.35);
-      box-shadow: 0 10px 22px rgba(0,0,0,.35), 0 0 18px rgba(199,223,58,0.36);
-      cursor: pointer;
-      pointer-events: auto;
-      transform: translateZ(0);
-    }
-    .marker:hover { transform: scale(1.08); }
-
-    .marker.stale {
-      opacity: 0.55 !important;
-      background: rgba(199,223,58,0.35) !important;
-      box-shadow: 0 10px 22px rgba(0,0,0,.35);
-    }
-
-    .marker.selected {
-      opacity: 1 !important;
-      background: rgba(199,223,58,0.98) !important;
-      border-color: rgba(255,255,255,0.35);
-      box-shadow:
-        0 10px 22px rgba(0,0,0,.35),
-        0 0 0 3px rgba(199,223,58,0.35),
-        0 0 18px rgba(199,223,58,0.55);
-    }
-    .marker.selected.stale { opacity: 0.78 !important; }
 
     /* Hint (Electric Green) */
     .hint-inline {
@@ -393,7 +360,7 @@
   </div>
 
   <script>
-    // --- 1. Konfiguration & Debug-Modus ---
+    // --- Debug ---
     const DEBUG = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
 
     // API-Keys
@@ -409,11 +376,11 @@
     const ROUTE_MS = 10 * 60_000;
     const MAX_POINTS = 200;
 
-    // Default View (für Aufheben)
+    // Default View
     const DEFAULT_CENTER = [8.8, 53.1];
     const DEFAULT_ZOOM = 10;
 
-    // --- Farben für Routen (stabil) ---
+    // --- Routenfarben ---
     const ROUTE_COLORS = ["#c7df3a", "#3bb2d0", "#ff6b6b", "#a55eea", "#4dabf7", "#f06595", "#ffd43b", "#7bed9f"];
 
     // --- Impact Polling / Backoff ---
@@ -421,6 +388,13 @@
     const IMPACT_MIN_MS = 5_000;
     const IMPACT_MAX_MS = 60_000;
     const IMPACT_BACKOFF = [5_000, 10_000, 20_000, 40_000, 60_000];
+
+    // --- Marker/Cluster Source IDs ---
+    const DRIVERS_SOURCE = "er-drivers";
+    const LAYER_CLUSTER_CIRCLE = "er-cluster";
+    const LAYER_CLUSTER_COUNT = "er-cluster-count";
+    const LAYER_POINTS = "er-points";
+    const LAYER_POINTS_SELECTED = "er-points-selected";
 
     // --- Helper ---
     function setSafeTextContent(id, text) {
@@ -457,7 +431,6 @@
       if (typeof cutoffOverride === "number") return new Date(cutoffOverride).toISOString();
       return String(cutoffOverride);
     }
-
     function normId(v) { return String(v ?? "").trim().toLowerCase(); }
 
     function getColorForDriver(driverKey) {
@@ -481,7 +454,6 @@
       if (!el) return;
       el.classList.toggle("on", !!on);
     }
-
     function pulse(id) {
       const el = document.getElementById(id);
       if (!el) return;
@@ -489,7 +461,7 @@
       setTimeout(() => el.classList.remove("flash"), 420);
     }
 
-    // ✅ C-M3: relative Zeit
+    // C-M3: relative Zeit
     function formatAge(ms) {
       const s = Math.max(0, Math.floor(ms / 1000));
       if (s < 60) return `vor ${s} Sek.`;
@@ -500,7 +472,6 @@
       const d = Math.floor(h / 24);
       return `vor ${d} Tg.`;
     }
-
     async function copyText(text) {
       try {
         if (navigator.clipboard?.writeText) {
@@ -508,7 +479,6 @@
           return true;
         }
       } catch (_) {}
-      // Fallback
       try {
         const ta = document.createElement("textarea");
         ta.value = text;
@@ -526,19 +496,17 @@
     }
 
     // --- Supabase + State ---
-    if (!SUPABASE_URL || SUPABASE_URL.includes("DEINE_SUPABASE_URL") || !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.includes("DEIN_SUPABASE_ANON_KEY")) {
-      showHint("Supabase Config fehlt.");
-      logError("SUPABASE_URL / SUPABASE_ANON_KEY sind nicht gesetzt.");
-    }
-
     const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     let map;
     let channel = null;
 
-    const markers = new Map();
-    const lastSeen = new Map();      // driverKey -> ts(ms)
-    const routePoints = new Map();   // driverKey -> [{lng,lat,ts}]
+    // ✅ C-M4: positions store (statt DOM markers)
+    // driverKey -> { rawId, lng, lat, ts }
+    const positions = new Map();
+
+    // Routen / Seen
+    const routePoints = new Map();
 
     let routesReady = false;
     let routesVisible = true;
@@ -547,30 +515,83 @@
     let currentFilter = "";
     let currentFilterKey = "";
 
-    // --- Impact state ---
+    // Impact state
     let impactTimer = null;
     let impactInFlight = false;
     let impactBackoffIdx = 0;
     let lastImpactOkAt = 0;
 
-    // ✅ C-M3: global Popup (reused)
+    // C-M3 Popup
     let markerPopup = null;
 
     function setImpactMarkers() {
-      setSafeTextContent("impactMarkers", String(markers.size));
+      // Marker = aktuell gerenderte Fahrer (nicht Cluster)
+      const count = getVisibleDriverCount();
+      setSafeTextContent("impactMarkers", String(count));
       pulse("impactMarkers");
     }
 
-    function setSelectedMarker(driverKey) {
-      for (const [k, m] of markers.entries()) {
-        m.getElement().classList.toggle("selected", !!driverKey && k === driverKey);
+    function getVisibleDriverCount() {
+      // bei aktivem Filter: max 1
+      if (currentFilterKey) return positions.has(currentFilterKey) ? 1 : 0;
+      return positions.size;
+    }
+
+    function updateSelectedLayerFilter() {
+      if (!map || !map.getLayer(LAYER_POINTS_SELECTED)) return;
+      if (currentFilterKey) {
+        map.setFilter(LAYER_POINTS_SELECTED, ["all", ["!", ["has", "point_count"]], ["==", ["get", "driverKey"], currentFilterKey]]);
+      } else {
+        // nichts selected
+        map.setFilter(LAYER_POINTS_SELECTED, ["all", ["!", ["has", "point_count"]], ["==", ["get", "driverKey"], "__none__"]]);
       }
     }
 
-    function openMarkerPopup(driverKey, rawId, markerInstance) {
-      if (!map || !markerInstance) return;
+    function refreshDriversSource() {
+      if (!map || !map.getSource(DRIVERS_SOURCE)) return;
 
-      const ts = lastSeen.get(driverKey) ?? Date.now();
+      const feats = [];
+      const now = Date.now();
+
+      for (const [driverKey, p] of positions.entries()) {
+        if (!p) continue;
+        if (currentFilterKey && driverKey !== currentFilterKey) continue;
+
+        const age = now - (p.ts || now);
+        const stale = age > STALE_VISUAL_MS;
+
+        feats.push({
+          type: "Feature",
+          properties: {
+            driverKey,
+            rawId: p.rawId,
+            ts: p.ts,
+            stale: stale ? 1 : 0
+          },
+          geometry: {
+            type: "Point",
+            coordinates: [p.lng, p.lat]
+          }
+        });
+      }
+
+      map.getSource(DRIVERS_SOURCE).setData({
+        type: "FeatureCollection",
+        features: feats
+      });
+
+      updateSelectedLayerFilter();
+      setCount(feats.length);
+      setImpactMarkers();
+    }
+
+    function openMarkerPopupFromFeature(feature) {
+      if (!map || !feature) return;
+
+      const props = feature.properties || {};
+      const rawId = props.rawId || props.driverKey || "";
+      const driverKey = props.driverKey || normId(rawId);
+      const ts = Number(props.ts) || Date.now();
       const ageMs = Date.now() - ts;
 
       const isStale = ageMs > STALE_VISUAL_MS;
@@ -607,7 +628,6 @@
       root.appendChild(sub);
       root.appendChild(actions);
 
-      // Events: Route / Copy
       btnRoute.addEventListener("click", async (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
@@ -618,41 +638,44 @@
           if (map && map.getLayer("er-routes-line")) {
             map.setLayoutProperty("er-routes-line", "visibility", "visible");
           }
-          const btn = document.getElementById("btnToggleRoutes");
-          if (btn) btn.textContent = "Ausblenden";
+          const b = document.getElementById("btnToggleRoutes");
+          if (b) b.textContent = "Ausblenden";
         }
 
-        // Filter setzen + selektieren
+        // Follow setzen
         const df = document.getElementById("driverFilter");
         if (df) df.value = rawId;
 
-        currentFilter = rawId.trim();
+        currentFilter = String(rawId).trim();
         currentFilterKey = normId(currentFilter);
-        setSelectedMarker(currentFilterKey);
+        updateSelectedLayerFilter();
 
-        // Zoom auf Marker
-        const ll = markerInstance.getLngLat();
-        map.easeTo({ center: [ll.lng, ll.lat], zoom: 14, duration: 550 });
+        // Zoom auf Feature
+        const c = feature.geometry?.coordinates;
+        if (Array.isArray(c) && c.length === 2) {
+          map.easeTo({ center: c, zoom: 14, duration: 550 });
+        }
 
         await fetchLatest().catch(() => {});
         await fetchRouteHistory().catch(() => {});
+        refreshDriversSource();
         onVisibilityOrPanelChange();
       });
 
       btnCopy.addEventListener("click", async (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
-        const ok = await copyText(rawId);
+        const ok = await copyText(String(rawId));
         showHint(ok ? "Driver ID kopiert." : "Kopieren nicht möglich.");
         setTimeout(() => hideHint(), 1200);
       });
 
-      // Popup setzen
-      const ll = markerInstance.getLngLat();
+      const coords = feature.geometry?.coordinates;
+      if (!Array.isArray(coords) || coords.length !== 2) return;
 
       if (markerPopup) markerPopup.remove();
-      markerPopup = new mapboxgl.Popup({ closeButton: true, closeOnClick: true, offset: 18 })
-        .setLngLat([ll.lng, ll.lat])
+      markerPopup = new mapboxgl.Popup({ closeButton: true, closeOnClick: true, offset: 14 })
+        .setLngLat(coords)
         .setDOMContent(root)
         .addTo(map);
     }
@@ -665,10 +688,7 @@
       setSync(true);
 
       try {
-        const { data, error } = await sb.rpc("get_live_impact", {
-          active_minutes: 2,
-          points_minutes: 10
-        });
+        const { data, error } = await sb.rpc("get_live_impact", { active_minutes: 2, points_minutes: 10 });
         if (error) throw error;
 
         const row = Array.isArray(data) ? data[0] : data;
@@ -682,7 +702,7 @@
         pulse("impactActive");
         pulse("impactPoints10");
 
-        setSafeTextContent("impactMarkers", String(markers.size));
+        setSafeTextContent("impactMarkers", String(getVisibleDriverCount()));
         lastImpactOkAt = Date.now();
         impactBackoffIdx = 0;
         setLast(new Date());
@@ -773,6 +793,7 @@
       map.on("load", () => {
         hideHint();
 
+        // --- Routes ---
         if (!map.getSource("er-routes")) {
           map.addSource("er-routes", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
 
@@ -793,7 +814,7 @@
           });
 
           map.on("click", "er-routes-line", (e) => {
-            const driverKey = e.features[0].properties.driverKey;
+            const driverKey = e.features?.[0]?.properties?.driverKey;
             new mapboxgl.Popup()
               .setLngLat(e.lngLat)
               .setHTML(`<b>Fahrer:</b> ${driverKey}<br><b>Route der letzten 10 Minuten</b>`)
@@ -804,11 +825,142 @@
           map.on("mouseleave", "er-routes-line", () => { map.getCanvas().style.cursor = ""; });
         }
 
+        // --- Drivers (C-M4) ---
+        if (!map.getSource(DRIVERS_SOURCE)) {
+          map.addSource(DRIVERS_SOURCE, {
+            type: "geojson",
+            data: { type: "FeatureCollection", features: [] },
+            cluster: true,
+            clusterRadius: 42,
+            clusterMaxZoom: 14
+          });
+
+          // Cluster circle
+          map.addLayer({
+            id: LAYER_CLUSTER_CIRCLE,
+            type: "circle",
+            source: DRIVERS_SOURCE,
+            filter: ["has", "point_count"],
+            paint: {
+              "circle-radius": ["step", ["get", "point_count"], 16, 25, 20, 50, 26, 100, 32],
+              "circle-color": "rgba(199,223,58,0.70)",
+              "circle-stroke-width": 1,
+              "circle-stroke-color": "rgba(17,24,37,0.35)"
+            }
+          });
+
+          // Cluster count
+          map.addLayer({
+            id: LAYER_CLUSTER_COUNT,
+            type: "symbol",
+            source: DRIVERS_SOURCE,
+            filter: ["has", "point_count"],
+            layout: {
+              "text-field": ["get", "point_count_abbreviated"],
+              "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
+              "text-size": 12
+            },
+            paint: {
+              "text-color": "#0b0f14"
+            }
+          });
+
+          // Unclustered points (normal + stale)
+          map.addLayer({
+            id: LAYER_POINTS,
+            type: "circle",
+            source: DRIVERS_SOURCE,
+            filter: ["all", ["!", ["has", "point_count"]]],
+            paint: {
+              "circle-radius": 7,
+              "circle-color": [
+                "case",
+                ["==", ["get", "stale"], 1], "rgba(199,223,58,0.35)",
+                "rgba(199,223,58,0.92)"
+              ],
+              "circle-opacity": [
+                "case",
+                ["==", ["get", "stale"], 1], 0.65,
+                1
+              ],
+              "circle-stroke-width": 2,
+              "circle-stroke-color": "rgba(199,223,58,0.35)"
+            }
+          });
+
+          // Selected overlay
+          map.addLayer({
+            id: LAYER_POINTS_SELECTED,
+            type: "circle",
+            source: DRIVERS_SOURCE,
+            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "driverKey"], "__none__"]],
+            paint: {
+              "circle-radius": 9,
+              "circle-color": [
+                "case",
+                ["==", ["get", "stale"], 1], "rgba(199,223,58,0.75)",
+                "rgba(199,223,58,0.98)"
+              ],
+              "circle-stroke-width": 3,
+              "circle-stroke-color": "rgba(255,255,255,0.35)",
+              "circle-blur": 0
+            }
+          });
+
+          // Cluster click => zoom in
+          map.on("click", LAYER_CLUSTER_CIRCLE, (e) => {
+            const f = e.features?.[0];
+            if (!f) return;
+            const clusterId = f.properties.cluster_id;
+            const source = map.getSource(DRIVERS_SOURCE);
+            source.getClusterExpansionZoom(clusterId, (err, zoom) => {
+              if (err) return;
+              map.easeTo({ center: f.geometry.coordinates, zoom, duration: 550 });
+            });
+          });
+
+          // Point click => follow + zoom + popup + route reload (C-M1 + C-M3)
+          map.on("click", LAYER_POINTS, async (e) => {
+            const f = e.features?.[0];
+            if (!f) return;
+
+            const rawId = f.properties?.rawId ?? "";
+            const driverKey = f.properties?.driverKey ?? normId(rawId);
+
+            // set filter
+            const df = document.getElementById("driverFilter");
+            if (df) df.value = rawId;
+
+            currentFilter = String(rawId).trim();
+            currentFilterKey = normId(currentFilter);
+
+            updateSelectedLayerFilter();
+
+            // zoom to point
+            map.easeTo({ center: f.geometry.coordinates, zoom: 14, duration: 650 });
+
+            // popup
+            openMarkerPopupFromFeature(f);
+
+            await fetchLatest().catch(() => {});
+            await fetchRouteHistory().catch(() => {});
+            refreshDriversSource();
+            onVisibilityOrPanelChange();
+          });
+
+          map.on("mouseenter", LAYER_CLUSTER_CIRCLE, () => { map.getCanvas().style.cursor = "pointer"; });
+          map.on("mouseleave", LAYER_CLUSTER_CIRCLE, () => { map.getCanvas().style.cursor = ""; });
+          map.on("mouseenter", LAYER_POINTS, () => { map.getCanvas().style.cursor = "pointer"; });
+          map.on("mouseleave", LAYER_POINTS, () => { map.getCanvas().style.cursor = ""; });
+        }
+
+        // Button label route
         const btn = document.getElementById("btnToggleRoutes");
         if (btn) btn.textContent = routesVisible ? "Ausblenden" : "Einblenden";
 
         routesReady = true;
         refreshRoutesSource();
+        refreshDriversSource();
       });
 
       map.on("error", (e) => {
@@ -824,7 +976,6 @@
       map = initMapbox();
       if (!map) return;
 
-      // optional: Popup schließen, wenn man auf die Karte klickt
       map.on("click", () => {
         if (markerPopup) markerPopup.remove();
       });
@@ -841,10 +992,11 @@
         currentFilter = df?.value?.trim() || "";
         currentFilterKey = normId(currentFilter);
 
-        setSelectedMarker(currentFilterKey);
+        updateSelectedLayerFilter();
 
         await fetchLatest();
         await fetchRouteHistory();
+        refreshDriversSource();
         onVisibilityOrPanelChange();
       });
 
@@ -854,18 +1006,16 @@
         currentFilter = "";
         currentFilterKey = "";
 
-        setSelectedMarker("");
+        updateSelectedLayerFilter();
 
-        // Popup schließen
         if (markerPopup) markerPopup.remove();
 
-        // Zoom zurück zur Übersicht
-        if (map) {
-          map.easeTo({ center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM, duration: 650 });
-        }
+        // Zoom zurück
+        map.easeTo({ center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM, duration: 650 });
 
         await fetchLatest();
         await fetchRouteHistory();
+        refreshDriversSource();
         onVisibilityOrPanelChange();
       });
 
@@ -888,6 +1038,7 @@
 
         await fetchLatest();
         await fetchRouteHistory();
+        refreshDriversSource();
         onVisibilityOrPanelChange();
       });
 
@@ -923,33 +1074,43 @@
         return;
       }
 
+      // Wir nehmen pro driver nur das neueste
       const seen = new Set();
-      const newMarkers = new Map();
+      const latest = new Map();
 
       for (const row of data || []) {
-        const driverKey = normId(row?.driver_id);
+        const rawId = (row?.driver_id ?? "").toString();
+        const driverKey = normId(rawId);
         if (!driverKey || seen.has(driverKey)) continue;
         seen.add(driverKey);
-        newMarkers.set(driverKey, row);
+        latest.set(driverKey, row);
       }
 
-      for (const [driverKey] of markers.entries()) {
-        if (!newMarkers.has(driverKey)) removeMarker(driverKey);
+      // Prune: entferne nicht mehr vorhandene
+      for (const key of Array.from(positions.keys())) {
+        if (!latest.has(key)) positions.delete(key);
       }
 
-      for (const [, row] of newMarkers.entries()) {
-        upsertMarker(row);
+      // Upsert
+      for (const [key, row] of latest.entries()) {
+        const lat = Number(row.lat);
+        const lng = Number(row.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
 
-        if (currentFilterKey && currentFilterKey === normId(row.driver_id)) {
-          const lat = Number(row.lat);
-          const lng = Number(row.lng);
-          if (Number.isFinite(lat) && Number.isFinite(lng)) {
-            map.easeTo({ center: [lng, lat], zoom: 14, duration: 600 });
-          }
+        const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
+        const age = Date.now() - ts;
+        if (age > STALE_MS) continue;
+
+        positions.set(key, { rawId: row.driver_id, lng, lat, ts });
+
+        // Wenn gefolgt: nach Latest refresh zentrieren
+        if (currentFilterKey && key === currentFilterKey) {
+          map.easeTo({ center: [lng, lat], zoom: 14, duration: 600 });
         }
       }
 
       setLast(new Date());
+      refreshDriversSource();
       setImpactMarkers();
     }
 
@@ -1009,9 +1170,12 @@
       channel = sb.channel("live_positions_map")
         .on("postgres_changes", { event: "*", schema: "public", table: "live_positions" }, (payload) => {
           if (payload?.eventType === "INSERT" || payload?.eventType === "UPDATE") {
-            upsertMarker(payload.new);
+            upsertPosition(payload.new);
           } else if (payload?.eventType === "DELETE") {
-            removeMarker(normId(payload.old?.driver_id));
+            const key = normId(payload.old?.driver_id);
+            if (key) positions.delete(key);
+            refreshDriversSource();
+            refreshRoutesSource();
           }
         })
         .subscribe((status) => {
@@ -1020,14 +1184,14 @@
         });
     }
 
-    // --- Marker ---
-    function upsertMarker(row) {
+    function upsertPosition(row) {
       if (!map || !row?.driver_id) return;
 
       const rawId = (row.driver_id ?? "").toString();
       const driverKey = normId(rawId);
       if (!driverKey) return;
 
+      // wenn Follow aktiv: nur diesen updaten
       if (currentFilterKey && driverKey !== currentFilterKey) return;
 
       const lat = Number(row.lat);
@@ -1038,62 +1202,9 @@
       const age = Date.now() - ts;
       if (age > STALE_MS) return;
 
-      let marker = markers.get(driverKey);
+      positions.set(driverKey, { rawId, lng, lat, ts });
 
-      if (!marker) {
-        const el = document.createElement("div");
-        el.className = "marker";
-        el.style.pointerEvents = "auto";
-
-        marker = new mapboxgl.Marker({ element: el })
-          .setLngLat([lng, lat])
-          .addTo(map);
-
-        markers.set(driverKey, marker);
-
-        // ✅ C-M1 + C-M3: Click = folgen + zoom + popup
-        marker.getElement().addEventListener("click", async (ev) => {
-          ev.preventDefault();
-          ev.stopPropagation();
-
-          const df = document.getElementById("driverFilter");
-          if (df) df.value = rawId;
-
-          currentFilter = rawId.trim();
-          currentFilterKey = normId(currentFilter);
-
-          setSelectedMarker(currentFilterKey);
-
-          const ll = marker.getLngLat();
-          if (map && ll) {
-            map.easeTo({ center: [ll.lng, ll.lat], zoom: 14, duration: 650 });
-          }
-
-          // Popup mit Info
-          openMarkerPopup(driverKey, rawId, marker);
-
-          await fetchLatest().catch(() => {});
-          await fetchRouteHistory().catch(() => {});
-          onVisibilityOrPanelChange();
-        });
-
-      } else {
-        marker.setLngLat([lng, lat]);
-      }
-
-      // lastSeen immer aktualisieren (für Popup „vor x“)
-      lastSeen.set(driverKey, ts);
-
-      // stale + selected setzen
-      const el = marker.getElement();
-      if (age > STALE_VISUAL_MS) el.classList.add("stale");
-      else el.classList.remove("stale");
-
-      el.classList.toggle("selected", !!currentFilterKey && driverKey === currentFilterKey);
-
-      setCount(markers.size);
-      setLast(new Date());
-
+      // RoutePoint streaming
       const now = Date.now();
       const minTs = now - ROUTE_MS;
       const arr = routePoints.get(driverKey) ?? [];
@@ -1102,8 +1213,10 @@
       if (arr.length > MAX_POINTS) arr.splice(0, arr.length - MAX_POINTS);
       routePoints.set(driverKey, arr);
 
+      refreshDriversSource();
       refreshRoutesSource();
 
+      setLast(new Date());
       setImpactMarkers();
 
       const sinceOk = Date.now() - (lastImpactOkAt || 0);
@@ -1112,29 +1225,21 @@
       }
     }
 
-    function removeMarker(driverKey) {
-      if (!driverKey) return;
-      const marker = markers.get(driverKey);
-      if (marker) {
-        marker.remove();
-        markers.delete(driverKey);
-      }
-      lastSeen.delete(driverKey);
-      routePoints.delete(driverKey);
-      refreshRoutesSource();
-      setCount(markers.size);
-      setImpactMarkers();
-    }
-
     // --- Prune ---
     setInterval(() => {
-      if (lastSeen.size === 0) return;
+      if (positions.size === 0) return;
       const now = Date.now();
       const staleKeys = [];
-      for (const [driverKey, ts] of lastSeen.entries()) {
+      for (const [driverKey, p] of positions.entries()) {
+        const ts = p?.ts || 0;
         if (now - ts > STALE_MS) staleKeys.push(driverKey);
       }
-      staleKeys.forEach(removeMarker);
+      staleKeys.forEach(k => positions.delete(k));
+      if (staleKeys.length) {
+        refreshDriversSource();
+        refreshRoutesSource();
+        setImpactMarkers();
+      }
     }, PRUNE_EVERY_MS);
 
     document.addEventListener("DOMContentLoaded", initMap);
