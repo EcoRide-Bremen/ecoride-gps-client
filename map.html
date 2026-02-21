@@ -211,13 +211,26 @@
     .dot { display:inline-block; width:10px; height:10px; border-radius:50%; background:#ef4444; }
     .dot.on { background:#22c55e; }
 
+    /* =========================
+       EcoRide Pin (Marker)
+       ========================= */
     .marker {
-      width:18px; height:18px; border-radius:50%;
-      background: rgba(199,223,58,0.92);
-      border: 2px solid rgba(199,223,58,0.35);
-      box-shadow: 0 10px 22px rgba(0,0,0,.35), 0 0 18px rgba(199,223,58,0.36);
+      width: 44px;
+      height: 54px;
+      transform: translateZ(0);
+      filter: drop-shadow(0 10px 22px rgba(0,0,0,.35));
+      user-select: none;
+      pointer-events: auto;
     }
-    .marker.stale { opacity: 0.6 !important; background: rgba(199,223,58,0.4) !important; }
+    .marker svg { display:block; width:100%; height:100%; }
+
+    .marker.stale { opacity: 0.6 !important; }
+
+    .pin-body { fill: rgba(199,223,58,0.95); }
+    .pin-stroke { stroke: rgba(199,223,58,0.55); stroke-width: 1.2; }
+    .pin-ring { fill: #ffffff; }
+    .pin-core { fill: rgba(199,223,58,0.98); }
+    .pin-icon { fill: #111; }
 
     .hint-inline {
       display:none;
@@ -326,12 +339,8 @@
       const panel = document.querySelector(".panel");
       return panel && !panel.classList.contains("collapsed");
     }
-    function isTabVisible() {
-      return document.visibilityState === "visible";
-    }
-    function shouldPollImpact() {
-      return isPanelOpen() && isTabVisible();
-    }
+    function isTabVisible() { return document.visibilityState === "visible"; }
+    function shouldPollImpact() { return isPanelOpen() && isTabVisible(); }
 
     function showHint(msg) {
       if (!isPanelOpen()) return;
@@ -384,6 +393,64 @@
       setTimeout(() => el.classList.remove("flash"), 420);
     }
 
+    // =========================
+    // EcoRide Pin (SVG Helper)
+    // Ziel: Seitenansicht-Auto + weißer Ring + grüner Innenkreis
+    // =========================
+    function createEcoRidePin() {
+      const el = document.createElement("div");
+      el.className = "marker";
+
+      // viewBox 64x64: Kreis sitzt oben, Spitze unten
+      el.innerHTML = `
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <!-- Pin body (Tropfen) -->
+          <path class="pin-body pin-stroke"
+                d="M32 2
+                   C19.4 2 9.2 12.2 9.2 24.8
+                   C9.2 40.6 25.2 53.3 30.3 61.1
+                   C31.2 62.5 32.8 62.5 33.7 61.1
+                   C38.8 53.3 54.8 40.6 54.8 24.8
+                   C54.8 12.2 44.6 2 32 2Z" />
+
+          <!-- White ring -->
+          <circle class="pin-ring" cx="32" cy="24" r="16" />
+
+          <!-- Green core -->
+          <circle class="pin-core" cx="32" cy="24" r="12" />
+
+          <!-- Car icon (SIDE VIEW) - centered and slightly UP -->
+          <g transform="translate(0,-1)">
+            <!-- simple side-view car silhouette -->
+            <path class="pin-icon"
+              d="M22 29
+                 C22 26.5 24 25 26 25
+                 H37
+                 C39.2 25 41 26.4 41.6 28.2
+                 L42.3 30.2
+                 C42.5 30.8 42.1 31.4 41.5 31.4
+                 H40.2
+                 A2.8 2.8 0 0 1 34.6 31.4
+                 H29.4
+                 A2.8 2.8 0 0 1 23.8 31.4
+                 H22.8
+                 C22.4 31.4 22 31.0 22 30.6
+                 Z
+                 M27.2 26.6
+                 C26.1 26.6 25.2 27.2 24.8 28.2
+                 L24.4 29.2
+                 H39.6
+                 L39.2 28.2
+                 C38.8 27.2 37.9 26.6 36.8 26.6
+                 Z" />
+            <circle class="pin-icon" cx="27.5" cy="31.2" r="2.1"/>
+            <circle class="pin-icon" cx="36.5" cy="31.2" r="2.1"/>
+          </g>
+        </svg>
+      `;
+      return el;
+    }
+
     // --- Supabase + State ---
     if (!SUPABASE_URL || SUPABASE_URL.includes("DEINE_SUPABASE_URL") || !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.includes("DEIN_SUPABASE_ANON_KEY")) {
       showHint("Supabase Config fehlt.");
@@ -421,7 +488,7 @@
     async function fetchImpactOnce(reason = "timer") {
       if (!shouldPollImpact()) return;
 
-      if (impactInFlight) return; // keine parallelen RPCs
+      if (impactInFlight) return;
       impactInFlight = true;
       setSync(true);
 
@@ -436,20 +503,16 @@
         const row = Array.isArray(data) ? data[0] : data;
         if (!row) throw new Error("RPC returned no rows");
 
-        // Werte nur aktualisieren, wenn wirklich geliefert (sonst letzten Snapshot behalten)
         const active = (row.active_drivers ?? 0);
         const points = (row.points_window ?? 0);
 
-        // sanftes Update (Pulse)
         setSafeTextContent("impactActive", String(active));
         setSafeTextContent("impactPoints10", String(points));
         pulse("impactActive");
         pulse("impactPoints10");
 
-        // Marker kommen aus lokalem State
         setSafeTextContent("impactMarkers", String(markers.size));
 
-        // Snapshot merken
         lastImpactSnapshot = {
           active_drivers: active,
           points_window: points,
@@ -457,16 +520,11 @@
         };
 
         lastImpactOkAt = Date.now();
-        impactBackoffIdx = 0; // Backoff reset
+        impactBackoffIdx = 0;
         setLast(new Date());
       } catch (e) {
-        // Robust: NICHT auf 0 setzen, sondern letzte Werte stehen lassen
         logError("RPC impact error:", e?.message || e);
-
-        // optional: Hinweis nur wenn Panel offen (ist es), aber nicht nervig
         showHint("Impact temporär nicht verfügbar.");
-
-        // Backoff hochfahren
         impactBackoffIdx = Math.min(impactBackoffIdx + 1, IMPACT_BACKOFF.length - 1);
       } finally {
         impactInFlight = false;
@@ -498,11 +556,9 @@
 
     function onVisibilityOrPanelChange() {
       if (shouldPollImpact()) {
-        // Panel offen & Tab sichtbar -> sofortiger Refresh, dann normales Scheduling
         fetchImpactOnce("resume").catch(() => {});
         scheduleImpactPoll(false);
       } else {
-        // Pause
         clearImpactTimer();
       }
     }
@@ -584,7 +640,6 @@
           map.on("mouseleave", "er-routes-line", () => { map.getCanvas().style.cursor = ""; });
         }
 
-        // Text korrekt: sichtbar => Ausblenden / unsichtbar => Einblenden
         const btn = document.getElementById("btnToggleRoutes");
         if (btn) btn.textContent = routesVisible ? "Ausblenden" : "Einblenden";
 
@@ -662,10 +717,7 @@
 
       subscribe();
 
-      // Marker impact sofort setzen (0)
       setImpactMarkers();
-
-      // Polling startet erst, wenn Panel offen & Tab sichtbar
       onVisibilityOrPanelChange();
     }
 
@@ -802,16 +854,18 @@
 
       let marker = markers.get(driverKey);
       if (!marker) {
-        const el = document.createElement("div");
-        el.className = "marker";
-        marker = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
+        const el = createEcoRidePin();
+        marker = new mapboxgl.Marker({ element: el, anchor: "bottom" })
+          .setLngLat([lng, lat])
+          .addTo(map);
         markers.set(driverKey, marker);
       } else {
         marker.setLngLat([lng, lat]);
       }
 
-      if (age > STALE_VISUAL_MS) marker.getElement().classList.add("stale");
-      else marker.getElement().classList.remove("stale");
+      const el = marker.getElement();
+      if (age > STALE_VISUAL_MS) el.classList.add("stale");
+      else el.classList.remove("stale");
 
       lastSeen.set(driverKey, ts);
       setCount(markers.size);
@@ -828,7 +882,6 @@
       refreshRoutesSource();
 
       setImpactMarkers();
-      // Impact RPC nicht bei jedem Event triggern, nur wenn Panel offen/Tab sichtbar und nicht zu oft:
       const sinceOk = Date.now() - (lastImpactOkAt || 0);
       if (shouldPollImpact() && sinceOk > 3000) {
         fetchImpactOnce("event").catch(() => {});
