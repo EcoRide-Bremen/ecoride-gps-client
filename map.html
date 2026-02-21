@@ -65,7 +65,6 @@
       box-sizing: border-box;
     }
 
-    /* Collapsed: nur Titel sichtbar */
     .panel.collapsed .row,
     .panel.collapsed .stat,
     .panel.collapsed .stat2,
@@ -129,7 +128,6 @@
       backdrop-filter: blur(10px);
     }
 
-    /* Statuszeile: Realtime | Hint | Marker */
     .stat {
       margin-top:10px;
       font-size:12.5px;
@@ -143,7 +141,6 @@
       box-sizing: border-box;
     }
     .stat .left { justify-self: start; display:flex; align-items:center; gap:6px; }
-
     .stat .mid {
       justify-self: center;
       text-align:center;
@@ -155,7 +152,6 @@
     }
     .stat .right { justify-self: end; }
 
-    /* Zweite Statuszeile (Letztes Update) */
     .stat2 {
       margin-top:8px;
       font-size:12.5px;
@@ -170,7 +166,6 @@
     }
     .last-left { display:flex; align-items:center; gap:8px; }
 
-    /* Mini Loader */
     .sync {
       display:inline-flex;
       align-items:center;
@@ -192,7 +187,6 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Phase 3: Impact-Zeile */
     .stat3{
       margin-top:8px;
       font-size:12.5px;
@@ -206,7 +200,6 @@
       flex-wrap: nowrap;
     }
 
-    /* sanfter Update-Pulse */
     .pulse {
       display:inline-block;
       padding: 0 6px;
@@ -218,7 +211,6 @@
     .dot { display:inline-block; width:10px; height:10px; border-radius:50%; background:#ef4444; }
     .dot.on { background:#22c55e; }
 
-    /* Hint (Electric Green) */
     .hint-inline {
       display:none;
       color:#00FF00;
@@ -233,7 +225,6 @@
     }
     .hint-inline.show { display:block; }
 
-    /* ✅ C-M3 Popup Styling */
     .mapboxgl-popup-content {
       background: rgba(17,24,37,0.92);
       color: #eaf0ff;
@@ -358,19 +349,8 @@
   </div>
 
   <script>
-    // ============================
-    // D-1: Deployment Hygiene
-    // ============================
-    // Optional: Du kannst auf dem Server (oder vor dem Script) window.ER_CONFIG setzen:
-    // window.ER_CONFIG = { mapboxToken:"...", supabaseUrl:"...", supabaseAnonKey:"..." }
+    // --- Debug ---
     const DEBUG = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-
-    const CONFIG = window.ER_CONFIG ?? {
-      mapboxToken: "MAPBOX_TOKEN_PLACEHOLDER",
-      supabaseUrl: "https://ihpszsoivqcrkkiucjvv.supabase.co",
-      supabaseAnonKey: "SUPABASE_KEY_PLACEHOLDER",
-    };
-
     function logDebug(...args) { if (DEBUG) console.log("[DEBUG]", new Date().toISOString(), ...args); }
     function logError(...args) { console.error("[ERROR]", new Date().toISOString(), ...args); }
 
@@ -380,15 +360,12 @@
       else if (DEBUG) console.warn(`[DEBUG] Element #${id} nicht gefunden!`);
     }
 
-    function isPlaceholder(v) {
-      const s = String(v ?? "");
-      return (
-        !s ||
-        s.includes("DEIN_MAPBOX_TOKEN") ||
-        s.includes("DEINE_SUPABASE_URL") ||
-        s.includes("DEIN_SUPABASE_ANON_KEY")
-      );
-    }
+    // --- D-1 Config (mit deinen echten Keys) ---
+    const CONFIG = window.ER_CONFIG ?? {
+      mapboxToken: "MAPBOX_TOKEN_PLACEHOLDER",
+      supabaseUrl: "https://ihpszsoivqcrkkiucjvv.supabase.co",
+      supabaseAnonKey: "SUPABASE_KEY_PLACEHOLDER",
+    };
 
     // --- Zeitfenster ---
     const ACTIVE_ONLY_MS = 2 * 60_000;
@@ -418,10 +395,11 @@
     const LAYER_POINTS = "er-points";
     const LAYER_POINTS_SELECTED = "er-points-selected";
 
-    // ============================
-    // D-2: Bounding-Box Data Scope
-    // ============================
+    // --- D-2 Settings ---
     const BBOX_DEBOUNCE_MS = 350;
+    const BBOX_LIMIT_LATEST = 500;
+    const BBOX_LIMIT_ROUTE_POINTS = 4000; // total rows limit for route history within bbox
+    const BBOX_PAD_FACTOR = 0.15; // 15% padding around viewport (smoother scrolling)
 
     function debounce(fn, waitMs) {
       let t = null;
@@ -431,19 +409,21 @@
       };
     }
 
-    function getBoundsBBox() {
-      if (!map) return null;
-      const b = map.getBounds();
-      if (!b) return null;
-      return {
-        west: b.getWest(),
-        south: b.getSouth(),
-        east: b.getEast(),
-        north: b.getNorth(),
-      };
+    function normalizeCutoff(cutoffOverride, fallbackIso) {
+      if (!cutoffOverride) return fallbackIso;
+      if (typeof cutoffOverride === "number") return new Date(cutoffOverride).toISOString();
+      return String(cutoffOverride);
     }
 
-    // --- Helper / UI ---
+    function normId(v) { return String(v ?? "").trim().toLowerCase(); }
+
+    function getColorForDriver(driverKey) {
+      let hash = 0;
+      for (let i = 0; i < driverKey.length; i++) hash = driverKey.charCodeAt(i) + ((hash << 5) - hash);
+      const index = Math.abs(hash) % ROUTE_COLORS.length;
+      return ROUTE_COLORS[index];
+    }
+
     function isPanelOpen() {
       const panel = document.querySelector(".panel");
       return panel && !panel.classList.contains("collapsed");
@@ -463,20 +443,6 @@
       if (!el) return;
       el.classList.remove("show");
       el.textContent = "";
-    }
-
-    function normalizeCutoff(cutoffOverride, fallbackIso) {
-      if (!cutoffOverride) return fallbackIso;
-      if (typeof cutoffOverride === "number") return new Date(cutoffOverride).toISOString();
-      return String(cutoffOverride);
-    }
-    function normId(v) { return String(v ?? "").trim().toLowerCase(); }
-
-    function getColorForDriver(driverKey) {
-      let hash = 0;
-      for (let i = 0; i < driverKey.length; i++) hash = driverKey.charCodeAt(i) + ((hash << 5) - hash);
-      const index = Math.abs(hash) % ROUTE_COLORS.length;
-      return ROUTE_COLORS[index];
     }
 
     function setRealtime(on) {
@@ -500,7 +466,7 @@
       setTimeout(() => el.classList.remove("flash"), 420);
     }
 
-    // C-M3: relative Zeit
+    // C-M3 helpers
     function formatAge(ms) {
       const s = Math.max(0, Math.floor(ms / 1000));
       if (s < 60) return `vor ${s} Sek.`;
@@ -535,9 +501,7 @@
     }
 
     // --- Supabase + State ---
-    // (Anon-Key im Client ist ok, wenn RLS sauber ist.)
-    const sb = supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey);
-
+    let sb = null;
     let map;
     let channel = null;
 
@@ -561,10 +525,34 @@
     // Popup
     let markerPopup = null;
 
-    // Visible count will be computed from rendered features list
-    function setImpactMarkersFromVisible(n) {
-      setSafeTextContent("impactMarkers", String(n));
-      pulse("impactMarkers");
+    // D-2: request sequencing to avoid race conditions (late responses must not overwrite newer)
+    let latestFetchSeq = 0;
+    let routeFetchSeq = 0;
+
+    function getBoundsBBoxPadded() {
+      if (!map) return null;
+      const b = map.getBounds();
+      if (!b) return null;
+
+      const west = b.getWest();
+      const south = b.getSouth();
+      const east = b.getEast();
+      const north = b.getNorth();
+
+      const dx = (east - west) * BBOX_PAD_FACTOR;
+      const dy = (north - south) * BBOX_PAD_FACTOR;
+
+      return {
+        west: west - dx,
+        south: south - dy,
+        east: east + dx,
+        north: north + dy
+      };
+    }
+
+    function isInBbox(bb, lng, lat) {
+      if (!bb) return true;
+      return lng >= bb.west && lng <= bb.east && lat >= bb.south && lat <= bb.north;
     }
 
     function updateSelectedLayerFilter() {
@@ -576,29 +564,21 @@
       }
     }
 
-    // D-2: optional - nur Punkte im aktuellen Bounds rendern (wenn kein Follow aktiv)
-    function isInCurrentBounds(lng, lat) {
-      const bb = getBoundsBBox();
-      if (!bb) return true;
-      return lng >= bb.west && lng <= bb.east && lat >= bb.south && lat <= bb.north;
-    }
-
     function refreshDriversSource() {
       if (!map || !map.getSource(DRIVERS_SOURCE)) return;
 
       const feats = [];
       const now = Date.now();
+      const bb = currentFilterKey ? null : getBoundsBBoxPadded();
 
       for (const [driverKey, p] of positions.entries()) {
         if (!p) continue;
 
-        // Follow: nur selected
+        // Follow => nur selected
         if (currentFilterKey && driverKey !== currentFilterKey) continue;
 
-        // D-2: wenn NICHT Follow, dann nur was im aktuellen View liegt (echtes “Data Scope”)
-        if (!currentFilterKey) {
-          if (!isInCurrentBounds(Number(p.lng), Number(p.lat))) continue;
-        }
+        // D-2 => im All-Modus nur innerhalb (gepaddeter) Bounds rendern
+        if (!currentFilterKey && bb && !isInBbox(bb, Number(p.lng), Number(p.lat))) continue;
 
         const age = now - (p.ts || now);
         const stale = age > STALE_VISUAL_MS;
@@ -619,7 +599,8 @@
 
       updateSelectedLayerFilter();
       setCount(feats.length);
-      setImpactMarkersFromVisible(feats.length);
+      setSafeTextContent("impactMarkers", String(feats.length));
+      pulse("impactMarkers");
     }
 
     function openMarkerPopupFromFeature(feature) {
@@ -722,7 +703,7 @@
 
       try {
         const { data, error } = await sb.rpc("get_live_impact", { active_minutes: 2, points_minutes: 10 });
-        if (error) throw new Error(`Supabase RPC error: ${error.message}`);
+        if (error) throw new Error(error.message);
 
         const row = Array.isArray(data) ? data[0] : data;
         if (!row) throw new Error("RPC returned no rows");
@@ -801,30 +782,24 @@
 
     // --- Mapbox ---
     function initMapbox() {
-      if (isPlaceholder(CONFIG.mapboxToken)) {
-        showHint("Mapbox Token fehlt.");
-        logError("CONFIG.mapboxToken ist nicht gesetzt.");
-        return null;
-      }
       mapboxgl.accessToken = CONFIG.mapboxToken;
 
-      const map = new mapboxgl.Map({
+      const m = new mapboxgl.Map({
         container: "map",
         style: "mapbox://styles/mapbox/streets-v12",
         center: DEFAULT_CENTER,
         zoom: DEFAULT_ZOOM,
       });
 
-      map.addControl(new mapboxgl.NavigationControl(), "bottom-right");
+      m.addControl(new mapboxgl.NavigationControl(), "bottom-right");
 
-      map.on("load", () => {
+      m.on("load", () => {
         hideHint();
 
-        // --- Routes ---
-        if (!map.getSource("er-routes")) {
-          map.addSource("er-routes", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+        if (!m.getSource("er-routes")) {
+          m.addSource("er-routes", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
 
-          map.addLayer({
+          m.addLayer({
             id: "er-routes-line",
             type: "line",
             source: "er-routes",
@@ -840,29 +815,20 @@
             }
           });
 
-          map.on("click", "er-routes-line", (e) => {
-            const driverKey = e.features?.[0]?.properties?.driverKey;
-            new mapboxgl.Popup()
-              .setLngLat(e.lngLat)
-              .setHTML(`<b>Fahrer:</b> ${driverKey}<br><b>Route der letzten 10 Minuten</b>`)
-              .addTo(map);
-          });
-
-          map.on("mouseenter", "er-routes-line", () => { map.getCanvas().style.cursor = "pointer"; });
-          map.on("mouseleave", "er-routes-line", () => { map.getCanvas().style.cursor = ""; });
+          m.on("mouseenter", "er-routes-line", () => { m.getCanvas().style.cursor = "pointer"; });
+          m.on("mouseleave", "er-routes-line", () => { m.getCanvas().style.cursor = ""; });
         }
 
-        // --- Drivers (Cluster) ---
-        if (!map.getSource(DRIVERS_SOURCE)) {
-          map.addSource(DRIVERS_SOURCE, {
+        if (!m.getSource(DRIVERS_SOURCE)) {
+          m.addSource(DRIVERS_SOURCE, {
             type: "geojson",
             data: { type: "FeatureCollection", features: [] },
             cluster: true,
-            clusterRadius: 48,     // Baseline ~50 ruhig
+            clusterRadius: 48,
             clusterMaxZoom: 14
           });
 
-          map.addLayer({
+          m.addLayer({
             id: LAYER_CLUSTER_CIRCLE,
             type: "circle",
             source: DRIVERS_SOURCE,
@@ -875,7 +841,7 @@
             }
           });
 
-          map.addLayer({
+          m.addLayer({
             id: LAYER_CLUSTER_COUNT,
             type: "symbol",
             source: DRIVERS_SOURCE,
@@ -888,7 +854,7 @@
             paint: { "text-color": "#0b0f14" }
           });
 
-          map.addLayer({
+          m.addLayer({
             id: LAYER_POINTS,
             type: "circle",
             source: DRIVERS_SOURCE,
@@ -910,7 +876,7 @@
             }
           });
 
-          map.addLayer({
+          m.addLayer({
             id: LAYER_POINTS_SELECTED,
             type: "circle",
             source: DRIVERS_SOURCE,
@@ -923,23 +889,22 @@
                 "rgba(199,223,58,0.98)"
               ],
               "circle-stroke-width": 3,
-              "circle-stroke-color": "rgba(255,255,255,0.35)",
-              "circle-blur": 0
+              "circle-stroke-color": "rgba(255,255,255,0.35)"
             }
           });
 
-          map.on("click", LAYER_CLUSTER_CIRCLE, (e) => {
+          m.on("click", LAYER_CLUSTER_CIRCLE, (e) => {
             const f = e.features?.[0];
             if (!f) return;
             const clusterId = f.properties.cluster_id;
-            const source = map.getSource(DRIVERS_SOURCE);
+            const source = m.getSource(DRIVERS_SOURCE);
             source.getClusterExpansionZoom(clusterId, (err, zoom) => {
               if (err) return;
-              map.easeTo({ center: f.geometry.coordinates, zoom, duration: 550 });
+              m.easeTo({ center: f.geometry.coordinates, zoom, duration: 550 });
             });
           });
 
-          map.on("click", LAYER_POINTS, async (e) => {
+          m.on("click", LAYER_POINTS, async (e) => {
             const f = e.features?.[0];
             if (!f) return;
 
@@ -951,7 +916,7 @@
             currentFilterKey = normId(currentFilter);
             updateSelectedLayerFilter();
 
-            map.easeTo({ center: f.geometry.coordinates, zoom: 14, duration: 650 });
+            m.easeTo({ center: f.geometry.coordinates, zoom: 14, duration: 650 });
             openMarkerPopupFromFeature(f);
 
             await fetchLatest().catch(() => {});
@@ -960,41 +925,306 @@
             onVisibilityOrPanelChange();
           });
 
-          map.on("mouseenter", LAYER_CLUSTER_CIRCLE, () => { map.getCanvas().style.cursor = "pointer"; });
-          map.on("mouseleave", LAYER_CLUSTER_CIRCLE, () => { map.getCanvas().style.cursor = ""; });
-          map.on("mouseenter", LAYER_POINTS, () => { map.getCanvas().style.cursor = "pointer"; });
-          map.on("mouseleave", LAYER_POINTS, () => { map.getCanvas().style.cursor = ""; });
+          m.on("mouseenter", LAYER_CLUSTER_CIRCLE, () => { m.getCanvas().style.cursor = "pointer"; });
+          m.on("mouseleave", LAYER_CLUSTER_CIRCLE, () => { m.getCanvas().style.cursor = ""; });
+          m.on("mouseenter", LAYER_POINTS, () => { m.getCanvas().style.cursor = "pointer"; });
+          m.on("mouseleave", LAYER_POINTS, () => { m.getCanvas().style.cursor = ""; });
         }
 
         const btn = document.getElementById("btnToggleRoutes");
         if (btn) btn.textContent = routesVisible ? "Ausblenden" : "Einblenden";
 
         routesReady = true;
-        refreshRoutesSource();
         refreshDriversSource();
+        refreshRoutesSource();
       });
 
-      map.on("error", (e) => {
+      m.on("error", (e) => {
         logError("Mapbox-Fehler:", e?.error || e);
         showHint("Karte konnte nicht geladen werden.");
       });
 
-      return map;
+      return m;
     }
 
-    // --- Init ---
-    function initMap() {
-      // D-1 Hard Fail wenn Config fehlt
-      if (isPlaceholder(CONFIG.supabaseUrl) || isPlaceholder(CONFIG.supabaseAnonKey)) {
-        showHint("Supabase Config fehlt.");
-        logError("CONFIG.supabaseUrl / CONFIG.supabaseAnonKey sind nicht gesetzt.");
+    // --- D-2: Latest fetch (Follow oder BBox) ---
+    async function fetchLatest(cutoffOverride) {
+      const seq = ++latestFetchSeq;
+
+      const now = Date.now();
+      const fallbackIso = new Date(now - (activeOnlyMode ? ACTIVE_ONLY_MS : STALE_MS)).toISOString();
+      const cutoffIso = normalizeCutoff(cutoffOverride, fallbackIso);
+
+      // Follow => nur Fahrer (kein bbox)
+      if (currentFilterKey) {
+        const idExact = String(currentFilter || "").trim();
+        if (!idExact) return;
+
+        const { data, error } = await sb
+          .from("live_positions")
+          .select("driver_id, lat, lng, updated_at")
+          .ilike("driver_id", idExact)
+          .gte("updated_at", cutoffIso)
+          .order("updated_at", { ascending: false })
+          .limit(5);
+
+        if (seq !== latestFetchSeq) return; // ignore late response
+        if (error) { logError("fetchLatest(follow) error:", error.message); showHint("Fehler beim Laden."); return; }
+
+        const row = data?.[0] ?? null;
+        if (!row) { showHint("Kein Signal für diesen Fahrer."); positions.clear(); refreshDriversSource(); return; }
+
+        const rawId = (row.driver_id ?? "").toString();
+        const key = normId(rawId);
+        const lat = Number(row.lat);
+        const lng = Number(row.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+        const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
+        if (Date.now() - ts > STALE_MS) return;
+
+        positions.clear();
+        positions.set(key, { rawId, lng, lat, ts });
+
+        map.easeTo({ center: [lng, lat], zoom: 14, duration: 600 });
+        setLast(new Date());
+        refreshDriversSource();
         return;
       }
 
+      // BBox => nur sichtbarer Ausschnitt (+ padding)
+      const bb = getBoundsBBoxPadded();
+      if (!bb) return;
+
+      const { data, error } = await sb
+        .from("live_positions")
+        .select("driver_id, lat, lng, updated_at")
+        .gte("updated_at", cutoffIso)
+        .gte("lat", bb.south)
+        .lte("lat", bb.north)
+        .gte("lng", bb.west)
+        .lte("lng", bb.east)
+        .order("updated_at", { ascending: false })
+        .limit(BBOX_LIMIT_LATEST);
+
+      if (seq !== latestFetchSeq) return;
+      if (error) { logError("fetchLatest(bbox) error:", error.message); showHint("Fehler beim Laden."); return; }
+
+      // Take newest per driver
+      const seen = new Set();
+      const latest = new Map();
+
+      for (const row of data || []) {
+        const rawId = (row?.driver_id ?? "").toString();
+        const driverKey = normId(rawId);
+        if (!driverKey || seen.has(driverKey)) continue;
+        seen.add(driverKey);
+        latest.set(driverKey, row);
+      }
+
+      // Keep store aligned to bbox scope (no memory growth)
+      positions.clear();
+
+      for (const [key, row] of latest.entries()) {
+        const lat = Number(row.lat);
+        const lng = Number(row.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+
+        const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
+        if (Date.now() - ts > STALE_MS) continue;
+
+        positions.set(key, { rawId: row.driver_id, lng, lat, ts });
+      }
+
+      setLast(new Date());
+      refreshDriversSource();
+    }
+
+    // --- D-2: Route history (Follow: global for driver, All: bbox scoped) ---
+    async function fetchRouteHistory(cutoffOverride) {
+      const seq = ++routeFetchSeq;
+
+      const now = Date.now();
+      const fallbackIso = new Date(now - (activeOnlyMode ? ACTIVE_ONLY_MS : ROUTE_MS)).toISOString();
+      const cutoffIso = normalizeCutoff(cutoffOverride, fallbackIso);
+
+      routePoints.clear();
+
+      // Follow => route for driver (no bbox, because it should always work)
+      if (currentFilterKey) {
+        const idExact = String(currentFilter || "").trim();
+        if (!idExact) { refreshRoutesSource(); return; }
+
+        const { data, error } = await sb
+          .from("live_positions")
+          .select("driver_id, lat, lng, updated_at")
+          .ilike("driver_id", idExact)
+          .gte("updated_at", cutoffIso)
+          .order("updated_at", { ascending: true })
+          .limit(MAX_POINTS);
+
+        if (seq !== routeFetchSeq) return;
+        if (error) { logError("fetchRouteHistory(follow) error:", error.message); return; }
+
+        const key = normId(idExact);
+        const arr = [];
+        for (const row of data || []) {
+          const lat = Number(row.lat), lng = Number(row.lng);
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+          const ts = row.updated_at ? new Date(row.updated_at).getTime() : null;
+          if (!ts) continue;
+          arr.push({ lng, lat, ts });
+        }
+        // prune
+        const minTs = now - ROUTE_MS;
+        while (arr.length && arr[0].ts < minTs) arr.shift();
+        if (arr.length > MAX_POINTS) arr.splice(0, arr.length - MAX_POINTS);
+        if (arr.length >= 2) routePoints.set(key, arr);
+
+        refreshRoutesSource();
+        return;
+      }
+
+      // All => bbox-scoped routes (optional but makes D-2 really complete)
+      const bb = getBoundsBBoxPadded();
+      if (!bb) { refreshRoutesSource(); return; }
+
+      const { data, error } = await sb
+        .from("live_positions")
+        .select("driver_id, lat, lng, updated_at")
+        .gte("updated_at", cutoffIso)
+        .gte("lat", bb.south)
+        .lte("lat", bb.north)
+        .gte("lng", bb.west)
+        .lte("lng", bb.east)
+        .order("driver_id", { ascending: true })
+        .order("updated_at", { ascending: true })
+        .limit(BBOX_LIMIT_ROUTE_POINTS);
+
+      if (seq !== routeFetchSeq) return;
+      if (error) { logError("fetchRouteHistory(bbox) error:", error.message); return; }
+
+      for (const row of data || []) {
+        const driverKey = normId(row?.driver_id);
+        if (!driverKey) continue;
+
+        const lat = Number(row.lat);
+        const lng = Number(row.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+
+        const ts = row.updated_at ? new Date(row.updated_at).getTime() : null;
+        if (!ts) continue;
+
+        const arr = routePoints.get(driverKey) ?? [];
+        arr.push({ lng, lat, ts });
+        routePoints.set(driverKey, arr);
+      }
+
+      for (const [driverKey, arr] of routePoints.entries()) {
+        const minTs = now - ROUTE_MS;
+        while (arr.length && arr[0].ts < minTs) arr.shift();
+        if (arr.length > MAX_POINTS) arr.splice(0, arr.length - MAX_POINTS);
+
+        const last = arr[arr.length - 1];
+        if (!last || (now - last.ts > STALE_MS) || arr.length < 2) routePoints.delete(driverKey);
+      }
+
+      refreshRoutesSource();
+    }
+
+    // --- Realtime subscribe (bounds-aware) ---
+    function subscribe() {
+      if (channel) sb.removeChannel(channel);
+
+      channel = sb.channel("live_positions_map")
+        .on("postgres_changes", { event: "*", schema: "public", table: "live_positions" }, (payload) => {
+          if (payload?.eventType === "INSERT" || payload?.eventType === "UPDATE") {
+            upsertRealtime(payload.new);
+          } else if (payload?.eventType === "DELETE") {
+            const key = normId(payload.old?.driver_id);
+            if (key) positions.delete(key);
+            routePoints.delete(key);
+            refreshDriversSource();
+            refreshRoutesSource();
+          }
+        })
+        .subscribe((status) => {
+          setRealtime(status === "SUBSCRIBED");
+          if (status !== "SUBSCRIBED") logDebug("Realtime-Status:", status);
+        });
+    }
+
+    function upsertRealtime(row) {
+      if (!map || !row?.driver_id) return;
+
+      const rawId = (row.driver_id ?? "").toString();
+      const driverKey = normId(rawId);
+      if (!driverKey) return;
+
+      const lat = Number(row.lat);
+      const lng = Number(row.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+      const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
+      if (Date.now() - ts > STALE_MS) return;
+
+      // Follow => only that driver
+      if (currentFilterKey) {
+        if (driverKey !== currentFilterKey) return;
+        positions.set(driverKey, { rawId, lng, lat, ts });
+      } else {
+        // All => bounds-aware
+        const bb = getBoundsBBoxPadded();
+        if (bb && !isInBbox(bb, lng, lat)) return;
+        positions.set(driverKey, { rawId, lng, lat, ts });
+      }
+
+      // Stream route points only for visible scope (cheap + bounded)
+      const now = Date.now();
+      const minTs = now - ROUTE_MS;
+      const arr = routePoints.get(driverKey) ?? [];
+      arr.push({ lng, lat, ts });
+      while (arr.length && arr[0].ts < minTs) arr.shift();
+      if (arr.length > MAX_POINTS) arr.splice(0, arr.length - MAX_POINTS);
+      routePoints.set(driverKey, arr);
+
+      refreshDriversSource();
+      refreshRoutesSource();
+
+      setLast(new Date());
+
+      const sinceOk = Date.now() - (lastImpactOkAt || 0);
+      if (shouldPollImpact() && sinceOk > 3000) fetchImpactOnce().catch(() => {});
+    }
+
+    // --- Prune ---
+    setInterval(() => {
+      if (positions.size === 0) return;
+      const now = Date.now();
+      let changed = false;
+
+      for (const [driverKey, p] of positions.entries()) {
+        const ts = p?.ts || 0;
+        if (now - ts > STALE_MS) {
+          positions.delete(driverKey);
+          routePoints.delete(driverKey);
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        refreshDriversSource();
+        refreshRoutesSource();
+      }
+    }, PRUNE_EVERY_MS);
+
+    // --- Init ---
+    function initMap() {
+      sb = supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey);
       map = initMapbox();
       if (!map) return;
 
-      // Popup schließen, wenn man in die Karte klickt (nicht schlimm, Buttons stoppen Propagation)
+      // Popup schließen bei Click in Map (Popup Buttons stoppen Propagation)
       map.on("click", () => {
         if (markerPopup) { markerPopup.remove(); markerPopup = null; }
       });
@@ -1021,9 +1251,11 @@
       document.getElementById("btnAll")?.addEventListener("click", async () => {
         const df = document.getElementById("driverFilter");
         if (df) df.value = "";
+
         currentFilter = "";
         currentFilterKey = "";
         updateSelectedLayerFilter();
+
         if (markerPopup) { markerPopup.remove(); markerPopup = null; }
 
         map.easeTo({ center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM, duration: 650 });
@@ -1059,293 +1291,29 @@
 
       document.addEventListener("visibilitychange", () => onVisibilityOrPanelChange());
 
-      // D-2: BBox-Reload bei Map-Interaktion (nur wenn NICHT Follow aktiv)
-      const debouncedBBoxReload = debounce(() => {
+      // D-2: move/zoom => debounced bbox reload (nur wenn NICHT Follow)
+      const debouncedReload = debounce(async () => {
         if (!map) return;
-        if (currentFilterKey) return; // Follow hat Priorität
-        fetchLatest().catch(() => {});
+        if (currentFilterKey) return;
+        await fetchLatest().catch(() => {});
+        // routes are optional, but we keep them consistent in view
+        await fetchRouteHistory().catch(() => {});
       }, BBOX_DEBOUNCE_MS);
 
-      map.on("moveend", debouncedBBoxReload);
-      map.on("zoomend", debouncedBBoxReload);
+      map.on("moveend", debouncedReload);
+      map.on("zoomend", debouncedReload);
 
       // initial
-      fetchLatest().catch(e => logError("Initial fetchLatest() fehlgeschlagen:", e));
-      fetchRouteHistory().catch(e => logError("Initial fetchRouteHistory() fehlgeschlagen:", e));
+      fetchLatest().catch(e => logError("Initial fetchLatest() failed:", e));
+      fetchRouteHistory().catch(e => logError("Initial fetchRouteHistory() failed:", e));
 
       subscribe();
-
-      refreshDriversSource();
       onVisibilityOrPanelChange();
     }
 
-    // --- Fetch Latest ---
-    async function fetchLatest(cutoffOverride) {
-      const now = Date.now();
-      const fallbackIso = new Date(now - (activeOnlyMode ? ACTIVE_ONLY_MS : STALE_MS)).toISOString();
-      const cutoffIso = normalizeCutoff(cutoffOverride, fallbackIso);
-
-      // Follow-Modus: gezielt nur den Fahrer (kein BBox)
-      if (currentFilterKey) {
-        const idExact = String(currentFilter || "").trim();
-        if (!idExact) return;
-
-        const { data, error } = await sb
-          .from("live_positions")
-          .select("driver_id, lat, lng, updated_at")
-          .ilike("driver_id", idExact)           // case-insensitiver Exact-Match
-          .gte("updated_at", cutoffIso)
-          .order("updated_at", { ascending: false })
-          .limit(5);
-
-        if (error) {
-          logError("fetchLatest(follow) Supabase-Fehler:", error.message);
-          showHint("Fehler beim Laden.");
-          return;
-        }
-
-        // Nimm den neuesten Datensatz
-        const row = (data && data[0]) ? data[0] : null;
-        if (!row) {
-          showHint("Kein Signal für diesen Fahrer.");
-          positions.clear();
-          refreshDriversSource();
-          return;
-        }
-
-        const rawId = (row.driver_id ?? "").toString();
-        const key = normId(rawId);
-        const lat = Number(row.lat);
-        const lng = Number(row.lng);
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-
-        const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
-        const age = Date.now() - ts;
-        if (age > STALE_MS) return;
-
-        // Nur den gefolgten Fahrer im Store halten
-        positions.clear();
-        positions.set(key, { rawId, lng, lat, ts });
-
-        map.easeTo({ center: [lng, lat], zoom: 14, duration: 600 });
-
-        setLast(new Date());
-        refreshDriversSource();
-        return;
-      }
-
-      // D-2: BBox-Modus (kein Follow)
-      const bb = getBoundsBBox();
-      if (!bb) {
-        // Fallback (Map noch nicht ready): minimaler Fetch
-        const { data, error } = await sb
-          .from("live_positions")
-          .select("driver_id, lat, lng, updated_at")
-          .gte("updated_at", cutoffIso)
-          .order("updated_at", { ascending: false })
-          .limit(200);
-
-        if (error) {
-          logError("fetchLatest(fallback) Supabase-Fehler:", error.message);
-          showHint("Fehler beim Laden.");
-          return;
-        }
-        applyLatestRows(data || []);
-        setLast(new Date());
-        refreshDriversSource();
-        return;
-      }
-
-      // Bounding-Box Query
-      const { data, error } = await sb
-        .from("live_positions")
-        .select("driver_id, lat, lng, updated_at")
-        .gte("updated_at", cutoffIso)
-        .gte("lat", bb.south)
-        .lte("lat", bb.north)
-        .gte("lng", bb.west)
-        .lte("lng", bb.east)
-        .order("updated_at", { ascending: false })
-        .limit(500);
-
-      if (error) {
-        logError("fetchLatest(bbox) Supabase-Fehler:", error.message);
-        showHint("Fehler beim Laden.");
-        return;
-      }
-
-      applyLatestRows(data || []);
-      setLast(new Date());
-      refreshDriversSource();
-    }
-
-    function applyLatestRows(rows) {
-      const seen = new Set();
-      const latest = new Map();
-
-      for (const row of rows || []) {
-        const rawId = (row?.driver_id ?? "").toString();
-        const driverKey = normId(rawId);
-        if (!driverKey || seen.has(driverKey)) continue;
-        seen.add(driverKey);
-        latest.set(driverKey, row);
-      }
-
-      // prune store to only what we fetched in scope
-      for (const key of Array.from(positions.keys())) {
-        if (!latest.has(key)) positions.delete(key);
-      }
-
-      // upsert
-      for (const [key, row] of latest.entries()) {
-        const lat = Number(row.lat);
-        const lng = Number(row.lng);
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-
-        const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
-        const age = Date.now() - ts;
-        if (age > STALE_MS) continue;
-
-        positions.set(key, { rawId: row.driver_id, lng, lat, ts });
-      }
-    }
-
-    // --- Fetch Route History ---
-    async function fetchRouteHistory(cutoffOverride) {
-      const now = Date.now();
-      const fallbackIso = new Date(now - (activeOnlyMode ? ACTIVE_ONLY_MS : ROUTE_MS)).toISOString();
-      const cutoffIso = normalizeCutoff(cutoffOverride, fallbackIso);
-
-      // Route History bleibt bewusst global / per Follow gefiltert (Roadmap später: bbox route scope)
-      const { data, error } = await sb
-        .from("live_positions")
-        .select("driver_id, lat, lng, updated_at")
-        .gte("updated_at", cutoffIso)
-        .order("driver_id", { ascending: true })
-        .order("updated_at", { ascending: true });
-
-      if (error) {
-        logError("Route-History Fehler:", error.message);
-        return;
-      }
-
-      routePoints.clear();
-
-      for (const row of data || []) {
-        const driverKey = normId(row?.driver_id);
-        if (!driverKey) continue;
-        if (currentFilterKey && driverKey !== currentFilterKey) continue;
-
-        const lat = Number(row.lat);
-        const lng = Number(row.lng);
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-
-        const ts = row.updated_at ? new Date(row.updated_at).getTime() : null;
-        if (!ts) continue;
-
-        const arr = routePoints.get(driverKey) ?? [];
-        arr.push({ lng, lat, ts });
-        routePoints.set(driverKey, arr);
-      }
-
-      for (const [driverKey, arr] of routePoints.entries()) {
-        const minTs = now - ROUTE_MS;
-        while (arr.length && arr[0].ts < minTs) arr.shift();
-        if (arr.length > MAX_POINTS) arr.splice(0, arr.length - MAX_POINTS);
-
-        const last = arr[arr.length - 1];
-        if (!last || (now - last.ts > STALE_MS) || arr.length < 2) routePoints.delete(driverKey);
-      }
-
-      refreshRoutesSource();
-    }
-
-    // --- Realtime subscribe ---
-    function subscribe() {
-      if (channel) sb.removeChannel(channel);
-
-      channel = sb.channel("live_positions_map")
-        .on("postgres_changes", { event: "*", schema: "public", table: "live_positions" }, (payload) => {
-          if (payload?.eventType === "INSERT" || payload?.eventType === "UPDATE") {
-            upsertPosition(payload.new);
-          } else if (payload?.eventType === "DELETE") {
-            const key = normId(payload.old?.driver_id);
-            if (key) positions.delete(key);
-            refreshDriversSource();
-            refreshRoutesSource();
-          }
-        })
-        .subscribe((status) => {
-          setRealtime(status === "SUBSCRIBED");
-          if (status !== "SUBSCRIBED") logDebug("Realtime-Status:", status);
-        });
-    }
-
-    function upsertPosition(row) {
-      if (!map || !row?.driver_id) return;
-
-      const rawId = (row.driver_id ?? "").toString();
-      const driverKey = normId(rawId);
-      if (!driverKey) return;
-
-      // Follow: nur diesen
-      if (currentFilterKey && driverKey !== currentFilterKey) return;
-
-      const lat = Number(row.lat);
-      const lng = Number(row.lng);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-
-      const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
-      const age = Date.now() - ts;
-      if (age > STALE_MS) return;
-
-      // D-2: ohne Follow - wenn außerhalb Bounds, nicht in UI drücken (Store kann bleiben, aber wir halten es schlank)
-      if (!currentFilterKey && !isInCurrentBounds(lng, lat)) {
-        // Optional: nicht speichern, damit Store klein bleibt
-        return;
-      }
-
-      positions.set(driverKey, { rawId, lng, lat, ts });
-
-      // Route streaming
-      const now = Date.now();
-      const minTs = now - ROUTE_MS;
-      const arr = routePoints.get(driverKey) ?? [];
-      arr.push({ lng, lat, ts });
-      while (arr.length && arr[0].ts < minTs) arr.shift();
-      if (arr.length > MAX_POINTS) arr.splice(0, arr.length - MAX_POINTS);
-      routePoints.set(driverKey, arr);
-
-      refreshDriversSource();
-      refreshRoutesSource();
-
-      setLast(new Date());
-
-      const sinceOk = Date.now() - (lastImpactOkAt || 0);
-      if (shouldPollImpact() && sinceOk > 3000) {
-        fetchImpactOnce().catch(() => {});
-      }
-    }
-
-    // --- Prune ---
-    setInterval(() => {
-      if (positions.size === 0) return;
-      const now = Date.now();
-      const staleKeys = [];
-      for (const [driverKey, p] of positions.entries()) {
-        const ts = p?.ts || 0;
-        if (now - ts > STALE_MS) staleKeys.push(driverKey);
-      }
-      staleKeys.forEach(k => positions.delete(k));
-      if (staleKeys.length) {
-        refreshDriversSource();
-        refreshRoutesSource();
-      }
-    }, PRUNE_EVERY_MS);
-
     // --- Cleanup ---
     window.addEventListener("beforeunload", () => {
-      if (channel) sb.removeChannel(channel);
+      if (channel) sb?.removeChannel(channel);
       if (markerPopup) markerPopup.remove();
     });
 
