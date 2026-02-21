@@ -435,33 +435,47 @@
           <!-- Car icon (centered) -->
           <g transform="translate(0,-11) scale(0.80)" transform-origin="32px 32px">
 <!-- Body -->
-<path class="pin-icon"
-      d="M20 34
-         C20 30 22 28 26 27
-         L27.5 23.5
-         C28.5 21.5 30 20.5 32 20.5
-         C34 20.5 35.5 21.5 36.5 23.5
-         L38 27
-         C42 28 44 30 44 34
-         V39
-         C44 41 42.8 42.5 41 42.5
-         H23
-         C21.2 42.5 20 41 20 39
-         Z" />
+<!-- Car icon (side view) -->
+<g transform="translate(0,-11) scale(0.80)" transform-origin="32px 32px">
+  <!-- Body -->
+  <path class="pin-icon"
+        d="M18 36
+           H46
+           C48 36 49 37 49 39
+           V41
+           C49 42.6 47.8 44 46 44
+           H18
+           C16.2 44 15 42.6 15 41
+           V39
+           C15 37 16 36 18 36
+           Z" />
 
-<!-- Windshield -->
-<path class="pin-icon"
-      d="M28.6 24.5
-         C29.1 23.3 30.3 22.6 32 22.6
-         C33.7 22.6 34.9 23.3 35.4 24.5
-         L36.6 27.1
-         H27.4
-         Z" />
+  <!-- Roof / Cabin -->
+  <path class="pin-icon"
+        d="M22 36
+           L26 30.8
+           C26.8 29.8 28 29.2 29.4 29.2
+           H38.6
+           C40 29.2 41.2 29.8 42 30.8
+           L46 36
+           Z" />
 
-<!-- Wheels -->
-<circle class="pin-icon" cx="26" cy="40.5" r="2.3"/>
-<circle class="pin-icon" cx="38" cy="40.5" r="2.3"/>
-          </g>
+  <!-- Window cut (gives “side” feel) -->
+  <path class="pin-icon"
+        d="M28.2 31.4
+           H37.8
+           C38.6 31.4 39.3 31.8 39.8 32.4
+           L42.8 36
+           H27.2
+           L30.2 32.4
+           C30.7 31.8 31.4 31.4 32.2 31.4
+           Z"
+        opacity="0.25" />
+
+  <!-- Wheels -->
+  <circle class="pin-icon" cx="24" cy="44" r="2.6" />
+  <circle class="pin-icon" cx="40" cy="44" r="2.6" />
+</g>
         </svg>`;
       return el;
     }
