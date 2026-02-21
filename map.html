@@ -64,7 +64,6 @@
       padding: 0 10px;
       box-sizing: border-box;
     }
-
     .panel.collapsed .row,
     .panel.collapsed .stat,
     .panel.collapsed .stat2,
@@ -351,8 +350,11 @@
   <script>
     // --- Debug ---
     const DEBUG = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+
     function logDebug(...args) { if (DEBUG) console.log("[DEBUG]", new Date().toISOString(), ...args); }
-    function logError(...args) { console.error("[ERROR]", new Date().toISOString(), ...args); }
+    function logError(code, message, ctx = {}) {
+      console.error(`[${code}] ${message}`, { ts: new Date().toISOString(), ...ctx });
+    }
 
     function setSafeTextContent(id, text) {
       const el = document.getElementById(id);
@@ -398,8 +400,18 @@
     // --- D-2 Settings ---
     const BBOX_DEBOUNCE_MS = 350;
     const BBOX_LIMIT_LATEST = 500;
-    const BBOX_LIMIT_ROUTE_POINTS = 4000; // total rows limit for route history within bbox
-    const BBOX_PAD_FACTOR = 0.15; // 15% padding around viewport (smoother scrolling)
+    const BBOX_LIMIT_ROUTE_POINTS = 4000;
+    const BBOX_PAD_FACTOR = 0.15;
+
+    // --- D-2.1 Realtime Watchdog ---
+    const RT_WATCHDOG_MS = 8_000;           // prüft alle 8s
+    const RT_STALE_MS = 12_000;             // wenn nicht SUBSCRIBED länger als 12s -> reconnect
+    const RT_RECONNECT_BACKOFF = [1000, 2000, 5000, 10000, 20000];
+    let rtWatchdogTimer = null;
+    let rtReconnectIdx = 0;
+    let rtLastOkAt = 0;
+    let rtLastStatus = "INIT";
+    let rtConnecting = false;
 
     function debounce(fn, waitMs) {
       let t = null;
@@ -445,12 +457,14 @@
       el.textContent = "";
     }
 
-    function setRealtime(on) {
+    function setRealtimeState(state) {
+      // state: "AN" | "AUS" | "RECONNECT"
       const rtDot = document.getElementById("rtDot");
       const rtTxt = document.getElementById("rtTxt");
-      if (rtDot) rtDot.classList.toggle("on", on);
-      if (rtTxt) rtTxt.textContent = "Realtime: " + (on ? "AN" : "AUS");
+      if (rtDot) rtDot.classList.toggle("on", state === "AN");
+      if (rtTxt) rtTxt.textContent = "Realtime: " + (state === "AN" ? "AN" : state === "RECONNECT" ? "RECONNECT" : "AUS");
     }
+
     function setLast(ts = new Date()) { setSafeTextContent("lastTxt", ts.toLocaleString("de-DE")); }
     function setCount(n) { setSafeTextContent("countTxt", "Marker: " + n); }
 
@@ -502,12 +516,11 @@
 
     // --- Supabase + State ---
     let sb = null;
-    let map;
+    let map = null;
     let channel = null;
 
-    // positions: driverKey -> { rawId, lng, lat, ts }
-    const positions = new Map();
-    const routePoints = new Map();
+    const positions = new Map();   // driverKey -> { rawId, lng, lat, ts }
+    const routePoints = new Map(); // driverKey -> [{lng,lat,ts},...]
 
     let routesReady = false;
     let routesVisible = true;
@@ -525,9 +538,38 @@
     // Popup
     let markerPopup = null;
 
-    // D-2: request sequencing to avoid race conditions (late responses must not overwrite newer)
+    // D-2: request sequencing
     let latestFetchSeq = 0;
     let routeFetchSeq = 0;
+
+    // D-2: map listeners refs for cleanup
+    let onMoveEnd = null;
+    let onZoomEnd = null;
+
+    function validateConfigOrFail() {
+      try {
+        if (!CONFIG?.mapboxToken || !String(CONFIG.mapboxToken).startsWith("pk.")) {
+          showHint("Mapbox Token fehlt.");
+          logError("ERR_CONFIG_MAPBOX", "mapboxToken missing/invalid", { mapboxToken: CONFIG?.mapboxToken });
+          return false;
+        }
+        const url = String(CONFIG?.supabaseUrl || "");
+        if (!/^https?:\/\/.+/i.test(url)) {
+          showHint("Supabase URL ungültig.");
+          logError("ERR_CONFIG_SUPABASE_URL", "supabaseUrl must be http/https", { supabaseUrl: url });
+          return false;
+        }
+        if (!CONFIG?.supabaseAnonKey || String(CONFIG.supabaseAnonKey).length < 20) {
+          showHint("Supabase Key fehlt.");
+          logError("ERR_CONFIG_SUPABASE_KEY", "supabaseAnonKey missing/invalid", { len: String(CONFIG?.supabaseAnonKey || "").length });
+          return false;
+        }
+        return true;
+      } catch (e) {
+        logError("ERR_CONFIG_UNKNOWN", e?.message || String(e));
+        return false;
+      }
+    }
 
     function getBoundsBBoxPadded() {
       if (!map) return null;
@@ -542,17 +584,19 @@
       const dx = (east - west) * BBOX_PAD_FACTOR;
       const dy = (north - south) * BBOX_PAD_FACTOR;
 
-      return {
-        west: west - dx,
-        south: south - dy,
-        east: east + dx,
-        north: north + dy
-      };
+      return { west: west - dx, south: south - dy, east: east + dx, north: north + dy };
     }
 
     function isInBbox(bb, lng, lat) {
       if (!bb) return true;
       return lng >= bb.west && lng <= bb.east && lat >= bb.south && lat <= bb.north;
+    }
+
+    function isValidLatLng(lat, lng) {
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+      if (lat < -90 || lat > 90) return false;
+      if (lng < -180 || lng > 180) return false;
+      return true;
     }
 
     function updateSelectedLayerFilter() {
@@ -573,11 +617,7 @@
 
       for (const [driverKey, p] of positions.entries()) {
         if (!p) continue;
-
-        // Follow => nur selected
         if (currentFilterKey && driverKey !== currentFilterKey) continue;
-
-        // D-2 => im All-Modus nur innerhalb (gepaddeter) Bounds rendern
         if (!currentFilterKey && bb && !isInBbox(bb, Number(p.lng), Number(p.lat))) continue;
 
         const age = now - (p.ts || now);
@@ -585,12 +625,7 @@
 
         feats.push({
           type: "Feature",
-          properties: {
-            driverKey,
-            rawId: p.rawId,
-            ts: p.ts,
-            stale: stale ? 1 : 0
-          },
+          properties: { driverKey, rawId: p.rawId, ts: p.ts, stale: stale ? 1 : 0 },
           geometry: { type: "Point", coordinates: [p.lng, p.lat] }
         });
       }
@@ -652,9 +687,7 @@
 
         if (!routesVisible) {
           routesVisible = true;
-          if (map && map.getLayer("er-routes-line")) {
-            map.setLayoutProperty("er-routes-line", "visibility", "visible");
-          }
+          if (map && map.getLayer("er-routes-line")) map.setLayoutProperty("er-routes-line", "visibility", "visible");
           const b = document.getElementById("btnToggleRoutes");
           if (b) b.textContent = "Ausblenden";
         }
@@ -667,9 +700,7 @@
         updateSelectedLayerFilter();
 
         const c = feature.geometry?.coordinates;
-        if (Array.isArray(c) && c.length === 2) {
-          map.easeTo({ center: c, zoom: 14, duration: 550 });
-        }
+        if (Array.isArray(c) && c.length === 2) map.easeTo({ center: c, zoom: 14, duration: 550 });
 
         await fetchLatest().catch(() => {});
         await fetchRouteHistory().catch(() => {});
@@ -692,6 +723,28 @@
         .setLngLat(coords)
         .setDOMContent(root)
         .addTo(map);
+    }
+
+    function clearImpactTimer() {
+      if (impactTimer) { clearTimeout(impactTimer); impactTimer = null; }
+    }
+    function scheduleImpactPoll(immediate = false) {
+      clearImpactTimer();
+      if (!shouldPollImpact()) return;
+
+      const base = IMPACT_OK_MS;
+      const backoff = IMPACT_BACKOFF[impactBackoffIdx] ?? IMPACT_MAX_MS;
+      const nextMs = immediate ? IMPACT_MIN_MS : Math.max(base, backoff);
+
+      impactTimer = setTimeout(() => { fetchImpactOnce().catch(() => {}); }, nextMs);
+    }
+    function onVisibilityOrPanelChange() {
+      if (shouldPollImpact()) {
+        fetchImpactOnce().catch(() => {});
+        scheduleImpactPoll(false);
+      } else {
+        clearImpactTimer();
+      }
     }
 
     async function fetchImpactOnce() {
@@ -720,7 +773,7 @@
         impactBackoffIdx = 0;
         setLast(new Date());
       } catch (e) {
-        logError("RPC impact error:", e?.message || e);
+        logError("ERR_RPC_IMPACT", e?.message || String(e));
         showHint("Impact temporär nicht verfügbar.");
         impactBackoffIdx = Math.min(impactBackoffIdx + 1, IMPACT_BACKOFF.length - 1);
       } finally {
@@ -729,32 +782,6 @@
       }
 
       scheduleImpactPoll();
-    }
-
-    function clearImpactTimer() {
-      if (impactTimer) { clearTimeout(impactTimer); impactTimer = null; }
-    }
-
-    function scheduleImpactPoll(immediate = false) {
-      clearImpactTimer();
-      if (!shouldPollImpact()) return;
-
-      const base = IMPACT_OK_MS;
-      const backoff = IMPACT_BACKOFF[impactBackoffIdx] ?? IMPACT_MAX_MS;
-      const nextMs = immediate ? IMPACT_MIN_MS : Math.max(base, backoff);
-
-      impactTimer = setTimeout(() => {
-        fetchImpactOnce().catch(() => {});
-      }, nextMs);
-    }
-
-    function onVisibilityOrPanelChange() {
-      if (shouldPollImpact()) {
-        fetchImpactOnce().catch(() => {});
-        scheduleImpactPoll(false);
-      } else {
-        clearImpactTimer();
-      }
     }
 
     function refreshRoutesSource() {
@@ -808,11 +835,7 @@
               "line-cap": "round",
               "visibility": routesVisible ? "visible" : "none"
             },
-            paint: {
-              "line-width": 4,
-              "line-opacity": 0.75,
-              "line-color": ["get", "color"]
-            }
+            paint: { "line-width": 4, "line-opacity": 0.75, "line-color": ["get", "color"] }
           });
 
           m.on("mouseenter", "er-routes-line", () => { m.getCanvas().style.cursor = "pointer"; });
@@ -940,7 +963,7 @@
       });
 
       m.on("error", (e) => {
-        logError("Mapbox-Fehler:", e?.error || e);
+        logError("ERR_MAPBOX", "Mapbox error", { err: e?.error || e });
         showHint("Karte konnte nicht geladen werden.");
       });
 
@@ -955,7 +978,7 @@
       const fallbackIso = new Date(now - (activeOnlyMode ? ACTIVE_ONLY_MS : STALE_MS)).toISOString();
       const cutoffIso = normalizeCutoff(cutoffOverride, fallbackIso);
 
-      // Follow => nur Fahrer (kein bbox)
+      // Follow
       if (currentFilterKey) {
         const idExact = String(currentFilter || "").trim();
         if (!idExact) return;
@@ -968,17 +991,29 @@
           .order("updated_at", { ascending: false })
           .limit(5);
 
-        if (seq !== latestFetchSeq) return; // ignore late response
-        if (error) { logError("fetchLatest(follow) error:", error.message); showHint("Fehler beim Laden."); return; }
+        if (seq !== latestFetchSeq) return;
+        if (error) {
+          logError("ERR_FETCH_LATEST_FOLLOW", error.message, { cutoffIso, idExact });
+          showHint("Fehler beim Laden.");
+          return;
+        }
 
         const row = data?.[0] ?? null;
-        if (!row) { showHint("Kein Signal für diesen Fahrer."); positions.clear(); refreshDriversSource(); return; }
+        if (!row) {
+          showHint("Kein Signal für diesen Fahrer.");
+          positions.clear();
+          refreshDriversSource();
+          return;
+        }
 
         const rawId = (row.driver_id ?? "").toString();
         const key = normId(rawId);
         const lat = Number(row.lat);
         const lng = Number(row.lng);
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+        if (!isValidLatLng(lat, lng)) {
+          logError("ERR_DATA_LATLNG", "Invalid lat/lng (follow)", { rawId, lat, lng });
+          return;
+        }
 
         const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
         if (Date.now() - ts > STALE_MS) return;
@@ -992,7 +1027,7 @@
         return;
       }
 
-      // BBox => nur sichtbarer Ausschnitt (+ padding)
+      // BBox
       const bb = getBoundsBBoxPadded();
       if (!bb) return;
 
@@ -1008,9 +1043,13 @@
         .limit(BBOX_LIMIT_LATEST);
 
       if (seq !== latestFetchSeq) return;
-      if (error) { logError("fetchLatest(bbox) error:", error.message); showHint("Fehler beim Laden."); return; }
 
-      // Take newest per driver
+      if (error) {
+        logError("ERR_FETCH_LATEST_BBOX", error.message, { cutoffIso, bb, limit: BBOX_LIMIT_LATEST });
+        showHint("Fehler beim Laden.");
+        return;
+      }
+
       const seen = new Set();
       const latest = new Map();
 
@@ -1022,13 +1061,12 @@
         latest.set(driverKey, row);
       }
 
-      // Keep store aligned to bbox scope (no memory growth)
       positions.clear();
 
       for (const [key, row] of latest.entries()) {
         const lat = Number(row.lat);
         const lng = Number(row.lng);
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+        if (!isValidLatLng(lat, lng)) continue;
 
         const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
         if (Date.now() - ts > STALE_MS) continue;
@@ -1040,7 +1078,7 @@
       refreshDriversSource();
     }
 
-    // --- D-2: Route history (Follow: global for driver, All: bbox scoped) ---
+    // --- D-2: Route history ---
     async function fetchRouteHistory(cutoffOverride) {
       const seq = ++routeFetchSeq;
 
@@ -1050,7 +1088,7 @@
 
       routePoints.clear();
 
-      // Follow => route for driver (no bbox, because it should always work)
+      // Follow => full driver route
       if (currentFilterKey) {
         const idExact = String(currentFilter || "").trim();
         if (!idExact) { refreshRoutesSource(); return; }
@@ -1064,18 +1102,22 @@
           .limit(MAX_POINTS);
 
         if (seq !== routeFetchSeq) return;
-        if (error) { logError("fetchRouteHistory(follow) error:", error.message); return; }
+
+        if (error) {
+          logError("ERR_FETCH_ROUTE_FOLLOW", error.message, { cutoffIso, idExact });
+          return;
+        }
 
         const key = normId(idExact);
         const arr = [];
         for (const row of data || []) {
           const lat = Number(row.lat), lng = Number(row.lng);
-          if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+          if (!isValidLatLng(lat, lng)) continue;
           const ts = row.updated_at ? new Date(row.updated_at).getTime() : null;
           if (!ts) continue;
           arr.push({ lng, lat, ts });
         }
-        // prune
+
         const minTs = now - ROUTE_MS;
         while (arr.length && arr[0].ts < minTs) arr.shift();
         if (arr.length > MAX_POINTS) arr.splice(0, arr.length - MAX_POINTS);
@@ -1085,7 +1127,7 @@
         return;
       }
 
-      // All => bbox-scoped routes (optional but makes D-2 really complete)
+      // All => bbox-scoped routes
       const bb = getBoundsBBoxPadded();
       if (!bb) { refreshRoutesSource(); return; }
 
@@ -1102,7 +1144,11 @@
         .limit(BBOX_LIMIT_ROUTE_POINTS);
 
       if (seq !== routeFetchSeq) return;
-      if (error) { logError("fetchRouteHistory(bbox) error:", error.message); return; }
+
+      if (error) {
+        logError("ERR_FETCH_ROUTE_BBOX", error.message, { cutoffIso, bb, limit: BBOX_LIMIT_ROUTE_POINTS });
+        return;
+      }
 
       for (const row of data || []) {
         const driverKey = normId(row?.driver_id);
@@ -1110,7 +1156,7 @@
 
         const lat = Number(row.lat);
         const lng = Number(row.lng);
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+        if (!isValidLatLng(lat, lng)) continue;
 
         const ts = row.updated_at ? new Date(row.updated_at).getTime() : null;
         if (!ts) continue;
@@ -1134,7 +1180,15 @@
 
     // --- Realtime subscribe (bounds-aware) ---
     function subscribe() {
-      if (channel) sb.removeChannel(channel);
+      if (!sb) return;
+
+      // prevent double-connect storms
+      if (rtConnecting) return;
+      rtConnecting = true;
+
+      try {
+        if (channel) sb.removeChannel(channel);
+      } catch (_) {}
 
       channel = sb.channel("live_positions_map")
         .on("postgres_changes", { event: "*", schema: "public", table: "live_positions" }, (payload) => {
@@ -1142,16 +1196,64 @@
             upsertRealtime(payload.new);
           } else if (payload?.eventType === "DELETE") {
             const key = normId(payload.old?.driver_id);
-            if (key) positions.delete(key);
-            routePoints.delete(key);
-            refreshDriversSource();
-            refreshRoutesSource();
+            if (key) {
+              positions.delete(key);
+              routePoints.delete(key);
+              refreshDriversSource();
+              refreshRoutesSource();
+            }
           }
         })
         .subscribe((status) => {
-          setRealtime(status === "SUBSCRIBED");
-          if (status !== "SUBSCRIBED") logDebug("Realtime-Status:", status);
+          rtLastStatus = status;
+
+          if (status === "SUBSCRIBED") {
+            rtLastOkAt = Date.now();
+            rtReconnectIdx = 0;
+            setRealtimeState("AN");
+          } else if (status === "CLOSED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            setRealtimeState("RECONNECT");
+          } else {
+            setRealtimeState("AUS");
+          }
+
+          logDebug("Realtime status:", status);
+          rtConnecting = false;
         });
+
+      startRealtimeWatchdog();
+    }
+
+    function startRealtimeWatchdog() {
+      if (rtWatchdogTimer) return;
+      rtWatchdogTimer = setInterval(() => {
+        if (!isTabVisible()) return; // wenn Tab inaktiv, kein reconnect spam
+        const now = Date.now();
+
+        // wenn wir "ok" waren, aber jetzt zu lang nicht mehr SUBSCRIBED
+        const age = now - (rtLastOkAt || 0);
+        const isBad = rtLastStatus !== "SUBSCRIBED";
+        const tooLong = age > RT_STALE_MS;
+
+        if (isBad && tooLong) {
+          const wait = RT_RECONNECT_BACKOFF[Math.min(rtReconnectIdx, RT_RECONNECT_BACKOFF.length - 1)];
+          rtReconnectIdx++;
+          setRealtimeState("RECONNECT");
+          logError("WARN_RT_RECONNECT", "Realtime not subscribed, reconnecting", { status: rtLastStatus, ageMs: age, backoffMs: wait });
+
+          // schedule reconnect (non-blocking)
+          setTimeout(() => {
+            try { subscribe(); } catch (_) {}
+          }, wait);
+        }
+      }, RT_WATCHDOG_MS);
+    }
+
+    function stopRealtimeWatchdog() {
+      if (rtWatchdogTimer) {
+        clearInterval(rtWatchdogTimer);
+        rtWatchdogTimer = null;
+      }
     }
 
     function upsertRealtime(row) {
@@ -1163,23 +1265,20 @@
 
       const lat = Number(row.lat);
       const lng = Number(row.lng);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      if (!isValidLatLng(lat, lng)) return;
 
       const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
       if (Date.now() - ts > STALE_MS) return;
 
-      // Follow => only that driver
       if (currentFilterKey) {
         if (driverKey !== currentFilterKey) return;
         positions.set(driverKey, { rawId, lng, lat, ts });
       } else {
-        // All => bounds-aware
         const bb = getBoundsBBoxPadded();
         if (bb && !isInBbox(bb, lng, lat)) return;
         positions.set(driverKey, { rawId, lng, lat, ts });
       }
 
-      // Stream route points only for visible scope (cheap + bounded)
       const now = Date.now();
       const minTs = now - ROUTE_MS;
       const arr = routePoints.get(driverKey) ?? [];
@@ -1190,7 +1289,6 @@
 
       refreshDriversSource();
       refreshRoutesSource();
-
       setLast(new Date());
 
       const sinceOk = Date.now() - (lastImpactOkAt || 0);
@@ -1198,7 +1296,7 @@
     }
 
     // --- Prune ---
-    setInterval(() => {
+    const pruneTimer = setInterval(() => {
       if (positions.size === 0) return;
       const now = Date.now();
       let changed = false;
@@ -1220,11 +1318,14 @@
 
     // --- Init ---
     function initMap() {
+      if (!validateConfigOrFail()) return;
+
+      // init supabase AFTER config validation
       sb = supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey);
+
       map = initMapbox();
       if (!map) return;
 
-      // Popup schließen bei Click in Map (Popup Buttons stoppen Propagation)
       map.on("click", () => {
         if (markerPopup) { markerPopup.remove(); markerPopup = null; }
       });
@@ -1289,33 +1390,62 @@
         onVisibilityOrPanelChange();
       });
 
-      document.addEventListener("visibilitychange", () => onVisibilityOrPanelChange());
+      document.addEventListener("visibilitychange", () => {
+        onVisibilityOrPanelChange();
+        // if tab becomes visible, poke watchdog state
+        if (document.visibilityState === "visible") {
+          // allow quick reconnect
+          rtLastOkAt = rtLastOkAt || 0;
+        }
+      });
 
       // D-2: move/zoom => debounced bbox reload (nur wenn NICHT Follow)
       const debouncedReload = debounce(async () => {
         if (!map) return;
         if (currentFilterKey) return;
         await fetchLatest().catch(() => {});
-        // routes are optional, but we keep them consistent in view
         await fetchRouteHistory().catch(() => {});
       }, BBOX_DEBOUNCE_MS);
 
-      map.on("moveend", debouncedReload);
-      map.on("zoomend", debouncedReload);
+      onMoveEnd = debouncedReload;
+      onZoomEnd = debouncedReload;
+      map.on("moveend", onMoveEnd);
+      map.on("zoomend", onZoomEnd);
 
       // initial
-      fetchLatest().catch(e => logError("Initial fetchLatest() failed:", e));
-      fetchRouteHistory().catch(e => logError("Initial fetchRouteHistory() failed:", e));
+      fetchLatest().catch(e => logError("ERR_INIT_FETCH_LATEST", e?.message || String(e)));
+      fetchRouteHistory().catch(e => logError("ERR_INIT_FETCH_ROUTE", e?.message || String(e)));
 
       subscribe();
       onVisibilityOrPanelChange();
     }
 
-    // --- Cleanup ---
-    window.addEventListener("beforeunload", () => {
-      if (channel) sb?.removeChannel(channel);
-      if (markerPopup) markerPopup.remove();
-    });
+    // --- Cleanup (D-2.1 Hygiene) ---
+    function cleanup() {
+      try { clearInterval(pruneTimer); } catch (_) {}
+      try { clearImpactTimer(); } catch (_) {}
+      try { stopRealtimeWatchdog(); } catch (_) {}
+
+      try {
+        if (map && onMoveEnd) map.off("moveend", onMoveEnd);
+        if (map && onZoomEnd) map.off("zoomend", onZoomEnd);
+      } catch (_) {}
+
+      try {
+        if (sb && channel) sb.removeChannel(channel);
+      } catch (_) {}
+
+      try {
+        if (markerPopup) markerPopup.remove();
+      } catch (_) {}
+
+      try {
+        if (map) map.remove(); // ✅ wichtig: Mapbox WebGL + Listener cleanup
+      } catch (_) {}
+    }
+
+    window.addEventListener("beforeunload", cleanup);
+    window.addEventListener("pagehide", cleanup);
 
     document.addEventListener("DOMContentLoaded", initMap);
   </script>
