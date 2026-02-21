@@ -213,9 +213,7 @@
       border-radius: 999px;
       transition: background-color .35s ease;
     }
-    .pulse.flash {
-      background: rgba(199,223,58,0.22);
-    }
+    .pulse.flash { background: rgba(199,223,58,0.22); }
 
     .dot { display:inline-block; width:10px; height:10px; border-radius:50%; background:#ef4444; }
     .dot.on { background:#22c55e; }
@@ -360,13 +358,37 @@
   </div>
 
   <script>
-    // --- Debug ---
+    // ============================
+    // D-1: Deployment Hygiene
+    // ============================
+    // Optional: Du kannst auf dem Server (oder vor dem Script) window.ER_CONFIG setzen:
+    // window.ER_CONFIG = { mapboxToken:"...", supabaseUrl:"...", supabaseAnonKey:"..." }
     const DEBUG = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
 
-    // API-Keys
-    const MAPBOX_TOKEN = "MAPBOX_TOKEN_PLACEHOLDER";
-    const SUPABASE_URL = "https://ihpszsoivqcrkkiucjvv.supabase.co";
-    const SUPABASE_ANON_KEY = "SUPABASE_KEY_PLACEHOLDER";
+    const CONFIG = window.ER_CONFIG ?? {
+      mapboxToken: "DEIN_MAPBOX_TOKEN",
+      supabaseUrl: "DEINE_SUPABASE_URL",
+      supabaseAnonKey: "DEIN_SUPABASE_ANON_KEY",
+    };
+
+    function logDebug(...args) { if (DEBUG) console.log("[DEBUG]", new Date().toISOString(), ...args); }
+    function logError(...args) { console.error("[ERROR]", new Date().toISOString(), ...args); }
+
+    function setSafeTextContent(id, text) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = text ?? "";
+      else if (DEBUG) console.warn(`[DEBUG] Element #${id} nicht gefunden!`);
+    }
+
+    function isPlaceholder(v) {
+      const s = String(v ?? "");
+      return (
+        !s ||
+        s.includes("DEIN_MAPBOX_TOKEN") ||
+        s.includes("DEINE_SUPABASE_URL") ||
+        s.includes("DEIN_SUPABASE_ANON_KEY")
+      );
+    }
 
     // --- Zeitfenster ---
     const ACTIVE_ONLY_MS = 2 * 60_000;
@@ -396,15 +418,32 @@
     const LAYER_POINTS = "er-points";
     const LAYER_POINTS_SELECTED = "er-points-selected";
 
-    // --- Helper ---
-    function setSafeTextContent(id, text) {
-      const el = document.getElementById(id);
-      if (el) el.textContent = text ?? "";
-      else if (DEBUG) console.warn(`[DEBUG] Element #${id} nicht gefunden!`);
-    }
-    function logDebug(...args) { if (DEBUG) console.log("[DEBUG]", ...args); }
-    function logError(...args) { console.error("[ERROR]", ...args); }
+    // ============================
+    // D-2: Bounding-Box Data Scope
+    // ============================
+    const BBOX_DEBOUNCE_MS = 350;
 
+    function debounce(fn, waitMs) {
+      let t = null;
+      return (...args) => {
+        if (t) clearTimeout(t);
+        t = setTimeout(() => fn(...args), waitMs);
+      };
+    }
+
+    function getBoundsBBox() {
+      if (!map) return null;
+      const b = map.getBounds();
+      if (!b) return null;
+      return {
+        west: b.getWest(),
+        south: b.getSouth(),
+        east: b.getEast(),
+        north: b.getNorth(),
+      };
+    }
+
+    // --- Helper / UI ---
     function isPanelOpen() {
       const panel = document.querySelector(".panel");
       return panel && !panel.classList.contains("collapsed");
@@ -496,16 +535,14 @@
     }
 
     // --- Supabase + State ---
-    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // (Anon-Key im Client ist ok, wenn RLS sauber ist.)
+    const sb = supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey);
 
     let map;
     let channel = null;
 
-    // ✅ C-M4: positions store (statt DOM markers)
-    // driverKey -> { rawId, lng, lat, ts }
+    // positions: driverKey -> { rawId, lng, lat, ts }
     const positions = new Map();
-
-    // Routen / Seen
     const routePoints = new Map();
 
     let routesReady = false;
@@ -521,20 +558,13 @@
     let impactBackoffIdx = 0;
     let lastImpactOkAt = 0;
 
-    // C-M3 Popup
+    // Popup
     let markerPopup = null;
 
-    function setImpactMarkers() {
-      // Marker = aktuell gerenderte Fahrer (nicht Cluster)
-      const count = getVisibleDriverCount();
-      setSafeTextContent("impactMarkers", String(count));
+    // Visible count will be computed from rendered features list
+    function setImpactMarkersFromVisible(n) {
+      setSafeTextContent("impactMarkers", String(n));
       pulse("impactMarkers");
-    }
-
-    function getVisibleDriverCount() {
-      // bei aktivem Filter: max 1
-      if (currentFilterKey) return positions.has(currentFilterKey) ? 1 : 0;
-      return positions.size;
     }
 
     function updateSelectedLayerFilter() {
@@ -542,9 +572,15 @@
       if (currentFilterKey) {
         map.setFilter(LAYER_POINTS_SELECTED, ["all", ["!", ["has", "point_count"]], ["==", ["get", "driverKey"], currentFilterKey]]);
       } else {
-        // nichts selected
         map.setFilter(LAYER_POINTS_SELECTED, ["all", ["!", ["has", "point_count"]], ["==", ["get", "driverKey"], "__none__"]]);
       }
+    }
+
+    // D-2: optional - nur Punkte im aktuellen Bounds rendern (wenn kein Follow aktiv)
+    function isInCurrentBounds(lng, lat) {
+      const bb = getBoundsBBox();
+      if (!bb) return true;
+      return lng >= bb.west && lng <= bb.east && lat >= bb.south && lat <= bb.north;
     }
 
     function refreshDriversSource() {
@@ -555,7 +591,14 @@
 
       for (const [driverKey, p] of positions.entries()) {
         if (!p) continue;
+
+        // Follow: nur selected
         if (currentFilterKey && driverKey !== currentFilterKey) continue;
+
+        // D-2: wenn NICHT Follow, dann nur was im aktuellen View liegt (echtes “Data Scope”)
+        if (!currentFilterKey) {
+          if (!isInCurrentBounds(Number(p.lng), Number(p.lat))) continue;
+        }
 
         const age = now - (p.ts || now);
         const stale = age > STALE_VISUAL_MS;
@@ -568,29 +611,23 @@
             ts: p.ts,
             stale: stale ? 1 : 0
           },
-          geometry: {
-            type: "Point",
-            coordinates: [p.lng, p.lat]
-          }
+          geometry: { type: "Point", coordinates: [p.lng, p.lat] }
         });
       }
 
-      map.getSource(DRIVERS_SOURCE).setData({
-        type: "FeatureCollection",
-        features: feats
-      });
+      map.getSource(DRIVERS_SOURCE).setData({ type: "FeatureCollection", features: feats });
 
       updateSelectedLayerFilter();
       setCount(feats.length);
-      setImpactMarkers();
+      setImpactMarkersFromVisible(feats.length);
     }
 
     function openMarkerPopupFromFeature(feature) {
       if (!map || !feature) return;
+      if (markerPopup) { markerPopup.remove(); markerPopup = null; }
 
       const props = feature.properties || {};
       const rawId = props.rawId || props.driverKey || "";
-      const driverKey = props.driverKey || normId(rawId);
       const ts = Number(props.ts) || Date.now();
       const ageMs = Date.now() - ts;
 
@@ -632,7 +669,6 @@
         ev.preventDefault();
         ev.stopPropagation();
 
-        // Route sichtbar machen
         if (!routesVisible) {
           routesVisible = true;
           if (map && map.getLayer("er-routes-line")) {
@@ -642,7 +678,6 @@
           if (b) b.textContent = "Ausblenden";
         }
 
-        // Follow setzen
         const df = document.getElementById("driverFilter");
         if (df) df.value = rawId;
 
@@ -650,7 +685,6 @@
         currentFilterKey = normId(currentFilter);
         updateSelectedLayerFilter();
 
-        // Zoom auf Feature
         const c = feature.geometry?.coordinates;
         if (Array.isArray(c) && c.length === 2) {
           map.easeTo({ center: c, zoom: 14, duration: 550 });
@@ -673,7 +707,6 @@
       const coords = feature.geometry?.coordinates;
       if (!Array.isArray(coords) || coords.length !== 2) return;
 
-      if (markerPopup) markerPopup.remove();
       markerPopup = new mapboxgl.Popup({ closeButton: true, closeOnClick: true, offset: 14 })
         .setLngLat(coords)
         .setDOMContent(root)
@@ -689,7 +722,7 @@
 
       try {
         const { data, error } = await sb.rpc("get_live_impact", { active_minutes: 2, points_minutes: 10 });
-        if (error) throw error;
+        if (error) throw new Error(`Supabase RPC error: ${error.message}`);
 
         const row = Array.isArray(data) ? data[0] : data;
         if (!row) throw new Error("RPC returned no rows");
@@ -702,7 +735,6 @@
         pulse("impactActive");
         pulse("impactPoints10");
 
-        setSafeTextContent("impactMarkers", String(getVisibleDriverCount()));
         lastImpactOkAt = Date.now();
         impactBackoffIdx = 0;
         setLast(new Date());
@@ -719,10 +751,7 @@
     }
 
     function clearImpactTimer() {
-      if (impactTimer) {
-        clearTimeout(impactTimer);
-        impactTimer = null;
-      }
+      if (impactTimer) { clearTimeout(impactTimer); impactTimer = null; }
     }
 
     function scheduleImpactPoll(immediate = false) {
@@ -765,7 +794,6 @@
       map.getSource("er-routes").setData({ type: "FeatureCollection", features });
 
       if (!isPanelOpen()) return;
-
       if (features.length === 0 && currentFilterKey) showHint("Keine Route für diesen Fahrer.");
       else if (features.length === 0) showHint("Keine Routen verfügbar.");
       else hideHint();
@@ -773,13 +801,12 @@
 
     // --- Mapbox ---
     function initMapbox() {
-      if (!MAPBOX_TOKEN || MAPBOX_TOKEN.includes("DEIN_MAPBOX_TOKEN") || MAPBOX_TOKEN.includes("REPLACE_WITH_YOUR_TOKEN")) {
+      if (isPlaceholder(CONFIG.mapboxToken)) {
         showHint("Mapbox Token fehlt.");
-        logError("MAPBOX_TOKEN ist nicht gesetzt.");
+        logError("CONFIG.mapboxToken ist nicht gesetzt.");
         return null;
       }
-
-      mapboxgl.accessToken = MAPBOX_TOKEN;
+      mapboxgl.accessToken = CONFIG.mapboxToken;
 
       const map = new mapboxgl.Map({
         container: "map",
@@ -825,17 +852,16 @@
           map.on("mouseleave", "er-routes-line", () => { map.getCanvas().style.cursor = ""; });
         }
 
-        // --- Drivers (C-M4) ---
+        // --- Drivers (Cluster) ---
         if (!map.getSource(DRIVERS_SOURCE)) {
           map.addSource(DRIVERS_SOURCE, {
             type: "geojson",
             data: { type: "FeatureCollection", features: [] },
             cluster: true,
-            clusterRadius: 42,
+            clusterRadius: 48,     // Baseline ~50 ruhig
             clusterMaxZoom: 14
           });
 
-          // Cluster circle
           map.addLayer({
             id: LAYER_CLUSTER_CIRCLE,
             type: "circle",
@@ -849,7 +875,6 @@
             }
           });
 
-          // Cluster count
           map.addLayer({
             id: LAYER_CLUSTER_COUNT,
             type: "symbol",
@@ -860,12 +885,9 @@
               "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
               "text-size": 12
             },
-            paint: {
-              "text-color": "#0b0f14"
-            }
+            paint: { "text-color": "#0b0f14" }
           });
 
-          // Unclustered points (normal + stale)
           map.addLayer({
             id: LAYER_POINTS,
             type: "circle",
@@ -888,7 +910,6 @@
             }
           });
 
-          // Selected overlay
           map.addLayer({
             id: LAYER_POINTS_SELECTED,
             type: "circle",
@@ -907,7 +928,6 @@
             }
           });
 
-          // Cluster click => zoom in
           map.on("click", LAYER_CLUSTER_CIRCLE, (e) => {
             const f = e.features?.[0];
             if (!f) return;
@@ -919,27 +939,19 @@
             });
           });
 
-          // Point click => follow + zoom + popup + route reload (C-M1 + C-M3)
           map.on("click", LAYER_POINTS, async (e) => {
             const f = e.features?.[0];
             if (!f) return;
 
             const rawId = f.properties?.rawId ?? "";
-            const driverKey = f.properties?.driverKey ?? normId(rawId);
-
-            // set filter
             const df = document.getElementById("driverFilter");
             if (df) df.value = rawId;
 
             currentFilter = String(rawId).trim();
             currentFilterKey = normId(currentFilter);
-
             updateSelectedLayerFilter();
 
-            // zoom to point
             map.easeTo({ center: f.geometry.coordinates, zoom: 14, duration: 650 });
-
-            // popup
             openMarkerPopupFromFeature(f);
 
             await fetchLatest().catch(() => {});
@@ -954,7 +966,6 @@
           map.on("mouseleave", LAYER_POINTS, () => { map.getCanvas().style.cursor = ""; });
         }
 
-        // Button label route
         const btn = document.getElementById("btnToggleRoutes");
         if (btn) btn.textContent = routesVisible ? "Ausblenden" : "Einblenden";
 
@@ -973,11 +984,19 @@
 
     // --- Init ---
     function initMap() {
+      // D-1 Hard Fail wenn Config fehlt
+      if (isPlaceholder(CONFIG.supabaseUrl) || isPlaceholder(CONFIG.supabaseAnonKey)) {
+        showHint("Supabase Config fehlt.");
+        logError("CONFIG.supabaseUrl / CONFIG.supabaseAnonKey sind nicht gesetzt.");
+        return;
+      }
+
       map = initMapbox();
       if (!map) return;
 
+      // Popup schließen, wenn man in die Karte klickt (nicht schlimm, Buttons stoppen Propagation)
       map.on("click", () => {
-        if (markerPopup) markerPopup.remove();
+        if (markerPopup) { markerPopup.remove(); markerPopup = null; }
       });
 
       document.getElementById("panelTitle")?.addEventListener("click", () => {
@@ -991,7 +1010,6 @@
         const df = document.getElementById("driverFilter");
         currentFilter = df?.value?.trim() || "";
         currentFilterKey = normId(currentFilter);
-
         updateSelectedLayerFilter();
 
         await fetchLatest();
@@ -1005,12 +1023,9 @@
         if (df) df.value = "";
         currentFilter = "";
         currentFilterKey = "";
-
         updateSelectedLayerFilter();
+        if (markerPopup) { markerPopup.remove(); markerPopup = null; }
 
-        if (markerPopup) markerPopup.remove();
-
-        // Zoom zurück
         map.easeTo({ center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM, duration: 650 });
 
         await fetchLatest();
@@ -1042,16 +1057,25 @@
         onVisibilityOrPanelChange();
       });
 
-      document.addEventListener("visibilitychange", () => {
-        onVisibilityOrPanelChange();
-      });
+      document.addEventListener("visibilitychange", () => onVisibilityOrPanelChange());
 
+      // D-2: BBox-Reload bei Map-Interaktion (nur wenn NICHT Follow aktiv)
+      const debouncedBBoxReload = debounce(() => {
+        if (!map) return;
+        if (currentFilterKey) return; // Follow hat Priorität
+        fetchLatest().catch(() => {});
+      }, BBOX_DEBOUNCE_MS);
+
+      map.on("moveend", debouncedBBoxReload);
+      map.on("zoomend", debouncedBBoxReload);
+
+      // initial
       fetchLatest().catch(e => logError("Initial fetchLatest() fehlgeschlagen:", e));
       fetchRouteHistory().catch(e => logError("Initial fetchRouteHistory() fehlgeschlagen:", e));
 
       subscribe();
 
-      setImpactMarkers();
+      refreshDriversSource();
       onVisibilityOrPanelChange();
     }
 
@@ -1061,24 +1085,105 @@
       const fallbackIso = new Date(now - (activeOnlyMode ? ACTIVE_ONLY_MS : STALE_MS)).toISOString();
       const cutoffIso = normalizeCutoff(cutoffOverride, fallbackIso);
 
+      // Follow-Modus: gezielt nur den Fahrer (kein BBox)
+      if (currentFilterKey) {
+        const idExact = String(currentFilter || "").trim();
+        if (!idExact) return;
+
+        const { data, error } = await sb
+          .from("live_positions")
+          .select("driver_id, lat, lng, updated_at")
+          .ilike("driver_id", idExact)           // case-insensitiver Exact-Match
+          .gte("updated_at", cutoffIso)
+          .order("updated_at", { ascending: false })
+          .limit(5);
+
+        if (error) {
+          logError("fetchLatest(follow) Supabase-Fehler:", error.message);
+          showHint("Fehler beim Laden.");
+          return;
+        }
+
+        // Nimm den neuesten Datensatz
+        const row = (data && data[0]) ? data[0] : null;
+        if (!row) {
+          showHint("Kein Signal für diesen Fahrer.");
+          positions.clear();
+          refreshDriversSource();
+          return;
+        }
+
+        const rawId = (row.driver_id ?? "").toString();
+        const key = normId(rawId);
+        const lat = Number(row.lat);
+        const lng = Number(row.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+        const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
+        const age = Date.now() - ts;
+        if (age > STALE_MS) return;
+
+        // Nur den gefolgten Fahrer im Store halten
+        positions.clear();
+        positions.set(key, { rawId, lng, lat, ts });
+
+        map.easeTo({ center: [lng, lat], zoom: 14, duration: 600 });
+
+        setLast(new Date());
+        refreshDriversSource();
+        return;
+      }
+
+      // D-2: BBox-Modus (kein Follow)
+      const bb = getBoundsBBox();
+      if (!bb) {
+        // Fallback (Map noch nicht ready): minimaler Fetch
+        const { data, error } = await sb
+          .from("live_positions")
+          .select("driver_id, lat, lng, updated_at")
+          .gte("updated_at", cutoffIso)
+          .order("updated_at", { ascending: false })
+          .limit(200);
+
+        if (error) {
+          logError("fetchLatest(fallback) Supabase-Fehler:", error.message);
+          showHint("Fehler beim Laden.");
+          return;
+        }
+        applyLatestRows(data || []);
+        setLast(new Date());
+        refreshDriversSource();
+        return;
+      }
+
+      // Bounding-Box Query
       const { data, error } = await sb
         .from("live_positions")
         .select("driver_id, lat, lng, updated_at")
         .gte("updated_at", cutoffIso)
+        .gte("lat", bb.south)
+        .lte("lat", bb.north)
+        .gte("lng", bb.west)
+        .lte("lng", bb.east)
         .order("updated_at", { ascending: false })
-        .limit(200);
+        .limit(500);
 
       if (error) {
-        logError("Supabase-Fehler:", error.message);
+        logError("fetchLatest(bbox) Supabase-Fehler:", error.message);
         showHint("Fehler beim Laden.");
         return;
       }
 
-      // Wir nehmen pro driver nur das neueste
+      applyLatestRows(data || []);
+      setLast(new Date());
+      refreshDriversSource();
+    }
+
+    function applyLatestRows(rows) {
       const seen = new Set();
       const latest = new Map();
 
-      for (const row of data || []) {
+      for (const row of rows || []) {
         const rawId = (row?.driver_id ?? "").toString();
         const driverKey = normId(rawId);
         if (!driverKey || seen.has(driverKey)) continue;
@@ -1086,12 +1191,12 @@
         latest.set(driverKey, row);
       }
 
-      // Prune: entferne nicht mehr vorhandene
+      // prune store to only what we fetched in scope
       for (const key of Array.from(positions.keys())) {
         if (!latest.has(key)) positions.delete(key);
       }
 
-      // Upsert
+      // upsert
       for (const [key, row] of latest.entries()) {
         const lat = Number(row.lat);
         const lng = Number(row.lng);
@@ -1102,16 +1207,7 @@
         if (age > STALE_MS) continue;
 
         positions.set(key, { rawId: row.driver_id, lng, lat, ts });
-
-        // Wenn gefolgt: nach Latest refresh zentrieren
-        if (currentFilterKey && key === currentFilterKey) {
-          map.easeTo({ center: [lng, lat], zoom: 14, duration: 600 });
-        }
       }
-
-      setLast(new Date());
-      refreshDriversSource();
-      setImpactMarkers();
     }
 
     // --- Fetch Route History ---
@@ -1120,6 +1216,7 @@
       const fallbackIso = new Date(now - (activeOnlyMode ? ACTIVE_ONLY_MS : ROUTE_MS)).toISOString();
       const cutoffIso = normalizeCutoff(cutoffOverride, fallbackIso);
 
+      // Route History bleibt bewusst global / per Follow gefiltert (Roadmap später: bbox route scope)
       const { data, error } = await sb
         .from("live_positions")
         .select("driver_id, lat, lng, updated_at")
@@ -1191,7 +1288,7 @@
       const driverKey = normId(rawId);
       if (!driverKey) return;
 
-      // wenn Follow aktiv: nur diesen updaten
+      // Follow: nur diesen
       if (currentFilterKey && driverKey !== currentFilterKey) return;
 
       const lat = Number(row.lat);
@@ -1202,9 +1299,15 @@
       const age = Date.now() - ts;
       if (age > STALE_MS) return;
 
+      // D-2: ohne Follow - wenn außerhalb Bounds, nicht in UI drücken (Store kann bleiben, aber wir halten es schlank)
+      if (!currentFilterKey && !isInCurrentBounds(lng, lat)) {
+        // Optional: nicht speichern, damit Store klein bleibt
+        return;
+      }
+
       positions.set(driverKey, { rawId, lng, lat, ts });
 
-      // RoutePoint streaming
+      // Route streaming
       const now = Date.now();
       const minTs = now - ROUTE_MS;
       const arr = routePoints.get(driverKey) ?? [];
@@ -1217,7 +1320,6 @@
       refreshRoutesSource();
 
       setLast(new Date());
-      setImpactMarkers();
 
       const sinceOk = Date.now() - (lastImpactOkAt || 0);
       if (shouldPollImpact() && sinceOk > 3000) {
@@ -1238,9 +1340,14 @@
       if (staleKeys.length) {
         refreshDriversSource();
         refreshRoutesSource();
-        setImpactMarkers();
       }
     }, PRUNE_EVERY_MS);
+
+    // --- Cleanup ---
+    window.addEventListener("beforeunload", () => {
+      if (channel) sb.removeChannel(channel);
+      if (markerPopup) markerPopup.remove();
+    });
 
     document.addEventListener("DOMContentLoaded", initMap);
   </script>
