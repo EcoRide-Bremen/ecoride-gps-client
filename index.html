@@ -203,6 +203,17 @@
     }
     updatePwaStatus();
 
+    // ── SUPABASE: DELETE POSITION (Bug 1) ────────────
+    async function deletePosition(driverId) {
+      if (!driverId) return;
+      const { error } = await sb
+        .from("live_positions")
+        .delete()
+        .eq("driver_id", driverId);
+      if (error) log("DELETE ERROR: " + error.message);
+      else        log("Position gelöscht ✅ " + driverId);
+    }
+
     // ── SUPABASE: GPS WRITE ───────────────────────────
     async function sendToSupabase(driverId, pos) {
       const now = Date.now();
@@ -258,20 +269,20 @@
       btnRideStart.disabled = false;
     }
 
-    function stopTracking() {
+    // Bug 1+2: async, löscht Position, kein interner endRide-Aufruf mehr
+    async function stopTracking() {
       if (watchId !== null) navigator.geolocation.clearWatch(watchId);
       watchId = null;
-
-      // Offene Fahrt automatisch beenden
-      if (rideActive) {
-        endRide(true);
-      }
 
       trackingActive       = false;
       stTrack.innerHTML    = '<span class="badge badge-aus">AUS</span>';
       btnTrack.textContent = "Tracking START";
       driverInput.disabled = false;
       btnRideStart.disabled = true;
+
+      // live_positions Zeile sofort löschen → verschwindet von der Karte
+      const driverId = driverInput.value.trim();
+      if (driverId) await deletePosition(driverId);
 
       log("Tracking STOP");
     }
@@ -344,10 +355,14 @@
     }
 
     // ── RIDE: STOP ────────────────────────────────────
+    // Bug 2: Fahrt beenden stoppt jetzt immer auch das Tracking
     async function endRide(auto = false) {
       if (!activeRideId) return;
 
       const rideId = activeRideId;
+      // Sofort zurücksetzen – verhindert Endlosschleife mit stopTracking
+      activeRideId = null;
+      rideActive   = false;
 
       const { error } = await sb
         .from("rides")
@@ -364,17 +379,16 @@
         log("FAHRT BEENDET ✅ ride_id=" + rideId + (auto ? " (automatisch)" : ""));
       }
 
-      activeRideId = null;
-      rideActive   = false;
-
       // UI zurücksetzen
       rideForm.style.display    = "block";
       rideDivider.style.display = "none";
       rideStatus.style.display  = "none";
       btnRideStart.textContent  = "Fahrt starten";
 
-      if (!auto) {
-        showHint("Fahrt abgeschlossen. Du kannst eine neue Fahrt starten.");
+      // Tracking ebenfalls stoppen + Position löschen (Bug 2)
+      if (trackingActive) {
+        if (!auto) showHint("Fahrt beendet – Tracking gestoppt, Position gelöscht.");
+        await stopTracking();
       }
     }
 
@@ -445,15 +459,15 @@
     }
 
     // ── BUTTONS ───────────────────────────────────────
-    btnTrack.addEventListener("click", () =>
-      trackingActive ? stopTracking() : startTracking()
+    btnTrack.addEventListener("click", async () =>
+      trackingActive ? await stopTracking() : startTracking()
     );
 
     btnWake.addEventListener("click", toggleWakeLock);
 
     btnRideStart.addEventListener("click", startRide);
 
-    btnRideStop.addEventListener("click", () => endRide(false));
+    btnRideStop.addEventListener("click", async () => await endRide(false));
 
     // ── INIT ──────────────────────────────────────────
     log("EcoRide GPS-Client bereit ✅");

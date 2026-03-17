@@ -627,6 +627,11 @@
         if (!p) continue;
         if (currentFilterKey && driverKey !== currentFilterKey) continue;
         if (!currentFilterKey && bb && !isInBbox(bb, Number(p.lng), Number(p.lat))) continue;
+        // Bug 3: Aktive-Modus = nur Fahrer mit aktiver Fahrt in activeRides
+        if (activeOnlyMode && !currentFilterKey) {
+          const hasRide = [...activeRides.values()].some(r => normId(r.driver_id) === driverKey);
+          if (!hasRide) continue;
+        }
         const stale = (now - (p.ts || now)) > STALE_VISUAL_MS;
         feats.push({
           type: "Feature",
@@ -1116,7 +1121,8 @@
     async function fetchLatest(cutoffOverride) {
       const seq = ++latestFetchSeq;
       const now = Date.now();
-      const fallbackIso = new Date(now - (activeOnlyMode ? ACTIVE_ONLY_MS : STALE_MS)).toISOString();
+      // Bug 3: immer STALE_MS als Fetch-Cutoff – activeOnlyMode filtert client-seitig via activeRides
+      const fallbackIso = new Date(now - STALE_MS).toISOString();
       const cutoffIso = normalizeCutoff(cutoffOverride, fallbackIso);
 
       if (currentFilterKey) {
@@ -1423,8 +1429,10 @@
         activeOnlyMode = !activeOnlyMode;
         const btn = document.getElementById("btnActiveOnly");
         if (btn) btn.textContent = activeOnlyMode ? "Alle anzeigen" : "Aktive";
-        showHint(activeOnlyMode ? "Nur aktive Fahrer." : "Alle Fahrer.");
-        await fetchLatest(); await fetchRouteHistory(); refreshDriversSource(); onVisibilityOrPanelChange();
+        showHint(activeOnlyMode ? "Nur Fahrer mit aktiver Fahrt." : "Alle Fahrer.");
+        await fetchLatest(); await fetchRouteHistory();
+        await fetchActiveRides(); // Bug 3: Rides laden damit client-seitiger Filter greift
+        refreshDriversSource(); onVisibilityOrPanelChange();
       });
 
       document.addEventListener("visibilitychange", () => { onVisibilityOrPanelChange(); });
