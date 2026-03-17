@@ -11,29 +11,46 @@
   <style>
     body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:0;padding:24px;background:#0f1115;color:#fff}
     .wrap{max-width:720px;margin:0 auto}
-    .muted{opacity:.75}
-    .card{background:#161a22;border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:16px}
+    .muted{opacity:.75;font-size:14px}
+    .card{background:#161a22;border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:16px;margin-bottom:16px}
+    .card-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.5;margin:0 0 12px}
     .row{display:flex;flex-direction:column;gap:6px;margin:12px 0}
     .row.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-    input{padding:12px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#0f1115;color:#fff}
-    button{padding:12px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);cursor:pointer}
-    .primary{background:#c7d92c;color:#000;font-weight:700}
+    .row.three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+    label{font-size:13px;opacity:.7}
+    input{padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#0f1115;color:#fff;font-size:15px;width:100%;box-sizing:border-box}
+    input:disabled{opacity:.35;cursor:not-allowed}
+    input[type=number]{-moz-appearance:textfield}
+    button{padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);cursor:pointer;font-size:14px;font-weight:600;width:100%}
+    button:disabled{opacity:.35;cursor:not-allowed}
+    .primary{background:#c7d92c;color:#000}
     .secondary{background:#0f1115;color:#fff}
-    .status{display:grid;gap:6px;margin-top:12px;padding:12px;border-radius:12px;background:#0f1115;border:1px solid rgba(255,255,255,.08)}
-    .hint{margin-top:10px;padding:10px;border-radius:12px;background:rgba(199,217,44,.12);border:1px solid rgba(199,217,44,.35)}
-    .log{margin-top:12px;background:#0b0d12;border:1px solid rgba(255,255,255,.08);padding:12px;border-radius:12px;min-height:120px;white-space:pre-wrap}
+    .danger{background:#ef4444;color:#fff;border-color:#ef4444}
+    .success{background:#22c55e;color:#000;border-color:#22c55e}
+    .status{display:grid;gap:6px;margin-top:12px;padding:12px;border-radius:12px;background:#0f1115;border:1px solid rgba(255,255,255,.08);font-size:13px}
+    .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700}
+    .badge-aktiv{background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.4);color:#22c55e}
+    .badge-bereit{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:#aaa}
+    .badge-aus{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#f87171}
+    .ride-id{font-size:11px;opacity:.55;word-break:break-all;margin-top:4px}
+    .hint{margin-top:8px;padding:10px 12px;border-radius:12px;background:rgba(199,217,44,.10);border:1px solid rgba(199,217,44,.30);font-size:13px;color:rgba(199,217,44,.9)}
+    .hint.error{background:rgba(239,68,68,.10);border-color:rgba(239,68,68,.30);color:#f87171}
+    .log{margin-top:12px;background:#0b0d12;border:1px solid rgba(255,255,255,.08);padding:12px;border-radius:12px;min-height:100px;max-height:200px;overflow-y:auto;white-space:pre-wrap;font-size:12px;font-family:monospace}
+    .divider{border:none;border-top:1px solid rgba(255,255,255,.07);margin:16px 0}
   </style>
 </head>
 
 <body>
   <div class="wrap">
-    <h1>EcoRide GPS-Client</h1>
+    <h1 style="margin-bottom:4px">EcoRide GPS-Client</h1>
+    <p class="muted">Fahrer-App: GPS tracken + Fahrt anbieten</p>
 
-    <p class="muted">
-      Fahrer sendet Live-Positionen an Supabase. Optional: Bildschirm wach halten (Wake-Lock).
-    </p>
-
+    <!-- ══════════════════════════════════════
+         KARTE 1: GPS-TRACKING
+    ═══════════════════════════════════════ -->
     <div class="card">
+      <div class="card-title">GPS-Tracking</div>
+
       <div class="row">
         <label>Driver ID</label>
         <input id="driverId" placeholder="z.B. Test_Bre" />
@@ -45,85 +62,160 @@
       </div>
 
       <div class="status">
-        <div><b>Tracking:</b> <span id="stTrack">AUS</span></div>
+        <div><b>Tracking:</b> <span id="stTrack"><span class="badge badge-aus">AUS</span></span></div>
         <div><b>Wake-Lock:</b> <span id="stWake">AUS</span></div>
         <div><b>PWA:</b> <span id="stPwa">bereit</span></div>
       </div>
 
-      <div class="hint" id="installHint" style="display:none;">
-        💡 Tipp: Du kannst diese Seite als App installieren („Zum Startbildschirm“).
-      </div>
-
       <pre id="log" class="log"></pre>
     </div>
-  </div>
+
+    <!-- ══════════════════════════════════════
+         KARTE 2: FAHRT ANBIETEN
+    ═══════════════════════════════════════ -->
+    <div class="card" id="rideCard">
+      <div class="card-title">Fahrt anbieten</div>
+
+      <div id="rideHint" class="hint" style="display:none"></div>
+
+      <!-- Formular -->
+      <div id="rideForm">
+        <div class="row two">
+          <div>
+            <label>Ziel – Breitengrad (lat)</label>
+            <input id="zielLat" type="number" step="0.000001" placeholder="53.0832" />
+          </div>
+          <div>
+            <label>Ziel – Längengrad (lng)</label>
+            <input id="zielLng" type="number" step="0.000001" placeholder="8.8133" />
+          </div>
+        </div>
+        <p class="muted" style="margin:0 0 8px;font-size:12px">💡 Tipp: Bremen Hbf = 53.0832 / 8.8133 · Google Maps → Rechtsklick → Koordinaten kopieren</p>
+
+        <div class="row two">
+          <div>
+            <label>Sitzplätze (1–8)</label>
+            <input id="plaetze" type="number" min="1" max="8" value="2" />
+          </div>
+          <div>
+            <label>Preis (€)</label>
+            <input id="preis" type="number" min="0" step="0.50" value="0.00" />
+          </div>
+        </div>
+
+        <div class="row">
+          <button id="btnRideStart" class="success" disabled>Fahrt starten</button>
+        </div>
+      </div>
+
+      <hr class="divider" id="rideDivider" style="display:none" />
+
+      <!-- Aktive Fahrt Status -->
+      <div id="rideStatus" style="display:none">
+        <div class="status">
+          <div><b>Fahrt:</b> <span class="badge badge-aktiv">AKTIV</span></div>
+          <div><b>Fahrer:</b> <span id="stRideDriver">–</span></div>
+          <div><b>Plätze:</b> <span id="stRidePlaetze">–</span></div>
+          <div><b>Preis:</b> <span id="stRidePreis">–</span></div>
+          <div class="ride-id">ride_id: <span id="stRideId">–</span></div>
+        </div>
+
+        <div class="row" style="margin-top:12px">
+          <button id="btnRideStop" class="danger">Fahrt beenden</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /wrap -->
 
   <script>
-    /*************************************************
-     * EcoRide GPS-Client — FINAL (1:1)
-     *************************************************/
+    /****************************************************
+     * EcoRide GPS-Client + Fahrer-Flow
+     ****************************************************/
 
-    // ===== SUPABASE =====
-    const SUPABASE_URL = "https://ihpszsoivqcrkkiucjvv.supabase.co";
+    // ── SUPABASE ──────────────────────────────────────
+    const SUPABASE_URL     = "https://ihpszsoivqcrkkiucjvv.supabase.co";
     const SUPABASE_ANON_KEY =
       "SUPABASE_KEY_PLACEHOLDER";
 
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // ===== STATE =====
-    let watchId = null;
+    // ── GPS STATE ─────────────────────────────────────
+    let watchId        = null;
     let trackingActive = false;
-
-    let wakeLock = null;
-    let wakeListenerAttached = false;
-
-    let lastSend = 0;
+    let lastPos        = null;
+    let lastSend       = 0;
     const SEND_EVERY_MS = 1500;
 
-    // ===== ELEMENTE =====
-    const el = (id) => document.getElementById(id);
+    // ── RIDE STATE ────────────────────────────────────
+    let activeRideId   = null;
+    let rideActive     = false;
 
-    const driverInput = el("driverId");
-    const btnTrack = el("btnTrack");
-    const btnWake  = el("btnWake");
+    // ── WAKE LOCK ─────────────────────────────────────
+    let wakeLock             = null;
+    let wakeListenerAttached = false;
 
-    const stTrack = el("stTrack");
-    const stWake  = el("stWake");
-    const stPwa   = el("stPwa");
+    // ── ELEMENTE ──────────────────────────────────────
+    const el = id => document.getElementById(id);
 
-    const logEl = el("log");
-    const installHint = el("installHint");
+    const driverInput  = el("driverId");
+    const btnTrack     = el("btnTrack");
+    const btnWake      = el("btnWake");
+    const stTrack      = el("stTrack");
+    const stWake       = el("stWake");
+    const stPwa        = el("stPwa");
+    const logEl        = el("log");
 
+    const zielLatInput = el("zielLat");
+    const zielLngInput = el("zielLng");
+    const plaetzeInput = el("plaetze");
+    const preisInput   = el("preis");
+    const btnRideStart = el("btnRideStart");
+    const btnRideStop  = el("btnRideStop");
+    const rideForm     = el("rideForm");
+    const rideStatus   = el("rideStatus");
+    const rideDivider  = el("rideDivider");
+    const rideHint     = el("rideHint");
+
+    // ── LOG ───────────────────────────────────────────
     function log(msg) {
       const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
       console.log(line);
       logEl.textContent = line + "\n" + (logEl.textContent || "");
     }
 
-    // ===== PWA STATUS =====
+    // ── HINT ──────────────────────────────────────────
+    function showHint(msg, isError = false) {
+      rideHint.textContent = msg;
+      rideHint.className   = isError ? "hint error" : "hint";
+      rideHint.style.display = "block";
+    }
+    function hideHint() {
+      rideHint.style.display = "none";
+    }
+
+    // ── PWA STATUS ────────────────────────────────────
     function updatePwaStatus() {
       const standalone =
         window.matchMedia("(display-mode: standalone)").matches ||
         window.navigator.standalone === true;
-
       stPwa.textContent = standalone ? "aktiv" : "bereit";
-      installHint.style.display = standalone ? "none" : "block";
     }
     updatePwaStatus();
 
-    // ===== SUPABASE WRITE =====
+    // ── SUPABASE: GPS WRITE ───────────────────────────
     async function sendToSupabase(driverId, pos) {
       const now = Date.now();
       if (now - lastSend < SEND_EVERY_MS) return;
       lastSend = now;
 
       const payload = {
-        driver_id: driverId,
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-        accuracy: pos.coords.accuracy,
-        speed: pos.coords.speed,
-        heading: pos.coords.heading,
+        driver_id:  driverId,
+        lat:        pos.coords.latitude,
+        lng:        pos.coords.longitude,
+        accuracy:   pos.coords.accuracy,
+        speed:      pos.coords.speed,
+        heading:    pos.coords.heading,
         updated_at: new Date().toISOString(),
       };
 
@@ -131,30 +223,25 @@
         .from("live_positions")
         .upsert(payload, { onConflict: "driver_id" });
 
-      if (error) {
-        log("SUPABASE ERROR: " + error.message);
-      } else {
-        log("SENT ✅ " + driverId);
-      }
+      if (error) log("SUPABASE ERROR: " + error.message);
+      else        log("SENT ✅ " + driverId);
     }
 
-    // ===== GPS TRACKING =====
-    let lastPos = null;
-
+    // ── GPS TRACKING ──────────────────────────────────
     function startTracking() {
       const driverId = driverInput.value.trim();
-      if (!driverId) return alert("Bitte Driver ID eingeben.");
-      if (!navigator.geolocation) return alert("GPS wird nicht unterstützt.");
+      if (!driverId)                return alert("Bitte Driver ID eingeben.");
+      if (!navigator.geolocation)  return alert("GPS wird nicht unterstützt.");
 
       log("Tracking START…");
 
       watchId = navigator.geolocation.watchPosition(
-        (pos) => {
-  lastPos = pos; // 👈 NEU
-  log(`GPS ${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)} (${Math.round(pos.coords.accuracy)}m)`);
-  sendToSupabase(driverId, pos);
-},
-        (err) => {
+        pos => {
+          lastPos = pos;
+          log(`GPS ${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)} (${Math.round(pos.coords.accuracy)}m)`);
+          sendToSupabase(driverId, pos);
+        },
+        err => {
           log("GPS Fehler: " + err.message);
           alert("GPS Fehler: " + err.message);
           stopTracking();
@@ -163,36 +250,137 @@
       );
 
       trackingActive = true;
-      stTrack.textContent = "AN";
+      stTrack.innerHTML = '<span class="badge badge-aktiv">AN</span>';
       btnTrack.textContent = "Tracking STOP";
+      driverInput.disabled = true;
+
+      // Fahrt-Button freischalten
+      btnRideStart.disabled = false;
     }
 
     function stopTracking() {
       if (watchId !== null) navigator.geolocation.clearWatch(watchId);
       watchId = null;
 
-      trackingActive = false;
-      stTrack.textContent = "AUS";
+      // Offene Fahrt automatisch beenden
+      if (rideActive) {
+        endRide(true);
+      }
+
+      trackingActive       = false;
+      stTrack.innerHTML    = '<span class="badge badge-aus">AUS</span>';
       btnTrack.textContent = "Tracking START";
+      driverInput.disabled = false;
+      btnRideStart.disabled = true;
+
       log("Tracking STOP");
     }
-document.addEventListener("visibilitychange", () => {
-  if (!trackingActive) return;
 
-  if (document.visibilityState === "visible") {
-    log("App zurück → GPS neu starten");
-    startTracking();
+    // Tab-Rückkehr: GPS neu starten
+    document.addEventListener("visibilitychange", () => {
+      if (!trackingActive) return;
+      if (document.visibilityState === "visible") {
+        log("App zurück → GPS neu starten");
+        startTracking();
+        if (lastPos) sendToSupabase(driverInput.value.trim(), lastPos);
+      }
+    });
 
-    // letzte bekannte Position sofort erneut senden
-    if (lastPos) {
-      sendToSupabase(driverInput.value.trim(), lastPos);
+    // ── RIDE: START ───────────────────────────────────
+    async function startRide() {
+      const driverId = driverInput.value.trim();
+      const zielLat  = parseFloat(zielLatInput.value);
+      const zielLng  = parseFloat(zielLngInput.value);
+      const plaetze  = parseInt(plaetzeInput.value);
+      const preis    = parseFloat(preisInput.value);
+
+      if (!driverId)                return showHint("Driver ID fehlt.", true);
+      if (isNaN(zielLat) || isNaN(zielLng)) return showHint("Bitte Ziel-Koordinaten eingeben.", true);
+      if (zielLat < -90 || zielLat > 90)    return showHint("Lat muss zwischen -90 und 90 liegen.", true);
+      if (zielLng < -180 || zielLng > 180)  return showHint("Lng muss zwischen -180 und 180 liegen.", true);
+      if (isNaN(plaetze) || plaetze < 1 || plaetze > 8) return showHint("Sitzplätze: 1–8.", true);
+      if (isNaN(preis)   || preis < 0)      return showHint("Preis darf nicht negativ sein.", true);
+
+      btnRideStart.disabled = true;
+      btnRideStart.textContent = "Starte…";
+      hideHint();
+
+      const { data, error } = await sb
+        .from("rides")
+        .insert({
+          driver_id: driverId,
+          ziel_lat:  zielLat,
+          ziel_lng:  zielLng,
+          plaetze:   plaetze,
+          preis:     preis,
+          status:    "aktiv",
+        })
+        .select("id")
+        .single();
+
+      if (error) {
+        log("RIDE INSERT ERROR: " + error.message);
+        showHint("Fehler beim Starten: " + error.message, true);
+        btnRideStart.disabled = false;
+        btnRideStart.textContent = "Fahrt starten";
+        return;
+      }
+
+      activeRideId = data.id;
+      rideActive   = true;
+
+      log("FAHRT GESTARTET ✅ ride_id=" + activeRideId);
+      showHint("Fahrt läuft! Mitfahrer können dich jetzt auf der Karte sehen.");
+
+      // UI umschalten
+      rideForm.style.display     = "none";
+      rideDivider.style.display  = "block";
+      rideStatus.style.display   = "block";
+
+      el("stRideDriver").textContent  = driverId;
+      el("stRidePlaetze").textContent = plaetze + " Platz/Plätze";
+      el("stRidePreis").textContent   = preis.toFixed(2) + " €";
+      el("stRideId").textContent      = activeRideId;
     }
-  }
-});
 
-    // ===== WAKE LOCK =====
+    // ── RIDE: STOP ────────────────────────────────────
+    async function endRide(auto = false) {
+      if (!activeRideId) return;
+
+      const rideId = activeRideId;
+
+      const { error } = await sb
+        .from("rides")
+        .update({
+          status:     "abgeschlossen",
+          beendet_am: new Date().toISOString(),
+        })
+        .eq("id", rideId);
+
+      if (error) {
+        log("RIDE UPDATE ERROR: " + error.message);
+        if (!auto) showHint("Fehler beim Beenden: " + error.message, true);
+      } else {
+        log("FAHRT BEENDET ✅ ride_id=" + rideId + (auto ? " (automatisch)" : ""));
+      }
+
+      activeRideId = null;
+      rideActive   = false;
+
+      // UI zurücksetzen
+      rideForm.style.display    = "block";
+      rideDivider.style.display = "none";
+      rideStatus.style.display  = "none";
+      btnRideStart.textContent  = "Fahrt starten";
+
+      if (!auto) {
+        showHint("Fahrt abgeschlossen. Du kannst eine neue Fahrt starten.");
+      }
+    }
+
+    // ── WAKE LOCK ─────────────────────────────────────
     function setWakeUi(on) {
-      stWake.textContent = on ? "AN" : "AUS";
+      stWake.textContent  = on ? "AN" : "AUS";
       btnWake.textContent = `Wake-Lock: ${on ? "AN" : "AUS"}`;
     }
 
@@ -209,23 +397,18 @@ document.addEventListener("visibilitychange", () => {
     }
 
     async function toggleWakeLock() {
-      // iframe blockt oft (CodePen Preview)
       if (window.self !== window.top) {
-        alert("Wake-Lock ist im CodePen-Preview (iframe) blockiert. Bitte Full Page/Debug View nutzen.");
+        alert("Wake-Lock im iframe nicht verfügbar. Bitte Full Page nutzen.");
         return;
       }
-
       if (!("wakeLock" in navigator)) {
-        alert("Wake-Lock wird in diesem Browser/Device nicht unterstützt.");
+        alert("Wake-Lock wird in diesem Browser/Gerät nicht unterstützt.");
         return;
       }
 
-      // AUS -> AN
       if (!wakeLock) {
         try {
           await requestWakeLock();
-
-          // Re-acquire bei Tab zurück
           if (!wakeListenerAttached) {
             wakeListenerAttached = true;
             document.addEventListener("visibilitychange", async () => {
@@ -245,12 +428,10 @@ document.addEventListener("visibilitychange", () => {
           wakeLock = null;
           setWakeUi(false);
           log("WakeLock Fehler: " + e.message);
-          alert("WakeLock Fehler: " + e.message);
         }
         return;
       }
 
-      // AN -> AUS
       try {
         await wakeLock.release();
         wakeLock = null;
@@ -263,15 +444,19 @@ document.addEventListener("visibilitychange", () => {
       }
     }
 
-    // ===== BUTTONS =====
-    btnTrack.addEventListener("click", () => (trackingActive ? stopTracking() : startTracking()));
+    // ── BUTTONS ───────────────────────────────────────
+    btnTrack.addEventListener("click", () =>
+      trackingActive ? stopTracking() : startTracking()
+    );
+
     btnWake.addEventListener("click", toggleWakeLock);
 
+    btnRideStart.addEventListener("click", startRide);
+
+    btnRideStop.addEventListener("click", () => endRide(false));
+
+    // ── INIT ──────────────────────────────────────────
     log("EcoRide GPS-Client bereit ✅");
   </script>
 </body>
 </html>
-
-
-
-
