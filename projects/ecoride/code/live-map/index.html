@@ -1297,7 +1297,11 @@
           } else if (ev === "UPDATE") {
             const rideId = payload.new?.id;
             if (payload.new?.status !== "aktiv") {
-              activeRides.delete(rideId);
+              const rawId = rideId;
+              activeRides.delete(rawId);
+              for (const [key, ride] of activeRides.entries()) {
+                if (ride.id === rawId || ride.ride_id === rawId) activeRides.delete(key);
+              }
               refreshRidesSource();
             } else {
               await fetchActiveRides().catch(() => {});
@@ -1400,6 +1404,7 @@
         const df = document.getElementById("driverFilter");
         currentFilter = df?.value?.trim() || "";
         currentFilterKey = normId(currentFilter);
+        localStorage.setItem("er_driver_filter", currentFilter);
         updateSelectedLayerFilter();
         await fetchLatest(); await fetchRouteHistory(); refreshDriversSource(); onVisibilityOrPanelChange();
       });
@@ -1408,6 +1413,7 @@
         const df = document.getElementById("driverFilter");
         if (df) df.value = "";
         currentFilter = ""; currentFilterKey = "";
+        localStorage.removeItem("er_driver_filter");
         updateSelectedLayerFilter();
         if (markerPopup) { markerPopup.remove(); markerPopup = null; }
         if (ridePopup)   { ridePopup.remove();   ridePopup   = null; }
@@ -1452,6 +1458,15 @@
       fetchLatest().catch(e => logError("ERR_INIT_FETCH_LATEST", e?.message || String(e)));
       fetchRouteHistory().catch(e => logError("ERR_INIT_FETCH_ROUTE", e?.message || String(e)));
       fetchActiveRides().catch(e => logError("ERR_INIT_FETCH_RIDES", e?.message || String(e))); // NEU
+      setInterval(() => fetchActiveRides().catch(() => {}), 15_000);
+      const savedFilter = localStorage.getItem("er_driver_filter");
+      if (savedFilter) {
+        const df = document.getElementById("driverFilter");
+        if (df) df.value = savedFilter;
+        currentFilter = savedFilter;
+        currentFilterKey = normId(savedFilter);
+        updateSelectedLayerFilter();
+      }
 
       subscribe();
       subscribeRides(); // NEU
