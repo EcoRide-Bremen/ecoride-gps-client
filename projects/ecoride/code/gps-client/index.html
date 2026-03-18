@@ -375,6 +375,11 @@
       activeRideId = null;
       rideActive   = false;
 
+      // GPS sofort stoppen – BEVOR der Supabase-Await beginnt,
+      // damit visibilitychange das Tracking nicht neu starten kann
+      if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+      trackingActive = false;
+
       const { error } = await sb
         .from("rides")
         .update({
@@ -396,11 +401,15 @@
       rideStatus.style.display  = "none";
       btnRideStart.textContent  = "Fahrt starten";
 
-      // Tracking ebenfalls stoppen + Position löschen (Bug 2)
-      if (trackingActive) {
-        if (!auto) showHint("Fahrt beendet – Tracking gestoppt, Position gelöscht.");
-        await stopTracking();
-      }
+      // UI-Zustand für Tracking aktualisieren (GPS wurde bereits oben gestoppt)
+      stTrack.innerHTML    = '<span class="badge badge-aus">AUS</span>';
+      btnTrack.textContent = "Tracking START";
+      driverInput.disabled = false;
+      btnRideStart.disabled = true;
+      // live_positions Zeile löschen → verschwindet von der Karte
+      const driverId = driverInput.value.trim();
+      if (driverId) await deletePosition(driverId);
+      if (!auto) showHint("Fahrt beendet – Tracking gestoppt, Position gelöscht.");
     }
 
     // ── WAKE LOCK ─────────────────────────────────────
