@@ -304,7 +304,14 @@
       const zielLng  = parseFloat(zielLngInput.value);
       const plaetze  = parseInt(plaetzeInput.value);
       const preis    = parseFloat(preisInput.value);
+      
+if (!lastPos) {
+  return showHint("Noch keine aktuelle GPS-Position vorhanden. Bitte kurz warten.", true);
+}
 
+const startLat = lastPos.coords.latitude;
+const startLng = lastPos.coords.longitude;
+      
       if (!driverId)                return showHint("Driver ID fehlt.", true);
       if (isNaN(zielLat) || isNaN(zielLng)) return showHint("Bitte Ziel-Koordinaten eingeben.", true);
       if (zielLat < -90 || zielLat > 90)    return showHint("Lat muss zwischen -90 und 90 liegen.", true);
