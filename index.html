@@ -338,7 +338,7 @@
           preis:     preis,
           status:    "aktiv",
         })
-        .select("id")
+        .select("id, ziel_lat, ziel_lng, start_lat, start_lng")
         .single();
 
       if (error) {
