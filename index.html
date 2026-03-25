@@ -305,12 +305,15 @@
       const plaetze  = parseInt(plaetzeInput.value);
       const preis    = parseFloat(preisInput.value);
       
-if (!lastPos) {
-  return showHint("Noch keine aktuelle GPS-Position vorhanden. Bitte kurz warten.", true);
-}
+      log(`DEBUG Ziel raw: lat="${zielLatInput.value}" lng="${zielLngInput.value}"`);
+      log(`DEBUG Ziel parsed: lat=${zielLat} lng=${zielLng}`);
+      
+      if (!lastPos) {
+        return showHint("Noch keine aktuelle GPS-Position vorhanden. Bitte kurz warten.", true);
+      }
 
-const startLat = lastPos.coords.latitude;
-const startLng = lastPos.coords.longitude;
+      const startLat = lastPos.coords.latitude;
+      const startLng = lastPos.coords.longitude;
       
       if (!driverId)                return showHint("Driver ID fehlt.", true);
       if (isNaN(zielLat) || isNaN(zielLng)) return showHint("Bitte Ziel-Koordinaten eingeben.", true);
