@@ -314,6 +314,11 @@
 
       const startLat = lastPos.coords.latitude;
       const startLng = lastPos.coords.longitude;
+
+      const routePunkte = [
+      [startLng, startLat],
+      [zielLng, zielLat]
+      ];
       
       if (!driverId)                return showHint("Driver ID fehlt.", true);
       if (isNaN(zielLat) || isNaN(zielLng)) return showHint("Bitte Ziel-Koordinaten eingeben.", true);
@@ -334,6 +339,7 @@
           start_lng: startLng,
           ziel_lat:  zielLat,
           ziel_lng:  zielLng,
+          route_punkte: routePunkte,
           plaetze:   plaetze,
           preis:     preis,
           status:    "aktiv",
