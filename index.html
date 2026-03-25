@@ -348,7 +348,9 @@
         btnRideStart.textContent = "Fahrt starten";
         return;
       }
-
+      
+      log(`DEBUG DB row: id=${data.id} ziel_lat=${data.ziel_lat} ziel_lng=${data.ziel_lng} start_lat=${data.start_lat} start_lng=${data.start_lng}`);
+      
       activeRideId = data.id;
       rideActive   = true;
 
