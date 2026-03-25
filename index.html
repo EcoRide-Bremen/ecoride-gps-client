@@ -327,6 +327,8 @@ const startLng = lastPos.coords.longitude;
         .from("rides")
         .insert({
           driver_id: driverId,
+          start_lat: startLat,
+          start_lng: startLng,
           ziel_lat:  zielLat,
           ziel_lng:  zielLng,
           plaetze:   plaetze,
