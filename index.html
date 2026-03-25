@@ -344,7 +344,7 @@
           preis:     preis,
           status:    "aktiv",
         })
-        .select("id, ziel_lat, ziel_lng, start_lat, start_lng")
+        .select("id, ziel_lat, ziel_lng, start_lat, start_lng, route_punkte")
         .single();
 
       if (error) {
