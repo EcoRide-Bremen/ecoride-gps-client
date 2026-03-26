@@ -1311,7 +1311,11 @@
 
       activeRides.clear();
       for (const row of data || []) {
-        if (row.ride_id) activeRides.set(row.ride_id, row);
+        if (!row.ride_id) continue;
+        // Nur einlesen wenn Fahrer-Position noch frisch vorhanden
+        const driverKey = normId(row.driver_id);
+        if (positions.size > 0 && !positions.has(driverKey)) continue;
+        activeRides.set(row.ride_id, row);
       }
       refreshRidesSource();
     }
