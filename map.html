@@ -1355,14 +1355,39 @@
         .on("postgres_changes", { event: "*", schema: "public", table: "rides" }, async (payload) => {
           const ev = payload?.eventType;
           if (ev === "INSERT") {
-            if (payload.new?.status === "aktiv") await fetchActiveRides().catch(() => {});
+            if (payload.new?.status !== "aktiv") return;
+            // Ride direkt aus v_aktive_fahrten nachladen (enthält Fahrer-Position + Route)
+            // Kein positions-Filter hier: Fahrer sendet GPS evtl. noch nicht seit langem
+            const rideId = payload.new?.id;
+            if (!rideId) return;
+            const { data, error } = await sb
+              .from("v_aktive_fahrten")
+              .select("*")
+              .eq("ride_id", rideId)
+              .single();
+            if (!error && data) {
+              activeRides.set(rideId, data);
+              refreshRidesSource();
+            } else {
+              // Fallback: alle aktiven Rides neu laden
+              await fetchActiveRides().catch(() => {});
+            }
           } else if (ev === "UPDATE") {
             const rideId = payload.new?.id;
             if (payload.new?.status !== "aktiv") {
               activeRides.delete(rideId);
               refreshRidesSource();
             } else {
-              await fetchActiveRides().catch(() => {});
+              // Update: frischen Stand aus View nachladen
+              const { data, error } = await sb
+                .from("v_aktive_fahrten")
+                .select("*")
+                .eq("ride_id", rideId)
+                .single();
+              if (!error && data) {
+                activeRides.set(rideId, data);
+                refreshRidesSource();
+              }
             }
           } else if (ev === "DELETE") {
             const rideId = payload.old?.id;
