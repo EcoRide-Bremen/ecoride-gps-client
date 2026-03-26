@@ -1306,14 +1306,33 @@
       if (seq !== ridesFetchSeq) return;
       if (error) { logError("ERR_FETCH_RIDES", error.message); return; }
 
+      // Fahrer die vorher aktiv waren merken
+      const prevDriverKeys = new Set(
+        [...activeRides.values()].map(r => normId(r.driver_id))
+      );
+
       activeRides.clear();
       for (const row of data || []) {
         if (!row.ride_id) continue;
-        // Nur einlesen wenn Fahrer-Position noch frisch vorhanden
         const driverKey = normId(row.driver_id);
         if (positions.size > 0 && !positions.has(driverKey)) continue;
         activeRides.set(row.ride_id, row);
       }
+
+      // Fahrer die nicht mehr in aktiven Rides sind → Marker sofort entfernen
+      const nowDriverKeys = new Set(
+        [...activeRides.values()].map(r => normId(r.driver_id))
+      );
+      let markerChanged = false;
+      for (const driverKey of prevDriverKeys) {
+        if (!nowDriverKeys.has(driverKey)) {
+          positions.delete(driverKey);
+          routePoints.delete(driverKey);
+          markerChanged = true;
+        }
+      }
+      if (markerChanged) { refreshDriversSource(); refreshRoutesSource(); }
+
       refreshRidesSource();
     }
 
