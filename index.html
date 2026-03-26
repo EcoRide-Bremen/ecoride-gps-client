@@ -393,26 +393,37 @@
     // ── RIDE: STOP ────────────────────────────────────
     // Bug 2: Fahrt beenden stoppt jetzt immer auch das Tracking
     async function endRide(auto = false) {
-      if (!activeRideId) return;
+      log("endRide() aufgerufen — activeRideId=" + activeRideId + " auto=" + auto);
+      if (!activeRideId) {
+        log("endRide() abgebrochen: keine activeRideId");
+        return;
+      }
 
       const rideId = activeRideId;
-      // Sofort zurücksetzen – verhindert Endlosschleife mit stopTracking
       activeRideId = null;
       rideActive   = false;
 
-      const { error } = await sb
+      log("Sende UPDATE für ride_id=" + rideId);
+
+      const { data, error, status, statusText } = await sb
         .from("rides")
         .update({
           status:     "abgeschlossen",
           beendet_am: new Date().toISOString(),
         })
-        .eq("id", rideId);
+        .eq("id", rideId)
+        .select("id, status, beendet_am");
+
+      log("UPDATE Antwort → status=" + status + " statusText=" + statusText);
 
       if (error) {
-        log("RIDE UPDATE ERROR: " + error.message);
+        log("RIDE UPDATE ERROR: " + JSON.stringify(error));
         if (!auto) showHint("Fehler beim Beenden: " + error.message, true);
+      } else if (!data || data.length === 0) {
+        log("⚠️ UPDATE lief durch aber KEINE Zeile geändert! RLS oder falsche ID?");
+        if (!auto) showHint("Achtung: Fahrt wurde nicht in DB beendet (RLS?)", true);
       } else {
-        log("FAHRT BEENDET ✅ ride_id=" + rideId + (auto ? " (automatisch)" : ""));
+        log("FAHRT BEENDET ✅ ride_id=" + rideId + " → " + JSON.stringify(data[0]));
       }
 
       // UI zurücksetzen
