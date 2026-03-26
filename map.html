@@ -448,6 +448,10 @@
     const RIDES_SOURCE          = "er-rides";
     const LAYER_RIDE_DEST       = "er-ride-dest";
 
+    // NEU: Ride-Routen (Linie Fahrer → Ziel)
+    const RIDES_ROUTE_SOURCE    = "er-ride-routes";
+    const LAYER_RIDE_ROUTES     = "er-ride-routes-line";
+
     // BBox / Debounce
     const BBOX_DEBOUNCE_MS        = 350;
     const BBOX_LIMIT_LATEST       = 800;
@@ -647,32 +651,73 @@
     }
 
     // ─────────────────────────────────────────────────
-    // NEU: RIDES SOURCE
+    // NEU: RIDES SOURCE (Ziel-Punkte + Routen-Linien)
     // ─────────────────────────────────────────────────
     function refreshRidesSource() {
       if (!map || !map.getSource(RIDES_SOURCE)) return;
-      const features = [];
+
+      const destFeatures  = [];
+      const routeFeatures = [];
+
       for (const [rideId, ride] of activeRides.entries()) {
         const zLat = Number(ride.ziel_lat), zLng = Number(ride.ziel_lng);
         if (!isValidLatLng(zLat, zLng)) continue;
-        features.push({
+
+        const props = {
+          rideId,
+          driverId:   ride.driver_id || "",
+          fahrerName: ride.fahrer_name || ride.driver_id || "",
+          plaetze:    ride.plaetze ?? 2,
+          preis:      Number(ride.preis ?? 0),
+          bewertung:  ride.fahrer_bewertung !== null && ride.fahrer_bewertung !== undefined
+                        ? Number(ride.fahrer_bewertung) : null,
+          fahrerLat:  Number(ride.fahrer_lat),
+          fahrerLng:  Number(ride.fahrer_lng),
+        };
+
+        // ── Ziel-Punkt (orange) ──
+        destFeatures.push({
           type: "Feature",
-          properties: {
-            rideId,
-            driverId:   ride.driver_id || "",
-            fahrerName: ride.fahrer_name || ride.driver_id || "",
-            plaetze:    ride.plaetze ?? 2,
-            preis:      Number(ride.preis ?? 0),
-            bewertung:  ride.fahrer_bewertung !== null && ride.fahrer_bewertung !== undefined
-                          ? Number(ride.fahrer_bewertung) : null,
-            fahrerLat:  Number(ride.fahrer_lat),
-            fahrerLng:  Number(ride.fahrer_lng),
-          },
+          properties: props,
           geometry: { type: "Point", coordinates: [zLng, zLat] }
         });
+
+        // ── Routen-Linie: route_punkte (JSONB) oder Fallback Start→Ziel ──
+        let coords = null;
+        try {
+          const raw = ride.route_punkte;
+          if (Array.isArray(raw) && raw.length >= 2) {
+            const pts = raw
+              .map(p => [Number(p.lng ?? p.lon ?? p[0]), Number(p.lat ?? p[1])])
+              .filter(([lng, lat]) => isValidLatLng(lat, lng));
+            if (pts.length >= 2) coords = pts;
+          }
+        } catch (_) {}
+
+        // Fallback: Fahrer-Startposition → Ziel (2 Punkte)
+        if (!coords) {
+          const fLat = Number(ride.fahrer_lat), fLng = Number(ride.fahrer_lng);
+          if (isValidLatLng(fLat, fLng)) {
+            coords = [[fLng, fLat], [zLng, zLat]];
+          }
+        }
+
+        if (coords && coords.length >= 2) {
+          routeFeatures.push({
+            type: "Feature",
+            properties: { rideId, driverId: ride.driver_id || "" },
+            geometry: { type: "LineString", coordinates: coords }
+          });
+        }
       }
-      map.getSource(RIDES_SOURCE).setData({ type: "FeatureCollection", features });
-      setSafeTextContent("rideCountTxt", String(features.length));
+
+      map.getSource(RIDES_SOURCE).setData({ type: "FeatureCollection", features: destFeatures });
+
+      if (map.getSource(RIDES_ROUTE_SOURCE)) {
+        map.getSource(RIDES_ROUTE_SOURCE).setData({ type: "FeatureCollection", features: routeFeatures });
+      }
+
+      setSafeTextContent("rideCountTxt", String(destFeatures.length));
       pulse("rideCountTxt");
     }
 
@@ -1075,6 +1120,23 @@
           m.on("mouseleave", LAYER_POINTS,         () => { m.getCanvas().style.cursor = ""; });
         }
 
+        // ── NEU: Ride-Routen-Layer (Linie Fahrer → Ziel) ──
+        if (!m.getSource(RIDES_ROUTE_SOURCE)) {
+          m.addSource(RIDES_ROUTE_SOURCE, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+          m.addLayer({
+            id:     LAYER_RIDE_ROUTES,
+            type:   "line",
+            source: RIDES_ROUTE_SOURCE,
+            layout: { "line-join": "round", "line-cap": "round" },
+            paint: {
+              "line-color":   "#ff9500",
+              "line-width":   3,
+              "line-opacity": 0.65,
+              "line-dasharray": [2, 2]
+            }
+          });
+        }
+
         // ── NEU: Rides-Ziel-Layer (orange Punkte) ──
         if (!m.getSource(RIDES_SOURCE)) {
           m.addSource(RIDES_SOURCE, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
@@ -1469,6 +1531,8 @@
       try { if (map && onZoomEnd) map.off("zoomend", onZoomEnd); } catch (_) {}
       try { if (sb && channel)       sb.removeChannel(channel);       } catch (_) {}
       try { if (sb && ridesChannel)  sb.removeChannel(ridesChannel);  } catch (_) {} // NEU
+      try { if (map && map.getLayer(LAYER_RIDE_ROUTES)) map.removeLayer(LAYER_RIDE_ROUTES); } catch (_) {}
+      try { if (map && map.getSource(RIDES_ROUTE_SOURCE)) map.removeSource(RIDES_ROUTE_SOURCE); } catch (_) {}
       try { if (markerPopup) markerPopup.remove(); } catch (_) {}
       try { if (ridePopup)   ridePopup.remove();   } catch (_) {} // NEU
       try { if (map) map.remove(); } catch (_) {}
