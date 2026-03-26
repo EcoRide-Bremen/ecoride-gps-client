@@ -1358,12 +1358,25 @@
           const rideId = payload.new?.id || payload.old?.id;
 
           if (ev === "DELETE") {
-            if (rideId) { activeRides.delete(rideId); refreshRidesSource(); }
+            if (rideId) {
+              activeRides.delete(rideId);
+              refreshRidesSource();
+              // Fahrer-Position + Route ebenfalls sofort entfernen
+              const driverKey = normId(payload.old?.driver_id);
+              if (driverKey) { positions.delete(driverKey); routePoints.delete(driverKey); }
+              refreshDriversSource(); refreshRoutesSource();
+            }
             return;
           }
           if (!rideId) return;
           if (ev === "UPDATE" && payload.new?.status !== "aktiv") {
-            activeRides.delete(rideId); refreshRidesSource(); return;
+            activeRides.delete(rideId);
+            refreshRidesSource();
+            // Fahrer-Position + Route ebenfalls sofort entfernen
+            const driverKey = normId(payload.new?.driver_id);
+            if (driverKey) { positions.delete(driverKey); routePoints.delete(driverKey); }
+            refreshDriversSource(); refreshRoutesSource();
+            return;
           }
           if (ev === "INSERT" && payload.new?.status !== "aktiv") return;
 
@@ -1559,10 +1572,10 @@
       subscribe();
       subscribeRides(); // NEU
 
-      // Periodischer Rides-Poll (10s) als Fallback falls Realtime nicht feuert
+      // Periodischer Rides-Poll (5s) als Fallback falls Realtime nicht feuert
       ridesPolTimer = setInterval(() => {
         if (isTabVisible()) fetchActiveRides().catch(() => {});
-      }, 10_000);
+      }, 5_000);
 
       onVisibilityOrPanelChange();
     }
