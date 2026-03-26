@@ -1427,15 +1427,34 @@
     }
 
     // ─────────────────────────────────────────────────
-    // PRUNE STALE POSITIONS
+    // PRUNE STALE POSITIONS + ORPHANED RIDES
     // ─────────────────────────────────────────────────
     const pruneTimer = setInterval(() => {
-      if (positions.size === 0) return;
-      const now = Date.now(); let changed = false;
+      const now = Date.now();
+      let driversChanged = false;
+      let ridesChanged   = false;
+
+      // 1. Stale Fahrer-Positionen entfernen
       for (const [key, p] of positions.entries()) {
-        if (now - (p?.ts || 0) > STALE_MS) { positions.delete(key); routePoints.delete(key); changed = true; }
+        if (now - (p?.ts || 0) > STALE_MS) {
+          positions.delete(key);
+          routePoints.delete(key);
+          driversChanged = true;
+        }
       }
-      if (changed) { refreshDriversSource(); refreshRoutesSource(); }
+
+      // 2. Rides ohne aktive Fahrer-Position ausblenden
+      // (Fahrt in DB noch aktiv, aber Fahrer sendet kein GPS mehr)
+      for (const [rideId, ride] of activeRides.entries()) {
+        const driverKey = normId(ride.driver_id);
+        if (!positions.has(driverKey)) {
+          activeRides.delete(rideId);
+          ridesChanged = true;
+        }
+      }
+
+      if (driversChanged) { refreshDriversSource(); refreshRoutesSource(); }
+      if (ridesChanged)   { refreshRidesSource(); }
     }, PRUNE_EVERY_MS);
 
     // ─────────────────────────────────────────────────
