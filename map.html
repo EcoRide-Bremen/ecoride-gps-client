@@ -482,6 +482,7 @@
     let currentFilterKey = "";
 
     // Impact
+    let ridesPolTimer    = null;  // periodischer Rides-Poll
     let impactTimer      = null;
     let impactInFlight   = false;
     let impactBackoffIdx = 0;
@@ -1354,45 +1355,38 @@
       ridesChannel = sb.channel("rides_map")
         .on("postgres_changes", { event: "*", schema: "public", table: "rides" }, async (payload) => {
           const ev = payload?.eventType;
-          if (ev === "INSERT") {
-            if (payload.new?.status !== "aktiv") return;
-            // Ride direkt aus v_aktive_fahrten nachladen (enthält Fahrer-Position + Route)
-            // Kein positions-Filter hier: Fahrer sendet GPS evtl. noch nicht seit langem
-            const rideId = payload.new?.id;
-            if (!rideId) return;
-            const { data, error } = await sb
-              .from("v_aktive_fahrten")
-              .select("*")
-              .eq("ride_id", rideId)
-              .single();
-            if (!error && data) {
-              activeRides.set(rideId, data);
-              refreshRidesSource();
-            } else {
-              // Fallback: alle aktiven Rides neu laden
-              await fetchActiveRides().catch(() => {});
-            }
-          } else if (ev === "UPDATE") {
-            const rideId = payload.new?.id;
-            if (payload.new?.status !== "aktiv") {
-              activeRides.delete(rideId);
-              refreshRidesSource();
-            } else {
-              // Update: frischen Stand aus View nachladen
-              const { data, error } = await sb
-                .from("v_aktive_fahrten")
-                .select("*")
-                .eq("ride_id", rideId)
-                .single();
-              if (!error && data) {
-                activeRides.set(rideId, data);
-                refreshRidesSource();
-              }
-            }
-          } else if (ev === "DELETE") {
-            const rideId = payload.old?.id;
+          const ev     = payload?.eventType;
+          const rideId = payload.new?.id || payload.old?.id;
+
+          if (ev === "DELETE") {
             if (rideId) { activeRides.delete(rideId); refreshRidesSource(); }
+            return;
           }
+          if (!rideId) return;
+          if (ev === "UPDATE" && payload.new?.status !== "aktiv") {
+            activeRides.delete(rideId); refreshRidesSource(); return;
+          }
+          if (ev === "INSERT" && payload.new?.status !== "aktiv") return;
+
+          // Sofort versuchen (View-JOIN braucht manchmal 1–2s)
+          async function loadRideWithRetry(id, attempts = 3, delayMs = 1500) {
+            for (let i = 0; i < attempts; i++) {
+              if (i > 0) await new Promise(r => setTimeout(r, delayMs));
+              const { data, error } = await sb
+                .from("v_aktive_fahrten").select("*").eq("ride_id", id).single();
+              if (!error && data) {
+                activeRides.set(id, data);
+                refreshRidesSource();
+                logDebug("Ride geladen nach", i, "Retry(s):", id);
+                return;
+              }
+              logDebug("Ride noch nicht in View (Versuch", i + 1, "):", error?.message);
+            }
+            // Letzter Fallback: vollen Fetch
+            logDebug("Ride-Einzelabruf fehlgeschlagen – lade alle aktiven Rides");
+            await fetchActiveRides().catch(() => {});
+          }
+          loadRideWithRetry(rideId).catch(() => {});
         })
         .subscribe((status) => { logDebug("Rides channel:", status); });
     }
@@ -1565,6 +1559,12 @@
 
       subscribe();
       subscribeRides(); // NEU
+
+      // Periodischer Rides-Poll (10s) als Fallback falls Realtime nicht feuert
+      ridesPolTimer = setInterval(() => {
+        if (isTabVisible()) fetchActiveRides().catch(() => {});
+      }, 10_000);
+
       onVisibilityOrPanelChange();
     }
 
@@ -1578,7 +1578,8 @@
       try { if (map && onMoveEnd) map.off("moveend", onMoveEnd); } catch (_) {}
       try { if (map && onZoomEnd) map.off("zoomend", onZoomEnd); } catch (_) {}
       try { if (sb && channel)       sb.removeChannel(channel);       } catch (_) {}
-      try { if (sb && ridesChannel)  sb.removeChannel(ridesChannel);  } catch (_) {} // NEU
+      try { if (sb && ridesChannel)  sb.removeChannel(ridesChannel);  } catch (_) {}
+      try { if (ridesPolTimer) clearInterval(ridesPolTimer); } catch (_) {}
       try { if (map && map.getLayer(LAYER_RIDE_ROUTES)) map.removeLayer(LAYER_RIDE_ROUTES); } catch (_) {}
       try { if (map && map.getSource(RIDES_ROUTE_SOURCE)) map.removeSource(RIDES_ROUTE_SOURCE); } catch (_) {}
       try { if (markerPopup) markerPopup.remove(); } catch (_) {}
