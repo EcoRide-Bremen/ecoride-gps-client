@@ -1524,9 +1524,9 @@
 
       const debouncedReload = debounce(async () => {
         if (!map || currentFilterKey) return;
-        await fetchLatest().catch(() => {});
+        await fetchLatest().catch(() => {});           // erst Positionen
+        await fetchActiveRides().catch(() => {});      // dann Rides (filter greift jetzt)
         await fetchRouteHistory().catch(() => {});
-        await fetchActiveRides().catch(() => {}); // NEU
       }, BBOX_DEBOUNCE_MS);
 
       onMoveEnd = debouncedReload;
@@ -1534,9 +1534,13 @@
       map.on("moveend", onMoveEnd);
       map.on("zoomend", onZoomEnd);
 
-      fetchLatest().catch(e => logError("ERR_INIT_FETCH_LATEST", e?.message || String(e)));
+      // Reihenfolge wichtig: erst Positionen laden, dann Rides filtern
+      // Sonst ist positions noch leer und stale Rides werden trotzdem eingelesen
+      fetchLatest()
+        .catch(e => logError("ERR_INIT_FETCH_LATEST", e?.message || String(e)))
+        .then(() => fetchActiveRides())
+        .catch(e => logError("ERR_INIT_FETCH_RIDES", e?.message || String(e)));
       fetchRouteHistory().catch(e => logError("ERR_INIT_FETCH_ROUTE", e?.message || String(e)));
-      fetchActiveRides().catch(e => logError("ERR_INIT_FETCH_RIDES", e?.message || String(e))); // NEU
 
       subscribe();
       subscribeRides(); // NEU
