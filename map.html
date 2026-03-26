@@ -1354,7 +1354,6 @@
 
       ridesChannel = sb.channel("rides_map")
         .on("postgres_changes", { event: "*", schema: "public", table: "rides" }, async (payload) => {
-          const ev = payload?.eventType;
           const ev     = payload?.eventType;
           const rideId = payload.new?.id || payload.old?.id;
 
