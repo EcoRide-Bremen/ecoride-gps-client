@@ -1296,14 +1296,10 @@
     // ─────────────────────────────────────────────────
     async function fetchActiveRides() {
       const seq = ++ridesFetchSeq;
-      const bb = currentFilterKey ? null : getBoundsBBoxPadded();
-
+      // Kein BBox-Filter: Fahrer-Position kann außerhalb der sichtbaren Karte liegen
+      // während die Route durch den sichtbaren Bereich führt → würde Route verschwinden lassen
+      // Rides sind durch LIMIT 200 begrenzt, BBox daher nicht nötig
       let query = sb.from("v_aktive_fahrten").select("*");
-      if (bb) {
-        query = query
-          .gte("fahrer_lat", bb.south).lte("fahrer_lat", bb.north)
-          .gte("fahrer_lng", bb.west).lte("fahrer_lng", bb.east);
-      }
 
       const { data, error } = await query.limit(200);
       if (seq !== ridesFetchSeq) return;
