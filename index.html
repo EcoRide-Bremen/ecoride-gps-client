@@ -269,22 +269,27 @@
       btnRideStart.disabled = false;
     }
 
-    // Bug 1+2: async, löscht Position, kein interner endRide-Aufruf mehr
     async function stopTracking() {
-      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-      watchId = null;
+      // GPS-Watcher sofort stoppen
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+        log("GPS-Watcher gestoppt – keine neuen Positionsupdates mehr.");
+      }
 
-      trackingActive       = false;
-      stTrack.innerHTML    = '<span class="badge badge-aus">AUS</span>';
-      btnTrack.textContent = "Tracking START";
-      driverInput.disabled = false;
+      trackingActive        = false;
+      lastPos               = null;
+      lastSend              = 0;
+      stTrack.innerHTML     = '<span class="badge badge-aus">AUS</span>';
+      btnTrack.textContent  = "Tracking START";
+      driverInput.disabled  = false;
       btnRideStart.disabled = true;
 
       // live_positions Zeile sofort löschen → verschwindet von der Karte
       const driverId = driverInput.value.trim();
       if (driverId) await deletePosition(driverId);
 
-      log("Tracking STOP");
+      log("✅ Tracking vollständig gestoppt – keine weiteren GPS-Sendungen aktiv.");
     }
 
     // Tab-Rückkehr: GPS neu starten
