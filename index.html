@@ -244,6 +244,13 @@
       if (!driverId)                return alert("Bitte Driver ID eingeben.");
       if (!navigator.geolocation)  return alert("GPS wird nicht unterstützt.");
 
+      // Bestehenden Watcher immer zuerst stoppen – verhindert gestapelte Watcher
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+        log("Alter GPS-Watcher gestoppt vor Neustart.");
+      }
+
       log("Tracking START…");
 
       watchId = navigator.geolocation.watchPosition(
@@ -294,12 +301,12 @@
 
     // Tab-Rückkehr: GPS neu starten
     document.addEventListener("visibilitychange", () => {
+      // Nur neu starten wenn Tracking explizit aktiv ist und kein Watcher läuft
       if (!trackingActive) return;
-      if (document.visibilityState === "visible") {
-        log("App zurück → GPS neu starten");
-        startTracking();
-        if (lastPos) sendToSupabase(driverInput.value.trim(), lastPos);
-      }
+      if (document.visibilityState !== "visible") return;
+      if (watchId !== null) return; // Watcher läuft bereits – kein Neustart nötig
+      log("App zurück → GPS-Watcher neu starten");
+      startTracking();
     });
 
     // ── OSRM: ECHTE STRAßENROUTE ─────────────────────
