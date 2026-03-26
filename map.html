@@ -1331,7 +1331,17 @@
             upsertRealtime(payload.new);
           } else if (payload?.eventType === "DELETE") {
             const key = normId(payload.old?.driver_id);
-            if (key) { positions.delete(key); routePoints.delete(key); refreshDriversSource(); refreshRoutesSource(); }
+            if (key) {
+              positions.delete(key);
+              routePoints.delete(key);
+              // Auch zugehörige Rides sofort entfernen → Zielpunkt + Route weg
+              for (const [rideId, ride] of activeRides.entries()) {
+                if (normId(ride.driver_id) === key) activeRides.delete(rideId);
+              }
+              refreshDriversSource();
+              refreshRoutesSource();
+              refreshRidesSource();
+            }
           }
         })
         .subscribe((status) => {
