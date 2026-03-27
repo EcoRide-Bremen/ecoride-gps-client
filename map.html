@@ -988,13 +988,20 @@
     // Sofortiger Reset der Impact-Anzeige bei manuellem Ride-Ende
     function resetImpactCounters() {
       manualEndedAt = Date.now();
+      // Timer stoppen damit kein Poll den Wert sofort überschreibt
+      clearImpactTimer();
       const activeCount = positions.size; // 0 nach manuellem Ende
-      const rideCount   = activeRides.size; // 0 nach manuellem Ende
-      setSafeTextContent("impactActive",   String(activeCount));
+      const rideCount   = activeRides.size;
+      setSafeTextContent("impactActive",   "0");
       setSafeTextContent("impactPoints10", "0");
       setSafeTextContent("impactMarkers",  String(activeCount));
       setSafeTextContent("rideCountTxt",   String(rideCount));
       pulse("impactActive");
+      // Erst nach 3 Min. wieder pollen (DB-Zeitfenster abgelaufen)
+      setTimeout(() => {
+        manualEndedAt = 0;
+        scheduleImpactPoll();
+      }, 3 * 60_000);
     }
 
     async function fetchImpactOnce() {
