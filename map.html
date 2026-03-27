@@ -1435,6 +1435,7 @@
               const { data, error } = await sb
                 .from("v_aktive_fahrten").select("*").eq("ride_id", id).single();
               if (!error && data) {
+                endedDrivers.delete(normId(data.driver_id));
                 activeRides.set(id, data);
                 refreshRidesSource();
                 logDebug("Ride geladen nach", i, "Retry(s):", id);
