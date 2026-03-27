@@ -474,6 +474,7 @@
     const positions   = new Map();
     const routePoints = new Map();
     const activeRides = new Map(); // NEU: rideId → v_aktive_fahrten row
+    const endedDrivers = new Set(); // Fahrer mit bewusst beendeter Fahrt -> Marker sofort sperren
 
     let routesReady     = false;
     let routesVisible   = true;
