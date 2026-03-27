@@ -1462,6 +1462,7 @@
       if (!map || !row?.driver_id) return;
       const rawId = (row.driver_id ?? "").toString();
       const driverKey = normId(rawId); if (!driverKey) return;
+      if (endedDrivers.has(driverKey)) return;
       const lat = Number(row.lat), lng = Number(row.lng);
       if (!isValidLatLng(lat, lng)) return;
       const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
