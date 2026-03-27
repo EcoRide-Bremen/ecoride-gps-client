@@ -982,9 +982,12 @@
       if (shouldPollImpact()) { fetchImpactOnce().catch(() => {}); scheduleImpactPoll(false); }
       else clearImpactTimer();
     }
+    // Timestamp letzten manuellen Ride-Endes – Impact-RPC für 3 Min. übersteuern
+    let manualEndedAt = 0;
+
     // Sofortiger Reset der Impact-Anzeige bei manuellem Ride-Ende
-    // positions-Map ist zu diesem Zeitpunkt bereits geleert → client-seitig korrekt
     function resetImpactCounters() {
+      manualEndedAt = Date.now();
       const activeCount = positions.size; // 0 nach manuellem Ende
       const rideCount   = activeRides.size; // 0 nach manuellem Ende
       setSafeTextContent("impactActive",   String(activeCount));
@@ -992,12 +995,21 @@
       setSafeTextContent("impactMarkers",  String(activeCount));
       setSafeTextContent("rideCountTxt",   String(rideCount));
       pulse("impactActive");
-      // Kein sofortiger RPC-Refresh: DB-Zeitfenster würde alten Wert zurückliefern
-      // Nächster regulärer Poll holt frischen Wert wenn Zeitfenster abgelaufen
     }
 
     async function fetchImpactOnce() {
       if (!shouldPollImpact() || impactInFlight) return;
+
+      // Nach manuellem Ride-Ende: 3 Min. lang positions.size verwenden statt DB-Wert
+      // (DB-Zeitfenster zählt noch 2 Min. lang alte GPS-Punkte)
+      const sinceManualEnd = Date.now() - manualEndedAt;
+      if (manualEndedAt > 0 && sinceManualEnd < 3 * 60_000) {
+        setSafeTextContent("impactActive", String(positions.size));
+        setSafeTextContent("impactMarkers", String(positions.size));
+        scheduleImpactPoll();
+        return;
+      }
+
       impactInFlight = true; setSync(true);
       try {
         const { data, error } = await sb.rpc("get_live_impact", { active_minutes: 2, points_minutes: 10 });
