@@ -983,13 +983,17 @@
       else clearImpactTimer();
     }
     // Sofortiger Reset der Impact-Anzeige bei manuellem Ride-Ende
+    // positions-Map ist zu diesem Zeitpunkt bereits geleert → client-seitig korrekt
     function resetImpactCounters() {
-      setSafeTextContent("impactActive",   "0");
+      const activeCount = positions.size; // 0 nach manuellem Ende
+      const rideCount   = activeRides.size; // 0 nach manuellem Ende
+      setSafeTextContent("impactActive",   String(activeCount));
       setSafeTextContent("impactPoints10", "0");
-      setSafeTextContent("impactMarkers",  "0");
-      setSafeTextContent("rideCountTxt",   "0");
-      // Danach frischen Wert aus DB nachladen
-      setTimeout(() => { fetchImpactOnce().catch(() => {}); }, 1500);
+      setSafeTextContent("impactMarkers",  String(activeCount));
+      setSafeTextContent("rideCountTxt",   String(rideCount));
+      pulse("impactActive");
+      // Kein sofortiger RPC-Refresh: DB-Zeitfenster würde alten Wert zurückliefern
+      // Nächster regulärer Poll holt frischen Wert wenn Zeitfenster abgelaufen
     }
 
     async function fetchImpactOnce() {
