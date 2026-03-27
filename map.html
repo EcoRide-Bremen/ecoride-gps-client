@@ -982,6 +982,16 @@
       if (shouldPollImpact()) { fetchImpactOnce().catch(() => {}); scheduleImpactPoll(false); }
       else clearImpactTimer();
     }
+    // Sofortiger Reset der Impact-Anzeige bei manuellem Ride-Ende
+    function resetImpactCounters() {
+      setSafeTextContent("impactActive",   "0");
+      setSafeTextContent("impactPoints10", "0");
+      setSafeTextContent("impactMarkers",  "0");
+      setSafeTextContent("rideCountTxt",   "0");
+      // Danach frischen Wert aus DB nachladen
+      setTimeout(() => { fetchImpactOnce().catch(() => {}); }, 1500);
+    }
+
     async function fetchImpactOnce() {
       if (!shouldPollImpact() || impactInFlight) return;
       impactInFlight = true; setSync(true);
@@ -1401,30 +1411,32 @@
           if (ev === "DELETE") {
             if (rideId) {
               activeRides.delete(rideId);
-              refreshRidesSource();
-              // Fahrer-Position + Route ebenfalls sofort entfernen
               const driverKey = normId(payload.old?.driver_id);
               if (driverKey) {
                 endedDrivers.add(driverKey);
                 positions.delete(driverKey);
                 routePoints.delete(driverKey);
               }
-              refreshDriversSource(); refreshRoutesSource();
+              refreshRidesSource();
+              refreshDriversSource();
+              refreshRoutesSource();
+              resetImpactCounters(); // Aktiv sofort auf 0
               return;
             }
           }
           if (!rideId) return;
           if (ev === "UPDATE" && payload.new?.status !== "aktiv") {
             activeRides.delete(rideId);
-            refreshRidesSource();
-            // Fahrer-Position + Route ebenfalls sofort entfernen
             const driverKey = normId(payload.new?.driver_id);
             if (driverKey) {
               endedDrivers.add(driverKey);
               positions.delete(driverKey);
               routePoints.delete(driverKey);
             }
-            refreshDriversSource(); refreshRoutesSource();
+            refreshRidesSource();
+            refreshDriversSource();
+            refreshRoutesSource();
+            resetImpactCounters(); // Aktiv sofort auf 0
             return;
           }
           if (ev === "INSERT" && payload.new?.status !== "aktiv") return;
