@@ -1403,11 +1403,14 @@
               activeRides.delete(rideId);
               refreshRidesSource();
               // Fahrer-Position + Route ebenfalls sofort entfernen
-              const driverKey = normId(payload.old?.driver_id);
-              if (driverKey) { positions.delete(driverKey); routePoints.delete(driverKey); }
-              refreshDriversSource(); refreshRoutesSource();
-            }
-            return;
+          const driverKey = normId(payload.new?.driver_id);
+          if (driverKey) {
+            endedDrivers.add(driverKey);
+            positions.delete(driverKey);
+            routePoints.delete(driverKey);
+          }
+          refreshDriversSource(); refreshRoutesSource();
+          return;
           }
           if (!rideId) return;
           if (ev === "UPDATE" && payload.new?.status !== "aktiv") {
