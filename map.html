@@ -1203,10 +1203,10 @@
         const rawId = (row.driver_id ?? "").toString();
         const driverKey = normId(rawId);
         if (endedDrivers.has(driverKey)) {
-        positions.clear();
-        refreshDriversSource();
-        return;
-      }
+          positions.clear();
+          refreshDriversSource();
+          return;
+        }
         const lat = Number(row.lat), lng = Number(row.lng);
         if (!isValidLatLng(lat, lng)) return;
         const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
@@ -1411,6 +1411,7 @@
               }
               refreshDriversSource(); refreshRoutesSource();
               return;
+            }
           }
           if (!rideId) return;
           if (ev === "UPDATE" && payload.new?.status !== "aktiv") {
