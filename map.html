@@ -1418,7 +1418,11 @@
             refreshRidesSource();
             // Fahrer-Position + Route ebenfalls sofort entfernen
             const driverKey = normId(payload.new?.driver_id);
-            if (driverKey) { positions.delete(driverKey); routePoints.delete(driverKey); }
+            if (driverKey) {
+              endedDrivers.add(driverKey);
+              positions.delete(driverKey);
+              routePoints.delete(driverKey);
+            }
             refreshDriversSource(); refreshRoutesSource();
             return;
           }
