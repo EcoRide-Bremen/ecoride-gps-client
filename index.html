@@ -32,6 +32,10 @@
     .badge-aktiv{background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.4);color:#22c55e}
     .badge-bereit{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:#aaa}
     .badge-aus{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#f87171}
+    .badge-tracking{background:rgba(234,179,8,.15);border:1px solid rgba(234,179,8,.4);color:#facc15}
+    .state-idle .show-tracking,.state-idle .show-ride { display:none !important; }
+    .state-tracking .show-idle,.state-tracking .show-ride { display:none !important; }
+    .state-ride .show-idle,.state-ride .show-tracking { display:none !important; }
     .ride-id{font-size:11px;opacity:.55;word-break:break-all;margin-top:4px}
     .hint{margin-top:8px;padding:10px 12px;border-radius:12px;background:rgba(199,217,44,.10);border:1px solid rgba(199,217,44,.30);font-size:13px;color:rgba(199,217,44,.9)}
     .hint.error{background:rgba(239,68,68,.10);border-color:rgba(239,68,68,.30);color:#f87171}
@@ -41,45 +45,65 @@
 </head>
 
 <body>
-  <div class="wrap">
+  <div class="wrap state-idle">
     <h1 style="margin-bottom:4px">EcoRide GPS-Client</h1>
     <p class="muted">Fahrer-App: GPS tracken + Fahrt anbieten</p>
 
     <!-- ══════════════════════════════════════
-         KARTE 1: GPS-TRACKING
+         ZUSTANDSANZEIGE (oben, immer sichtbar)
     ═══════════════════════════════════════ -->
-    <div class="card">
-      <div class="card-title">GPS-Tracking</div>
-
-      <div class="row">
-        <label>Driver ID</label>
-        <input id="driverId" placeholder="z.B. Test_Bre" />
-      </div>
-
-      <div class="row two">
-        <button id="btnTrack" class="primary">Tracking START</button>
-        <button id="btnWake" class="secondary">Wake-Lock: AUS</button>
-      </div>
-
+    <div class="card" id="stateCard">
+      <div class="card-title">Fahrer-Status</div>
       <div class="status">
-        <div><b>Tracking:</b> <span id="stTrack"><span class="badge badge-aus">AUS</span></span></div>
+        <div><b>Zustand:</b> <span id="stState"><span class="badge badge-aus">IDLE</span></span></div>
         <div><b>Wake-Lock:</b> <span id="stWake">AUS</span></div>
         <div><b>PWA:</b> <span id="stPwa">bereit</span></div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         KARTE 1: GPS-TRACKING (IDLE → TRACKING)
+    ═══════════════════════════════════════ -->
+    <div class="card show-idle show-tracking" id="trackCard">
+      <div class="card-title">GPS-Tracking</div>
+
+      <!-- IDLE: Driver ID + Tracking starten -->
+      <div class="show-idle">
+        <div class="row">
+          <label>Driver ID</label>
+          <input id="driverId" placeholder="z.B. Test_Bre" />
+        </div>
+        <div class="row two">
+          <button id="btnTrackStart" class="primary">Tracking starten</button>
+          <button id="btnWake" class="secondary">Wake-Lock: AUS</button>
+        </div>
+      </div>
+
+      <!-- TRACKING: Status + Tracking beenden -->
+      <div class="show-tracking">
+        <div class="status">
+          <div><b>Tracking:</b> <span class="badge badge-tracking">AKTIV</span></div>
+          <div><b>Fahrer:</b> <span id="stTrackDriver">–</span></div>
+        </div>
+        <div class="row two" style="margin-top:12px">
+          <button id="btnTrackStop" class="secondary">Tracking beenden</button>
+          <button id="btnWake2" class="secondary">Wake-Lock: AUS</button>
+        </div>
       </div>
 
       <pre id="log" class="log"></pre>
     </div>
 
     <!-- ══════════════════════════════════════
-         KARTE 2: FAHRT ANBIETEN
+         KARTE 2: FAHRT ANBIETEN (TRACKING → AKTIVE FAHRT)
     ═══════════════════════════════════════ -->
-    <div class="card" id="rideCard">
+    <div class="card show-tracking show-ride" id="rideCard">
       <div class="card-title">Fahrt anbieten</div>
 
       <div id="rideHint" class="hint" style="display:none"></div>
 
-      <!-- Formular -->
-      <div id="rideForm">
+      <!-- TRACKING: Fahrt starten (Formular) -->
+      <div class="show-tracking" id="rideForm">
         <div class="row two">
           <div>
             <label>Ziel – Breitengrad (lat)</label>
@@ -104,14 +128,12 @@
         </div>
 
         <div class="row">
-          <button id="btnRideStart" class="success" disabled>Fahrt starten</button>
+          <button id="btnRideStart" class="success">Fahrt starten</button>
         </div>
       </div>
 
-      <hr class="divider" id="rideDivider" style="display:none" />
-
-      <!-- Aktive Fahrt Status -->
-      <div id="rideStatus" style="display:none">
+      <!-- AKTIVE FAHRT: Status + beenden -->
+      <div class="show-ride" id="rideStatus">
         <div class="status">
           <div><b>Fahrt:</b> <span class="badge badge-aktiv">AKTIV</span></div>
           <div><b>Fahrer:</b> <span id="stRideDriver">–</span></div>
@@ -119,7 +141,6 @@
           <div><b>Preis:</b> <span id="stRidePreis">–</span></div>
           <div class="ride-id">ride_id: <span id="stRideId">–</span></div>
         </div>
-
         <div class="row" style="margin-top:12px">
           <button id="btnRideStop" class="danger">Fahrt beenden</button>
         </div>
@@ -140,16 +161,30 @@
 
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+    // ── ZUSTANDSAUTOMAT ───────────────────────────────
+    // Zustände: "idle" | "tracking" | "ride"
+    let appState = "idle";
+
+    function setState(newState) {
+      appState = newState;
+      const wrap = document.querySelector(".wrap");
+      wrap.classList.remove("state-idle", "state-tracking", "state-ride");
+      wrap.classList.add("state-" + newState);
+
+      const badges = { idle: "badge-aus", tracking: "badge-tracking", ride: "badge-aktiv" };
+      const labels = { idle: "IDLE", tracking: "TRACKING", ride: "AKTIVE FAHRT" };
+      el("stState").innerHTML = `<span class="badge ${badges[newState]}">${labels[newState]}</span>`;
+      log("Zustand → " + newState.toUpperCase());
+    }
+
     // ── GPS STATE ─────────────────────────────────────
     let watchId        = null;
-    let trackingActive = false;
     let lastPos        = null;
     let lastSend       = 0;
     const SEND_EVERY_MS = 1500;
 
     // ── RIDE STATE ────────────────────────────────────
     let activeRideId   = null;
-    let rideActive     = false;
 
     // ── WAKE LOCK ─────────────────────────────────────
     let wakeLock             = null;
@@ -158,13 +193,14 @@
     // ── ELEMENTE ──────────────────────────────────────
     const el = id => document.getElementById(id);
 
-    const driverInput  = el("driverId");
-    const btnTrack     = el("btnTrack");
-    const btnWake      = el("btnWake");
-    const stTrack      = el("stTrack");
-    const stWake       = el("stWake");
-    const stPwa        = el("stPwa");
-    const logEl        = el("log");
+    const driverInput    = el("driverId");
+    const btnTrackStart  = el("btnTrackStart");
+    const btnTrackStop   = el("btnTrackStop");
+    const btnWake        = el("btnWake");
+    const btnWake2       = el("btnWake2");
+    const stWake         = el("stWake");
+    const stPwa          = el("stPwa");
+    const logEl          = el("log");
 
     const zielLatInput = el("zielLat");
     const zielLngInput = el("zielLng");
@@ -172,9 +208,6 @@
     const preisInput   = el("preis");
     const btnRideStart = el("btnRideStart");
     const btnRideStop  = el("btnRideStop");
-    const rideForm     = el("rideForm");
-    const rideStatus   = el("rideStatus");
-    const rideDivider  = el("rideDivider");
     const rideHint     = el("rideHint");
 
     // ── LOG ───────────────────────────────────────────
@@ -241,10 +274,9 @@
     // ── GPS TRACKING ──────────────────────────────────
     function startTracking() {
       const driverId = driverInput.value.trim();
-      if (!driverId)                return alert("Bitte Driver ID eingeben.");
+      if (!driverId)               return alert("Bitte Driver ID eingeben.");
       if (!navigator.geolocation)  return alert("GPS wird nicht unterstützt.");
 
-      // Bestehenden Watcher immer zuerst stoppen – verhindert gestapelte Watcher
       if (watchId !== null) {
         navigator.geolocation.clearWatch(watchId);
         watchId = null;
@@ -252,6 +284,8 @@
       }
 
       log("Tracking START…");
+      el("stTrackDriver").textContent = driverId;
+      driverInput.disabled = true;
 
       watchId = navigator.geolocation.watchPosition(
         pos => {
@@ -267,44 +301,32 @@
         { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
       );
 
-      trackingActive = true;
-      stTrack.innerHTML = '<span class="badge badge-aktiv">AN</span>';
-      btnTrack.textContent = "Tracking STOP";
-      driverInput.disabled = true;
-
-      // Fahrt-Button freischalten
-      btnRideStart.disabled = false;
+      setState("tracking");
     }
 
     async function stopTracking() {
-      // GPS-Watcher sofort stoppen
       if (watchId !== null) {
         navigator.geolocation.clearWatch(watchId);
         watchId = null;
-        log("GPS-Watcher gestoppt – keine neuen Positionsupdates mehr.");
+        log("GPS-Watcher gestoppt.");
       }
 
-      trackingActive        = false;
-      lastPos               = null;
-      lastSend              = 0;
-      stTrack.innerHTML     = '<span class="badge badge-aus">AUS</span>';
-      btnTrack.textContent  = "Tracking START";
-      driverInput.disabled  = false;
-      btnRideStart.disabled = true;
+      lastPos  = null;
+      lastSend = 0;
+      driverInput.disabled = false;
 
-      // live_positions Zeile sofort löschen → verschwindet von der Karte
       const driverId = driverInput.value.trim();
       if (driverId) await deletePosition(driverId);
 
-      log("✅ Tracking vollständig gestoppt – keine weiteren GPS-Sendungen aktiv.");
+      log("✅ Tracking vollständig gestoppt.");
+      setState("idle");
     }
 
-    // Tab-Rückkehr: GPS neu starten
+    // Tab-Rückkehr: GPS-Watcher neu starten wenn Tracking aktiv
     document.addEventListener("visibilitychange", () => {
-      // Nur neu starten wenn Tracking explizit aktiv ist und kein Watcher läuft
-      if (!trackingActive) return;
+      if (appState !== "tracking" && appState !== "ride") return;
       if (document.visibilityState !== "visible") return;
-      if (watchId !== null) return; // Watcher läuft bereits – kein Neustart nötig
+      if (watchId !== null) return;
       log("App zurück → GPS-Watcher neu starten");
       startTracking();
     });
@@ -324,27 +346,24 @@
 
     // ── RIDE: START ───────────────────────────────────
     async function startRide() {
+      if (appState !== "tracking") return;
       const driverId = driverInput.value.trim();
       const zielLat  = parseFloat(zielLatInput.value);
       const zielLng  = parseFloat(zielLngInput.value);
       const plaetze  = parseInt(plaetzeInput.value);
       const preis    = parseFloat(preisInput.value);
 
-      if (!driverId)                              return showHint("Driver ID fehlt.", true);
-      if (isNaN(zielLat) || isNaN(zielLng))      return showHint("Bitte Ziel-Koordinaten eingeben.", true);
-      if (zielLat < -90  || zielLat > 90)        return showHint("Lat muss zwischen -90 und 90 liegen.", true);
-      if (zielLng < -180 || zielLng > 180)       return showHint("Lng muss zwischen -180 und 180 liegen.", true);
+      if (!driverId)                                    return showHint("Driver ID fehlt.", true);
+      if (isNaN(zielLat) || isNaN(zielLng))            return showHint("Bitte Ziel-Koordinaten eingeben.", true);
+      if (zielLat < -90  || zielLat > 90)              return showHint("Lat muss zwischen -90 und 90 liegen.", true);
+      if (zielLng < -180 || zielLng > 180)             return showHint("Lng muss zwischen -180 und 180 liegen.", true);
       if (isNaN(plaetze) || plaetze < 1 || plaetze > 8) return showHint("Sitzplätze: 1–8.", true);
-      if (isNaN(preis)   || preis < 0)           return showHint("Preis darf nicht negativ sein.", true);
-
-      if (!lastPos) {
-        return showHint("Noch keine aktuelle GPS-Position vorhanden. Bitte kurz warten.", true);
-      }
+      if (isNaN(preis)   || preis < 0)                 return showHint("Preis darf nicht negativ sein.", true);
+      if (!lastPos) return showHint("Noch keine GPS-Position. Bitte kurz warten.", true);
 
       const startLat = lastPos.coords.latitude;
       const startLng = lastPos.coords.longitude;
 
-      // OSRM-Route abrufen (Fallback: Luftlinie)
       let routePunkte;
       try {
         log("Route wird berechnet…");
@@ -354,7 +373,7 @@
         log("OSRM Fehler – Luftlinie als Fallback: " + e.message);
         routePunkte = [[startLng, startLat], [zielLng, zielLat]];
       }
-      
+
       btnRideStart.disabled = true;
       btnRideStart.textContent = "Starte…";
       hideHint();
@@ -362,67 +381,51 @@
       const { data, error } = await sb
         .from("rides")
         .insert({
-          driver_id: driverId,
-          start_lat: startLat,
-          start_lng: startLng,
-          ziel_lat:  zielLat,
-          ziel_lng:  zielLng,
+          driver_id:    driverId,
+          start_lat:    startLat,
+          start_lng:    startLng,
+          ziel_lat:     zielLat,
+          ziel_lng:     zielLng,
           route_punkte: routePunkte,
-          plaetze:   plaetze,
-          preis:     preis,
-          status:    "aktiv",
+          plaetze:      plaetze,
+          preis:        preis,
+          status:       "aktiv",
         })
         .select("id, ziel_lat, ziel_lng, start_lat, start_lng, route_punkte")
         .single();
 
+      btnRideStart.disabled = false;
+      btnRideStart.textContent = "Fahrt starten";
+
       if (error) {
         log("RIDE INSERT ERROR: " + error.message);
         showHint("Fehler beim Starten: " + error.message, true);
-        btnRideStart.disabled = false;
-        btnRideStart.textContent = "Fahrt starten";
         return;
       }
-      
 
-      
       activeRideId = data.id;
-      rideActive   = true;
-
       log("FAHRT GESTARTET ✅ ride_id=" + activeRideId);
       showHint("Fahrt läuft! Mitfahrer können dich jetzt auf der Karte sehen.");
-
-      // UI umschalten
-      rideForm.style.display     = "none";
-      rideDivider.style.display  = "block";
-      rideStatus.style.display   = "block";
 
       el("stRideDriver").textContent  = driverId;
       el("stRidePlaetze").textContent = plaetze + " Platz/Plätze";
       el("stRidePreis").textContent   = preis.toFixed(2) + " €";
       el("stRideId").textContent      = activeRideId;
+
+      setState("ride");
     }
 
     // ── RIDE: STOP ────────────────────────────────────
-    // Bug 2: Fahrt beenden stoppt jetzt immer auch das Tracking
-    async function endRide(auto = false) {
-      log("endRide() aufgerufen — activeRideId=" + activeRideId + " auto=" + auto);
-      if (!activeRideId) {
-        log("endRide() abgebrochen: keine activeRideId");
-        return;
-      }
+    async function endRide() {
+      log("endRide() aufgerufen — activeRideId=" + activeRideId);
+      if (!activeRideId) { log("endRide() abgebrochen: keine activeRideId"); return; }
 
       const rideId = activeRideId;
       activeRideId = null;
-      rideActive   = false;
-
-      log("Sende UPDATE für ride_id=" + rideId);
 
       const { data, error, status, statusText } = await sb
         .from("rides")
-        .update({
-          status:     "abgeschlossen",
-          beendet_am: new Date().toISOString(),
-        })
+        .update({ status: "abgeschlossen", beendet_am: new Date().toISOString() })
         .eq("id", rideId)
         .select("id, status, beendet_am");
 
@@ -430,25 +433,17 @@
 
       if (error) {
         log("RIDE UPDATE ERROR: " + JSON.stringify(error));
-        if (!auto) showHint("Fehler beim Beenden: " + error.message, true);
+        showHint("Fehler beim Beenden: " + error.message, true);
       } else if (!data || data.length === 0) {
-        log("⚠️ UPDATE lief durch aber KEINE Zeile geändert! RLS oder falsche ID?");
-        if (!auto) showHint("Achtung: Fahrt wurde nicht in DB beendet (RLS?)", true);
+        log("⚠️ UPDATE: keine Zeile geändert! RLS oder falsche ID?");
+        showHint("Achtung: Fahrt wurde nicht in DB beendet (RLS?).", true);
       } else {
-        log("FAHRT BEENDET ✅ ride_id=" + rideId + " → " + JSON.stringify(data[0]));
+        log("FAHRT BEENDET ✅ ride_id=" + rideId);
       }
 
-      // UI zurücksetzen
-      rideForm.style.display    = "block";
-      rideDivider.style.display = "none";
-      rideStatus.style.display  = "none";
-      btnRideStart.textContent  = "Fahrt starten";
-
-      // Tracking ebenfalls stoppen + Position löschen (Bug 2)
-      if (trackingActive) {
-        if (!auto) showHint("Fahrt beendet – Tracking gestoppt, Position gelöscht.");
-        await stopTracking();
-      }
+      // Fahrt beenden = Tracking beenden = IDLE (alles aus)
+      showHint("Fahrt beendet – Tracking gestoppt.");
+      await stopTracking(); // setzt auch setState("idle")
     }
 
     // ── WAKE LOCK ─────────────────────────────────────
@@ -518,17 +513,15 @@
     }
 
     // ── BUTTONS ───────────────────────────────────────
-    btnTrack.addEventListener("click", async () =>
-      trackingActive ? await stopTracking() : startTracking()
-    );
-
-    btnWake.addEventListener("click", toggleWakeLock);
-
+    btnTrackStart.addEventListener("click", startTracking);
+    btnTrackStop.addEventListener("click",  async () => await stopTracking());
+    btnWake.addEventListener("click",  toggleWakeLock);
+    btnWake2.addEventListener("click", toggleWakeLock);
     btnRideStart.addEventListener("click", startRide);
-
-    btnRideStop.addEventListener("click", async () => await endRide(false));
+    btnRideStop.addEventListener("click",  async () => await endRide());
 
     // ── INIT ──────────────────────────────────────────
+    setState("idle");
     log("EcoRide GPS-Client bereit ✅");
   </script>
 </body>
