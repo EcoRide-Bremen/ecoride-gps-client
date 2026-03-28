@@ -1373,8 +1373,9 @@
         if (!row.ride_id) continue;
         const driverKey = normId(row.driver_id);
         if (!driverKey) continue;
-        // Fix A: recentlyEnded-Sperre respektieren – kein Delete wenn manuell beendet
-        if (!recentlyEnded.has(driverKey)) endedDrivers.delete(driverKey);
+        // Neue bestätigte Fahrt → Sperren sofort aufheben (Neustart desselben Fahrers)
+        recentlyEnded.delete(driverKey);
+        endedDrivers.delete(driverKey);
         if (positions.size > 0 && !positions.has(driverKey)) continue;
         activeRides.set(row.ride_id, row);
       }
@@ -1502,7 +1503,9 @@
               const { data, error } = await sb
                 .from("v_aktive_fahrten").select("*").eq("ride_id", id).single();
               if (!error && data) {
-                endedDrivers.delete(normId(data.driver_id));
+                const dk = normId(data.driver_id);
+                recentlyEnded.delete(dk);
+                endedDrivers.delete(dk);
                 activeRides.set(id, data);
                 refreshRidesSource();
                 logDebug("Ride geladen nach", i, "Retry(s):", id);
