@@ -68,7 +68,64 @@
     .panel.collapsed .stat,
     .panel.collapsed .stat2,
     .panel.collapsed .stat3,
-    .panel.collapsed .stat4 { display:none !important; }
+    .panel.collapsed .stat4,
+    .panel.collapsed .mode-switcher,
+    .panel.collapsed .mode-panel { display:none !important; }
+
+    /* ── Modus-Umschalter ── */
+    .mode-switcher {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin: 10px 10px 0;
+    }
+    .mode-btn {
+      flex: 1;
+      height: 30px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid rgba(199,223,58,0.25);
+      background: rgba(17,24,37,0.28);
+      color: #e5e7eb;
+      transition: background .2s, color .2s;
+    }
+    .mode-btn.active {
+      background: rgba(199,223,58,0.85);
+      color: #0b0f14;
+      border-color: transparent;
+    }
+    .mode-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    /* ── Mode-Panels ── */
+    .mode-panel { margin-top: 8px; }
+
+    /* ── Mitfahrer-Panel ── */
+    .passenger-section { margin-top: 6px; }
+    .passenger-section label {
+      display: block;
+      font-size: 11px;
+      opacity: 0.6;
+      margin-bottom: 4px;
+      padding-left: 4px;
+    }
+    .passenger-section input {
+      max-width: 100%;
+      width: 100%;
+      text-align: left;
+      padding: 0 12px;
+    }
+    .passenger-hint {
+      font-size: 11px;
+      opacity: 0.5;
+      text-align: center;
+      margin-top: 10px;
+      padding: 0 10px;
+    }
 
     .input-button-group {
       width:100%;
@@ -349,51 +406,76 @@
   <div class="panel collapsed">
     <p class="title" id="panelTitle">EcoRide – Live-Karte <span class="toggle-icon" aria-hidden="true">▼</span></p>
 
-    <div class="row">
-      <div class="input-button-group">
-        <input id="driverFilter" placeholder="Driver ID" />
-      </div>
-
-      <div class="button-group">
-        <button id="btnApply">Folgen</button>
-        <button id="btnAll" class="secondary">Aufheben</button>
-        <button id="btnToggleRoutes" class="secondary">Einblenden</button>
-        <button id="btnActiveOnly" class="secondary">Aktive</button>
-      </div>
+    <!-- ── Modus-Umschalter ── -->
+    <div class="mode-switcher">
+      <button id="btnModeDriver"    class="mode-btn active">🚗 Fahrer</button>
+      <button id="btnModePassenger" class="mode-btn">🙋 Mitfahrer</button>
     </div>
 
-    <div class="stat">
-      <div class="left">
-        <span id="rtDot" class="dot"></span>
-        <span id="rtTxt">Realtime: AUS</span>
+    <!-- ── FAHRER-PANEL ── -->
+    <div class="mode-panel" id="driverPanel">
+      <div class="row">
+        <div class="input-button-group">
+          <input id="driverFilter" placeholder="Driver ID" />
+        </div>
+        <div class="button-group">
+          <button id="btnApply">Folgen</button>
+          <button id="btnAll" class="secondary">Aufheben</button>
+          <button id="btnToggleRoutes" class="secondary">Einblenden</button>
+          <button id="btnActiveOnly" class="secondary">Aktive</button>
+        </div>
       </div>
-      <div class="mid">
-        <span id="hintInline" class="hint-inline"></span>
-      </div>
-      <div class="right">
-        <span id="countTxt">Marker: 0</span>
-      </div>
-    </div>
 
-    <div class="stat2">
-      <div class="last-left">
-        <span>Letztes Update:</span>
-        <span id="syncIcon" class="sync" title="Aktualisiere…">⟳</span>
+      <div class="stat">
+        <div class="left">
+          <span id="rtDot" class="dot"></span>
+          <span id="rtTxt">Realtime: AUS</span>
+        </div>
+        <div class="mid">
+          <span id="hintInline" class="hint-inline"></span>
+        </div>
+        <div class="right">
+          <span id="countTxt">Marker: 0</span>
+        </div>
       </div>
-      <div id="lastTxt">–</div>
-    </div>
 
-    <div class="stat3">
-      <div>Aktiv: <span id="impactActive" class="pulse">–</span></div>
-      <div>Punkte 10m: <span id="impactPoints10" class="pulse">–</span></div>
-      <div>Marker: <span id="impactMarkers" class="pulse">0</span></div>
-    </div>
+      <div class="stat2">
+        <div class="last-left">
+          <span>Letztes Update:</span>
+          <span id="syncIcon" class="sync" title="Aktualisiere…">⟳</span>
+        </div>
+        <div id="lastTxt">–</div>
+      </div>
 
-    <!-- NEU: Fahrten-Zähler -->
-    <div class="stat4">
-      <div>🟠 Fahrten: <span id="rideCountTxt" class="pulse">0</span></div>
-      <div style="font-size:11px;opacity:0.55">Ziel = orangener Punkt</div>
-    </div>
+      <div class="stat3">
+        <div>Aktiv: <span id="impactActive" class="pulse">–</span></div>
+        <div>Punkte 10m: <span id="impactPoints10" class="pulse">–</span></div>
+        <div>Marker: <span id="impactMarkers" class="pulse">0</span></div>
+      </div>
+
+      <div class="stat4">
+        <div>🟠 Fahrten: <span id="rideCountTxt" class="pulse">0</span></div>
+        <div style="font-size:11px;opacity:0.55">Ziel = orangener Punkt</div>
+      </div>
+    </div><!-- /driverPanel -->
+
+    <!-- ── MITFAHRER-PANEL ── -->
+    <div class="mode-panel" id="passengerPanel" style="display:none">
+      <div class="passenger-section" style="padding: 0 10px; box-sizing: border-box;">
+        <label>Mein Standort</label>
+        <input id="paxLocation" placeholder="z.B. Bremen Hbf" />
+      </div>
+      <div class="passenger-section" style="padding: 0 10px; margin-top: 8px; box-sizing: border-box;">
+        <label>Richtung / Zielgebiet</label>
+        <input id="paxDestination" placeholder="z.B. Richtung Norden / Ikea" />
+      </div>
+      <div class="passenger-section" style="padding: 0 10px; margin-top: 8px; box-sizing: border-box;">
+        <label>Zeitfenster (optional)</label>
+        <input id="paxTime" placeholder="z.B. jetzt / in 20 Min" />
+      </div>
+      <p class="passenger-hint">Passende Fahrer auf der Karte werden hervorgehoben.<br>Funktion in Entwicklung.</p>
+    </div><!-- /passengerPanel -->
+
   </div>
 
   <script>
@@ -520,6 +602,59 @@
 
     // NEU: Mitfahrer-Identität (localStorage-basiert)
     let mitfahrerId = localStorage.getItem("er_mitfahrer_id") || null;
+
+    // ─────────────────────────────────────────────────
+    // MODUS-UMSCHALTER (Fahrer / Mitfahrer)
+    // ─────────────────────────────────────────────────
+    // Modus: "driver" | "passenger"
+    let appMode = localStorage.getItem("er_mode") || "driver";
+
+    function isModeLocked() {
+      // Gesperrt wenn Fahrer aktiv (Tracking oder Fahrt läuft)
+      // Erkennbar: manualEndedAt === 0 und activeRides oder positions befüllt
+      // Einfache Heuristik: positions.size > 0 = Fahrer-Session aktiv
+      return positions.size > 0 || activeRides.size > 0;
+    }
+
+    function setMode(mode) {
+      if (mode === appMode) return;
+      if (isModeLocked()) {
+        // Umschalten gesperrt – visuell kurz anzeigen
+        const lockBtn = mode === "driver" ? document.getElementById("btnModeDriver") : document.getElementById("btnModePassenger");
+        if (lockBtn) {
+          lockBtn.style.opacity = "0.35";
+          setTimeout(() => { lockBtn.style.opacity = ""; }, 600);
+        }
+        showHint("Erst aktive Fahrt/Tracking beenden.");
+        return;
+      }
+      appMode = mode;
+      localStorage.setItem("er_mode", mode);
+      renderModeUI();
+    }
+
+    function renderModeUI() {
+      const btnDriver    = document.getElementById("btnModeDriver");
+      const btnPassenger = document.getElementById("btnModePassenger");
+      const driverPanel  = document.getElementById("driverPanel");
+      const passengerPanel = document.getElementById("passengerPanel");
+      if (!btnDriver) return;
+
+      const locked = isModeLocked();
+
+      btnDriver.classList.toggle("active", appMode === "driver");
+      btnPassenger.classList.toggle("active", appMode === "passenger");
+
+      // Anderer Modus-Button sperren wenn aktive Session
+      btnDriver.disabled    = locked && appMode !== "driver";
+      btnPassenger.disabled = locked && appMode !== "passenger";
+
+      driverPanel.style.display    = appMode === "driver"    ? "" : "none";
+      passengerPanel.style.display = appMode === "passenger" ? "" : "none";
+    }
+
+    document.getElementById("btnModeDriver")?.addEventListener("click",    () => setMode("driver"));
+    document.getElementById("btnModePassenger")?.addEventListener("click", () => setMode("passenger"));
 
     // ─────────────────────────────────────────────────
     // UTILS
@@ -1413,6 +1548,7 @@
       for (const dk of reactivatedDrivers) {
         fetchPositionWithRetry(dk).catch(() => {});
       }
+      renderModeUI(); // Lock-Zustand aktualisieren
 
       // Fahrer die nicht mehr in aktiven Rides sind → Marker sofort entfernen
       const nowDriverKeys = new Set(
@@ -1732,6 +1868,9 @@
       ridesPolTimer = setInterval(() => {
         if (isTabVisible()) fetchActiveRides().catch(() => {});
       }, 5_000);
+
+      // Modus-Umschalter initialisieren
+      renderModeUI();
 
       onVisibilityOrPanelChange();
     }
