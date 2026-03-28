@@ -105,7 +105,12 @@
     .mode-panel { margin-top: 8px; }
 
     /* ── Mitfahrer-Panel ── */
-    .passenger-section { margin-top: 6px; }
+    .passenger-fields {
+      padding: 0 10px;
+      box-sizing: border-box;
+      width: 100%;
+    }
+    .passenger-section { margin-top: 8px; }
     .passenger-section label {
       display: block;
       font-size: 11px;
@@ -116,6 +121,7 @@
     .passenger-section input {
       max-width: 100%;
       width: 100%;
+      box-sizing: border-box;
       text-align: left;
       padding: 0 12px;
     }
@@ -408,8 +414,8 @@
 
     <!-- ── Modus-Umschalter ── -->
     <div class="mode-switcher">
-      <button id="btnModeDriver"    class="mode-btn active">🚗 Fahrer</button>
-      <button id="btnModePassenger" class="mode-btn">🙋 Mitfahrer</button>
+      <button id="btnModeDriver"    class="mode-btn active">Fahrer</button>
+      <button id="btnModePassenger" class="mode-btn">Mitfahrer</button>
     </div>
 
     <!-- ── FAHRER-PANEL ── -->
@@ -461,17 +467,19 @@
 
     <!-- ── MITFAHRER-PANEL ── -->
     <div class="mode-panel" id="passengerPanel" style="display:none">
-      <div class="passenger-section" style="padding: 0 10px; box-sizing: border-box;">
-        <label>Mein Standort</label>
-        <input id="paxLocation" placeholder="z.B. Bremen Hbf" />
-      </div>
-      <div class="passenger-section" style="padding: 0 10px; margin-top: 8px; box-sizing: border-box;">
-        <label>Richtung / Zielgebiet</label>
-        <input id="paxDestination" placeholder="z.B. Richtung Norden / Ikea" />
-      </div>
-      <div class="passenger-section" style="padding: 0 10px; margin-top: 8px; box-sizing: border-box;">
-        <label>Zeitfenster (optional)</label>
-        <input id="paxTime" placeholder="z.B. jetzt / in 20 Min" />
+      <div class="passenger-fields">
+        <div class="passenger-section">
+          <label>Mein Standort</label>
+          <input id="paxLocation" placeholder="z.B. Bremen Hbf" />
+        </div>
+        <div class="passenger-section">
+          <label>Richtung / Zielgebiet</label>
+          <input id="paxDestination" placeholder="z.B. Richtung Norden / Ikea" />
+        </div>
+        <div class="passenger-section">
+          <label>Zeitfenster (optional)</label>
+          <input id="paxTime" placeholder="z.B. jetzt / in 20 Min" />
+        </div>
       </div>
       <p class="passenger-hint">Passende Fahrer auf der Karte werden hervorgehoben.<br>Funktion in Entwicklung.</p>
     </div><!-- /passengerPanel -->
@@ -619,13 +627,7 @@
     function setMode(mode) {
       if (mode === appMode) return;
       if (isModeLocked()) {
-        // Umschalten gesperrt – visuell kurz anzeigen
-        const lockBtn = mode === "driver" ? document.getElementById("btnModeDriver") : document.getElementById("btnModePassenger");
-        if (lockBtn) {
-          lockBtn.style.opacity = "0.35";
-          setTimeout(() => { lockBtn.style.opacity = ""; }, 600);
-        }
-        showHint("Erst aktive Fahrt/Tracking beenden.");
+        showHint("Erst aktive Fahrt / Tracking beenden.");
         return;
       }
       appMode = mode;
