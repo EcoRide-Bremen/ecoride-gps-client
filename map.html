@@ -477,6 +477,14 @@
     const endedDrivers = new Set(); // Fahrer mit bewusst beendeter Fahrt -> Marker sofort sperren
     const recentlyEnded = new Set(); // Fahrer im 3-Min-Sperr-Fenster nach manuellem Ende
 
+    function getActiveDriverCount() {
+      return new Set(
+        [...activeRides.values()]
+          .map(r => normId(r.driver_id))
+          .filter(Boolean)
+      ).size;
+    }
+
     let routesReady     = false;
     let routesVisible   = true;
     let activeOnlyMode  = false;
@@ -996,11 +1004,10 @@
       }
       // Timer stoppen damit kein Poll den Wert sofort überschreibt
       clearImpactTimer();
-      const activeCount = positions.size; // 0 nach manuellem Ende
       const rideCount   = activeRides.size;
-      setSafeTextContent("impactActive",   "0");
+      setSafeTextContent("impactActive",   String(getActiveDriverCount()));
       setSafeTextContent("impactPoints10", "0");
-      setSafeTextContent("impactMarkers",  String(activeCount));
+      setSafeTextContent("impactMarkers",  String(positions.size));
       setSafeTextContent("rideCountTxt",   String(rideCount));
       pulse("impactActive");
       // Erst nach 3 Min. wieder pollen (DB-Zeitfenster abgelaufen)
@@ -1019,7 +1026,7 @@
       // (DB-Zeitfenster zählt noch 2 Min. lang alte GPS-Punkte)
       const sinceManualEnd = Date.now() - manualEndedAt;
       if (manualEndedAt > 0 && sinceManualEnd < 3 * 60_000) {
-        setSafeTextContent("impactActive", "0");
+        setSafeTextContent("impactActive", String(getActiveDriverCount()));
         setSafeTextContent("impactMarkers", String(positions.size));
         scheduleImpactPoll();
         return;
@@ -1031,7 +1038,7 @@
         if (error) throw new Error(error.message);
         const row = Array.isArray(data) ? data[0] : data;
         if (!row) throw new Error("RPC returned no rows");
-        setSafeTextContent("impactActive",   String(row.active_drivers ?? 0));
+        setSafeTextContent("impactActive",   String(getActiveDriverCount()));
         setSafeTextContent("impactPoints10", String(row.points_window  ?? 0));
         pulse("impactActive"); pulse("impactPoints10");
         lastImpactOkAt = Date.now(); impactBackoffIdx = 0; setLast(new Date());
