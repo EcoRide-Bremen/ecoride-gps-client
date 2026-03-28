@@ -33,9 +33,12 @@
     .badge-bereit{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:#aaa}
     .badge-aus{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#f87171}
     .badge-tracking{background:rgba(234,179,8,.15);border:1px solid rgba(234,179,8,.4);color:#facc15}
+    /* Innere Sektionen ein-/ausblenden */
     .state-idle .show-tracking,.state-idle .show-ride { display:none !important; }
     .state-tracking .show-idle,.state-tracking .show-ride { display:none !important; }
     .state-ride .show-idle,.state-ride .show-tracking { display:none !important; }
+    /* Card-Sichtbarkeit: rideCard erst ab TRACKING sichtbar */
+    .state-idle #rideCard { display:none !important; }
     .ride-id{font-size:11px;opacity:.55;word-break:break-all;margin-top:4px}
     .hint{margin-top:8px;padding:10px 12px;border-radius:12px;background:rgba(199,217,44,.10);border:1px solid rgba(199,217,44,.30);font-size:13px;color:rgba(199,217,44,.9)}
     .hint.error{background:rgba(239,68,68,.10);border-color:rgba(239,68,68,.30);color:#f87171}
@@ -64,7 +67,7 @@
     <!-- ══════════════════════════════════════
          KARTE 1: GPS-TRACKING (IDLE → TRACKING)
     ═══════════════════════════════════════ -->
-    <div class="card show-idle show-tracking" id="trackCard">
+    <div class="card" id="trackCard">
       <div class="card-title">GPS-Tracking</div>
 
       <!-- IDLE: Driver ID + Tracking starten -->
@@ -97,7 +100,7 @@
     <!-- ══════════════════════════════════════
          KARTE 2: FAHRT ANBIETEN (TRACKING → AKTIVE FAHRT)
     ═══════════════════════════════════════ -->
-    <div class="card show-tracking show-ride" id="rideCard">
+    <div class="card" id="rideCard">
       <div class="card-title">Fahrt anbieten</div>
 
       <div id="rideHint" class="hint" style="display:none"></div>
