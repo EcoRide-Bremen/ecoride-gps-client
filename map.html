@@ -475,6 +475,7 @@
     const routePoints = new Map();
     const activeRides = new Map(); // NEU: rideId → v_aktive_fahrten row
     const endedDrivers = new Set(); // Fahrer mit bewusst beendeter Fahrt -> Marker sofort sperren
+    const recentlyEnded = new Set(); // Fahrer im 3-Min-Sperr-Fenster nach manuellem Ende
 
     let routesReady     = false;
     let routesVisible   = true;
@@ -984,10 +985,15 @@
     }
     // Timestamp letzten manuellen Ride-Endes – Impact-RPC für 3 Min. übersteuern
     let manualEndedAt = 0;
+    let manualEndedDriverKey = null; // driverKey des manuell beendeten Fahrers
 
     // Sofortiger Reset der Impact-Anzeige bei manuellem Ride-Ende
-    function resetImpactCounters() {
+    function resetImpactCounters(driverKey) {
       manualEndedAt = Date.now();
+      if (driverKey) {
+        manualEndedDriverKey = driverKey;
+        recentlyEnded.add(driverKey);
+      }
       // Timer stoppen damit kein Poll den Wert sofort überschreibt
       clearImpactTimer();
       const activeCount = positions.size; // 0 nach manuellem Ende
@@ -1000,6 +1006,8 @@
       // Erst nach 3 Min. wieder pollen (DB-Zeitfenster abgelaufen)
       setTimeout(() => {
         manualEndedAt = 0;
+        manualEndedDriverKey = null;
+        if (driverKey) recentlyEnded.delete(driverKey);
         scheduleImpactPoll();
       }, 3 * 60_000);
     }
@@ -1358,7 +1366,8 @@
         if (!row.ride_id) continue;
         const driverKey = normId(row.driver_id);
         if (!driverKey) continue;
-        endedDrivers.delete(driverKey);
+        // Fix A: recentlyEnded-Sperre respektieren – kein Delete wenn manuell beendet
+        if (!recentlyEnded.has(driverKey)) endedDrivers.delete(driverKey);
         if (positions.size > 0 && !positions.has(driverKey)) continue;
         activeRides.set(row.ride_id, row);
       }
@@ -1376,6 +1385,18 @@
           markerChanged = true;
         }
       }
+
+      // Fix B: Reload-Bug – Positionen ohne aktive Fahrt konsequent bereinigen
+      // (endedDrivers nach F5 leer → fetchLatest lädt letzte GPS-Position → Marker erscheint)
+      for (const key of [...positions.keys()]) {
+        if (!nowDriverKeys.has(key)) {
+          endedDrivers.add(key);
+          positions.delete(key);
+          routePoints.delete(key);
+          markerChanged = true;
+        }
+      }
+
       if (markerChanged) { refreshDriversSource(); refreshRoutesSource(); }
 
       refreshRidesSource();
@@ -1443,7 +1464,7 @@
               refreshRidesSource();
               refreshDriversSource();
               refreshRoutesSource();
-              resetImpactCounters(); // Aktiv sofort auf 0
+              resetImpactCounters(driverKey); // Aktiv sofort auf 0, driverKey sperren
               return;
             }
           }
@@ -1459,7 +1480,7 @@
             refreshRidesSource();
             refreshDriversSource();
             refreshRoutesSource();
-            resetImpactCounters(); // Aktiv sofort auf 0
+            resetImpactCounters(driverKey); // Aktiv sofort auf 0, driverKey sperren
             return;
           }
           if (ev === "INSERT" && payload.new?.status !== "aktiv") return;
