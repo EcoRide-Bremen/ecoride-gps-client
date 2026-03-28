@@ -1351,6 +1351,32 @@
 
     // ─────────────────────────────────────────────────
     // NEU: FETCH: AKTIVE FAHRTEN
+    // Lädt Position eines reaktivierten Fahrers direkt per driver_id (kein BBox-Filter)
+    // Retry bis Position in v_live_positions_latest sichtbar oder Timeout
+    async function fetchPositionWithRetry(driverKey, attempts = 5, delayMs = 1500) {
+      for (let i = 0; i < attempts; i++) {
+        if (i > 0) await new Promise(r => setTimeout(r, delayMs));
+        if (endedDrivers.has(driverKey)) return; // inzwischen wieder beendet
+        const { data, error } = await sb.from("v_live_positions_latest")
+          .select("driver_id,lat,lng,updated_at")
+          .ilike("driver_id", driverKey)
+          .limit(1);
+        if (error) { logError("ERR_FETCH_POS_RETRY", error.message); continue; }
+        const row = data?.[0];
+        if (!row) { logDebug("fetchPositionWithRetry: kein Eintrag (Versuch", i + 1, "):", driverKey); continue; }
+        const lat = Number(row.lat), lng = Number(row.lng);
+        if (!isValidLatLng(lat, lng)) return;
+        const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
+        if (Date.now() - ts > STALE_MS) return; // Position zu alt
+        const rawId = (row.driver_id ?? "").toString();
+        positions.set(driverKey, { rawId, lng, lat, ts });
+        logDebug("fetchPositionWithRetry: Position gesetzt (Versuch", i + 1, "):", driverKey);
+        refreshDriversSource();
+        return;
+      }
+      logDebug("fetchPositionWithRetry: kein Ergebnis nach", attempts, "Versuchen für", driverKey);
+    }
+
     // ─────────────────────────────────────────────────
     async function fetchActiveRides() {
       const seq = ++ridesFetchSeq;
@@ -1383,9 +1409,9 @@
         if (positions.size > 0 && !positions.has(driverKey)) continue;
         activeRides.set(row.ride_id, row);
       }
-      // Reaktivierte Fahrer: positions ist leer → sofort neu laden damit Marker erscheint
-      if (reactivatedDrivers.size > 0) {
-        fetchLatest().catch(() => {});
+      // Reaktivierte Fahrer: positions ist leer → Retry per driver_id bis Marker erscheint
+      for (const dk of reactivatedDrivers) {
+        fetchPositionWithRetry(dk).catch(() => {});
       }
 
       // Fahrer die nicht mehr in aktiven Rides sind → Marker sofort entfernen
@@ -1517,7 +1543,7 @@
                 endedDrivers.delete(dk);
                 activeRides.set(id, data);
                 refreshRidesSource();
-                if (wasBlocked) fetchLatest().catch(() => {}); // Position neu laden → Marker
+                if (wasBlocked) fetchPositionWithRetry(dk).catch(() => {}); // Position neu laden → Marker
                 logDebug("Ride geladen nach", i, "Retry(s):", id);
                 return;
               }
