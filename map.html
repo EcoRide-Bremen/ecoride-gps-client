@@ -105,32 +105,93 @@
     .mode-panel { margin-top: 8px; }
 
     /* ── Mitfahrer-Panel ── */
-    .passenger-fields {
+    .pax-block {
+      padding: 8px 10px 0;
+      box-sizing: border-box;
+      width: 100%;
+    }
+    .pax-block-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      opacity: 0.45;
+      margin-bottom: 6px;
+    }
+    .pax-btn {
+      width: 100%;
+      box-sizing: border-box;
+      height: 32px;
+      border-radius: 999px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid rgba(199,223,58,0.25);
+      background: rgba(17,24,37,0.28);
+      color: #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+    .pax-btn.active-pax {
+      background: rgba(199,223,58,0.85);
+      color: #0b0f14;
+      border-color: transparent;
+    }
+    .pax-status {
+      font-size: 12px;
+      padding: 6px 4px;
+      color: rgba(234,240,255,0.75);
+    }
+    .pax-status.set { color: #4ade80; }
+    .pax-divider {
+      border: none;
+      border-top: 1px solid rgba(255,255,255,0.07);
+      margin: 8px 10px;
+    }
+    .pax-time-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
       padding: 0 10px;
       box-sizing: border-box;
-      width: 100%;
     }
-    .passenger-section { margin-top: 8px; }
-    .passenger-section label {
-      display: block;
+    .pax-time-btn {
+      flex: 1 1 calc(33% - 4px);
+      min-width: 52px;
+      height: 30px;
+      border-radius: 999px;
+      font-size: 12px;
+      cursor: pointer;
+      border: 1px solid rgba(199,223,58,0.20);
+      background: rgba(17,24,37,0.28);
+      color: #e5e7eb;
+    }
+    .pax-time-btn.selected {
+      background: rgba(199,223,58,0.80);
+      color: #0b0f14;
+      border-color: transparent;
+    }
+    .pax-time-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+    .pax-locked-hint {
       font-size: 11px;
-      opacity: 0.6;
-      margin-bottom: 4px;
-      padding-left: 4px;
+      opacity: 0.5;
+      text-align: center;
+      padding: 4px 10px 0;
+      display: none;
     }
-    .passenger-section input {
-      max-width: 100%;
-      width: 100%;
-      box-sizing: border-box;
-      text-align: left;
-      padding: 0 12px;
-    }
+    .pax-locked-hint.show { display: block; }
     .passenger-hint {
       font-size: 11px;
       opacity: 0.5;
       text-align: center;
-      margin-top: 10px;
-      padding: 0 10px;
+      margin-top: 8px;
+      padding: 0 10px 8px;
     }
 
     .input-button-group {
@@ -467,21 +528,33 @@
 
     <!-- ── MITFAHRER-PANEL ── -->
     <div class="mode-panel" id="passengerPanel" style="display:none">
-      <div class="passenger-fields">
-        <div class="passenger-section">
-          <label>Mein Standort</label>
-          <input id="paxLocation" placeholder="z.B. Bremen Hbf" />
-        </div>
-        <div class="passenger-section">
-          <label>Richtung / Zielgebiet</label>
-          <input id="paxDestination" placeholder="z.B. Richtung Norden / Ikea" />
-        </div>
-        <div class="passenger-section">
-          <label>Zeitfenster (optional)</label>
-          <input id="paxTime" placeholder="z.B. jetzt / in 20 Min" />
-        </div>
+
+      <!-- Block 1: Standort / Treffpunkt -->
+      <div class="pax-block">
+        <div class="pax-block-title">Treffpunkt</div>
+        <button class="pax-btn" id="btnPaxGps">📍 Meinen Standort verwenden</button>
+        <button class="pax-btn" id="btnPaxMarker">🗺 Marker setzen / verschieben</button>
+        <div class="pax-status" id="paxMarkerStatus">Kein Treffpunkt gesetzt</div>
       </div>
-      <p class="passenger-hint">Passende Fahrer auf der Karte werden hervorgehoben.<br>Funktion in Entwicklung.</p>
+
+      <!-- Block 2: Zeitfenster (nur nach gesetztem Marker sichtbar) -->
+      <div id="paxTimeBlock" style="display:none">
+        <hr class="pax-divider" />
+        <div class="pax-block" style="padding-bottom:6px">
+          <div class="pax-block-title">Wann erreichst du den Treffpunkt?</div>
+        </div>
+        <div class="pax-time-grid" id="paxTimeGrid">
+          <button class="pax-time-btn" data-val="0">jetzt</button>
+          <button class="pax-time-btn" data-val="15">15 Min</button>
+          <button class="pax-time-btn" data-val="30">30 Min</button>
+          <button class="pax-time-btn" data-val="45">45 Min</button>
+          <button class="pax-time-btn" data-val="60">60 Min</button>
+          <button class="pax-time-btn" data-val="120">2 Std</button>
+        </div>
+        <div class="pax-locked-hint" id="paxLockedHint">Zum Ändern Suche abbrechen und neu starten</div>
+      </div>
+
+      <p class="passenger-hint" id="paxHint">Treffpunkt setzen um passende Fahrer zu sehen.</p>
     </div><!-- /passengerPanel -->
 
   </div>
@@ -657,6 +730,96 @@
 
     document.getElementById("btnModeDriver")?.addEventListener("click",    () => setMode("driver"));
     document.getElementById("btnModePassenger")?.addEventListener("click", () => setMode("passenger"));
+
+    // ─────────────────────────────────────────────────
+    // MITFAHRER-PANEL LOGIK
+    // ─────────────────────────────────────────────────
+    let paxMarker      = null;  // Mapbox Marker für Treffpunkt
+    let paxLat         = null;
+    let paxLng         = null;
+    let paxTimeMin     = null;  // gewähltes Zeitfenster in Minuten (0 = jetzt)
+    let paxSearchActive = false; // Suche gestartet → Zeitfenster gesperrt
+    let paxMarkerMode  = false; // Nutzer kann Marker per Klick setzen
+
+    function setPaxMarkerPos(lng, lat) {
+      paxLng = lng; paxLat = lat;
+      if (!paxMarker) {
+        paxMarker = new mapboxgl.Marker({ color: "#60a5fa", draggable: true })
+          .setLngLat([lng, lat])
+          .addTo(map);
+        paxMarker.on("dragend", () => {
+          const pos = paxMarker.getLngLat();
+          paxLng = pos.lng; paxLat = pos.lat;
+          updatePaxUI();
+        });
+      } else {
+        paxMarker.setLngLat([lng, lat]);
+      }
+      updatePaxUI();
+    }
+
+    function updatePaxUI() {
+      const statusEl    = document.getElementById("paxMarkerStatus");
+      const timeBlock   = document.getElementById("paxTimeBlock");
+      const lockedHint  = document.getElementById("paxLockedHint");
+      const hintEl      = document.getElementById("paxHint");
+      const timeBtns    = document.querySelectorAll(".pax-time-btn");
+      if (!statusEl) return;
+
+      if (paxLat !== null && paxLng !== null) {
+        statusEl.textContent = `Treffpunkt gesetzt ✅  (${paxLat.toFixed(5)}, ${paxLng.toFixed(5)})`;
+        statusEl.className = "pax-status set";
+        timeBlock.style.display = "";
+        hintEl.textContent = "Zeitfenster wählen, dann sind passende Fahrer sichtbar.";
+      } else {
+        statusEl.textContent = "Kein Treffpunkt gesetzt";
+        statusEl.className = "pax-status";
+        timeBlock.style.display = "none";
+        hintEl.textContent = "Treffpunkt setzen um passende Fahrer zu sehen.";
+      }
+
+      // Zeitfenster-Buttons: Auswahl anzeigen + Sperre
+      timeBtns.forEach(btn => {
+        const val = parseInt(btn.dataset.val);
+        btn.classList.toggle("selected", paxTimeMin === val);
+        btn.disabled = paxSearchActive;
+      });
+      lockedHint.classList.toggle("show", paxSearchActive);
+    }
+
+    // GPS-Standort → Marker setzen
+    document.getElementById("btnPaxGps")?.addEventListener("click", () => {
+      if (!navigator.geolocation) return showHint("GPS nicht verfügbar.");
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          const { longitude: lng, latitude: lat } = pos.coords;
+          setPaxMarkerPos(lng, lat);
+          map.easeTo({ center: [lng, lat], zoom: 15, duration: 600 });
+        },
+        err => showHint("GPS-Fehler: " + err.message)
+      );
+    });
+
+    // Marker per Kartenklick setzen
+    document.getElementById("btnPaxMarker")?.addEventListener("click", () => {
+      if (paxMarkerMode) {
+        paxMarkerMode = false;
+        document.getElementById("btnPaxMarker").classList.remove("active-pax");
+        showHint("");
+        return;
+      }
+      paxMarkerMode = true;
+      document.getElementById("btnPaxMarker").classList.add("active-pax");
+      showHint("Auf Karte tippen um Treffpunkt zu setzen.");
+    });
+
+    // Zeitfenster-Buttons
+    document.getElementById("paxTimeGrid")?.addEventListener("click", e => {
+      const btn = e.target.closest(".pax-time-btn");
+      if (!btn || btn.disabled) return;
+      paxTimeMin = parseInt(btn.dataset.val);
+      updatePaxUI();
+    });
 
     // ─────────────────────────────────────────────────
     // UTILS
@@ -1791,9 +1954,16 @@
       map = initMapbox();
       if (!map) return;
 
-      map.on("click", () => {
+      map.on("click", (e) => {
         if (markerPopup) { markerPopup.remove(); markerPopup = null; }
         if (ridePopup)   { ridePopup.remove();   ridePopup   = null; }
+        // Mitfahrer: Treffpunkt per Kartenklick setzen
+        if (paxMarkerMode) {
+          setPaxMarkerPos(e.lngLat.lng, e.lngLat.lat);
+          paxMarkerMode = false;
+          document.getElementById("btnPaxMarker")?.classList.remove("active-pax");
+          showHint("");
+        }
       });
 
       document.getElementById("panelTitle")?.addEventListener("click", () => {
