@@ -1011,7 +1011,7 @@
       // (DB-Zeitfenster zählt noch 2 Min. lang alte GPS-Punkte)
       const sinceManualEnd = Date.now() - manualEndedAt;
       if (manualEndedAt > 0 && sinceManualEnd < 3 * 60_000) {
-        setSafeTextContent("impactActive", String(positions.size));
+        setSafeTextContent("impactActive", "0");
         setSafeTextContent("impactMarkers", String(positions.size));
         scheduleImpactPoll();
         return;
