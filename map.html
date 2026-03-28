@@ -825,9 +825,10 @@
       const btn = e.target.closest(".pax-time-btn");
       if (!btn || btn.disabled) return;
       if (btn.id === "btnPaxMoreTime") {
-        // Erweiterte Optionen einblenden, "mehr anzeigen" ausblenden
-        document.querySelectorAll(".pax-time-more").forEach(b => b.style.display = "");
-        btn.style.display = "none";
+        const expanded = btn.dataset.expanded === "1";
+        document.querySelectorAll(".pax-time-more").forEach(b => b.style.display = expanded ? "none" : "");
+        btn.dataset.expanded = expanded ? "0" : "1";
+        btn.textContent = expanded ? "mehr anzeigen" : "weniger anzeigen";
         return;
       }
       if (!btn.dataset.val) return;
