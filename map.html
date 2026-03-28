@@ -1393,15 +1393,18 @@
         }
       }
 
-      // Fix B: Reload-Bug – Positionen ohne aktive Fahrt konsequent bereinigen
-      // (endedDrivers nach F5 leer → fetchLatest lädt letzte GPS-Position → Marker erscheint)
-      for (const key of [...positions.keys()]) {
-        if (!nowDriverKeys.has(key)) {
-          endedDrivers.add(key);
-          positions.delete(key);
-          routePoints.delete(key);
-          markerChanged = true;
-        }
+      // Fix B: Reload-Bug – Positionen ohne aktive Fahrt bereinigen
+      // Schonfenster 10s: frisch gestartete Fahrten erscheinen kurz vor v_aktive_fahrten-JOIN
+      const now = Date.now();
+      for (const [key, pos] of positions.entries()) {
+        if (nowDriverKeys.has(key)) continue;
+        if (recentlyEnded.has(key)) continue; // manuell gesperrt → bereits behandelt
+        const posAge = now - (pos.ts ?? 0);
+        if (posAge < 10_000) continue; // Schonfenster: frische Position nicht sofort löschen
+        endedDrivers.add(key);
+        positions.delete(key);
+        routePoints.delete(key);
+        markerChanged = true;
       }
 
       if (markerChanged) { refreshDriversSource(); refreshRoutesSource(); }
