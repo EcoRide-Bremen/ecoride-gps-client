@@ -864,13 +864,24 @@
     let paxSearchActive = false; // Suche gestartet → Zeitfenster gesperrt
     let paxMarkerMode  = false; // Nutzer kann Marker per Klick setzen
 
+    // Gibt true zurück wenn Cooldown aktiv → Suchparameter dürfen nicht geändert werden
+    function isPaxInputLocked() {
+      return Date.now() < paxCooldownUntil;
+    }
+
     function setPaxMarkerPos(lng, lat) {
+      if (isPaxInputLocked()) return; // Cooldown: Marker-Änderung gesperrt
       paxLng = lng; paxLat = lat;
       if (!paxMarker) {
         paxMarker = new mapboxgl.Marker({ color: "#60a5fa", draggable: true })
           .setLngLat([lng, lat])
           .addTo(map);
         paxMarker.on("dragend", () => {
+          if (isPaxInputLocked()) {
+            // Marker zurücksetzen wenn Cooldown aktiv
+            paxMarker.setLngLat([paxLng, paxLat]);
+            return;
+          }
           const pos = paxMarker.getLngLat();
           paxLng = pos.lng; paxLat = pos.lat;
           updatePaxUI();
@@ -922,20 +933,25 @@
         hintEl.textContent = "Suche aktiv – passende Fahrer sind hervorgehoben.";
       }
 
-      // Zeitfenster-Buttons: Auswahl anzeigen + Sperre
+      // Zeitfenster-Buttons: bei aktiver Suche ODER Cooldown sperren
+      const onCooldown = isPaxInputLocked();
       timeBtns.forEach(btn => {
         const val = parseInt(btn.dataset.val);
         btn.classList.toggle("selected", paxTimeMin === val);
-        btn.disabled = paxSearchActive;
+        btn.disabled = paxSearchActive || onCooldown;
       });
       lockedHint.classList.toggle("show", paxSearchActive);
 
+      // GPS + Marker-Buttons während Cooldown sperren
+      const btnGps    = document.getElementById("btnPaxGps");
+      const btnMarker = document.getElementById("btnPaxMarker");
+      if (btnGps)    btnGps.disabled    = paxSearchActive || onCooldown;
+      if (btnMarker) btnMarker.disabled = paxSearchActive || onCooldown;
+
       // Such-Button & Abbrechen-Button
-      const onCooldown = Date.now() < paxCooldownUntil;
       if (searchBtn) searchBtn.disabled = paxSearchActive || onCooldown;
       if (cancelBtn) cancelBtn.classList.toggle("show", paxSearchActive);
       if (zielInput) zielInput.disabled = paxSearchActive;
-      // Zeitfenster: nur bei aktiver Suche sperren – Cooldown lässt Eingabe frei
     }
 
     // GPS-Standort → Marker setzen
@@ -1050,18 +1066,19 @@
 
     function isPaxRateLimited() {
       const now = Date.now();
-      // Alte Einträge außerhalb des Zeitfensters entfernen
+      // Alte Einträge außerhalb des Zeitfensters bereinigen
       while (paxStartTimes.length && now - paxStartTimes[0] > PAX_MAX_WINDOW_MS) {
         paxStartTimes.shift();
       }
+      // Bereits >= MAX_STARTS im Fenster → gesperrt
       return paxStartTimes.length >= PAX_MAX_STARTS;
     }
 
     function runPaxSearch() {
       if (!map || paxLat === null || paxLng === null || paxTimeMin === null) return;
-      if (Date.now() < paxCooldownUntil) return; // Cooldown nach Abbrechen läuft noch
+      if (isPaxInputLocked()) return; // Cooldown nach Abbrechen läuft noch
 
-      // Rate-Limit: zu viele Neustarts nach Abbrechen in kurzer Zeit
+      // Rate-Limit: zu viele Neustarts in kurzer Zeit
       if (isPaxRateLimited()) {
         const statusEl = document.getElementById("paxMatchStatus");
         if (statusEl) {
@@ -1072,7 +1089,7 @@
         return;
       }
 
-      // Start-Timestamp für Rate-Limit erfassen
+      // Start-Timestamp VOR dem Matching erfassen (zählt für nächste Prüfung)
       paxStartTimes.push(Date.now());
 
       const zielText = (document.getElementById("paxZielInput")?.value || "").trim();
@@ -2155,12 +2172,15 @@
       map.on("click", (e) => {
         if (markerPopup) { markerPopup.remove(); markerPopup = null; }
         if (ridePopup)   { ridePopup.remove();   ridePopup   = null; }
-        // Mitfahrer: Treffpunkt per Kartenklick setzen
+        // Mitfahrer: Treffpunkt per Kartenklick setzen (nur wenn kein Cooldown)
         if (paxMarkerMode) {
-          setPaxMarkerPos(e.lngLat.lng, e.lngLat.lat);
-          paxMarkerMode = false;
-          document.getElementById("btnPaxMarker")?.classList.remove("active-pax");
-          showHint("");
+          if (!isPaxInputLocked()) {
+            setPaxMarkerPos(e.lngLat.lng, e.lngLat.lat);
+            paxMarkerMode = false;
+            document.getElementById("btnPaxMarker")?.classList.remove("active-pax");
+            showHint("");
+          }
+          // Bei Cooldown: Marker-Modus bleibt aktiv, Klick wird ignoriert
         }
       });
 
