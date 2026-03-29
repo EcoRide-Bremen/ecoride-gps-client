@@ -881,6 +881,14 @@
       paxMarker.setDraggable(isPaxMarkerDraggable());
     }
 
+    // Marker-Setzmodus sauber beenden (Button-State + interne Flag)
+    function exitPaxMarkerMode() {
+      if (!paxMarkerMode) return;
+      paxMarkerMode = false;
+      const btn = document.getElementById("btnPaxMarker");
+      if (btn) btn.classList.remove("active-pax");
+    }
+
     function setPaxMarkerPos(lng, lat) {
       if (isPaxInputLocked()) return; // Cooldown: Marker-Änderung gesperrt
       paxLng = lng; paxLat = lat;
@@ -965,6 +973,11 @@
 
       // Marker-Draggability synchron halten
       syncPaxMarkerDraggable();
+
+      // Marker-Setzmodus beenden sobald Zeitfenster gewählt, Suche aktiv oder Cooldown
+      if (paxTimeMin !== null || paxSearchActive || onCooldown) {
+        exitPaxMarkerMode();
+      }
     }
 
     // GPS-Standort → Marker setzen
