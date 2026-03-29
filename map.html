@@ -907,8 +907,8 @@
 
     // Gibt true zurück wenn der Marker aktuell verschiebbar sein darf
     function isPaxMarkerDraggable() {
-      // Nur verschiebbar wenn: keine aktive Suche, kein Cooldown
-      return !paxSearchActive && !isPaxInputLocked();
+      // Nur verschiebbar wenn explizit im manuellen Marker-Modus
+      return paxMarkerMode && !paxSearchActive && !isPaxInputLocked();
     }
 
     // Draggability des Markers an aktuellen State anpassen
@@ -973,18 +973,18 @@
       updatePaxUI();
     });
 
-    function setPaxMarkerPos(lng, lat) {
-      if (isPaxInputLocked()) return; // Cooldown: Marker-Änderung gesperrt
+    function setPaxMarkerPos(lng, lat, fromGps = false) {
+      if (isPaxInputLocked()) return;
       paxLng = lng; paxLat = lat;
+      if (!fromGps) paxHasGps = false; // manuell gesetzt → GPS-Verifikation aufgehoben
       if (!paxMarker) {
         paxMarker = new mapboxgl.Marker({ color: "#60a5fa", draggable: isPaxMarkerDraggable() })
           .setLngLat([lng, lat])
           .addTo(map);
         paxMarker.on("dragend", () => {
-          // Draggability ist bereits deaktiviert wenn nicht erlaubt –
-          // dieser Handler feuert also nur wenn wirklich erlaubt
           const pos = paxMarker.getLngLat();
           paxLng = pos.lng; paxLat = pos.lat;
+          paxHasGps = false; // manuell verschoben → GPS-Verifikation aufgehoben
           updatePaxUI();
         });
       } else {
@@ -1096,9 +1096,9 @@
       navigator.geolocation.getCurrentPosition(
         pos => {
           const { longitude: lng, latitude: lat } = pos.coords;
-          paxHasGps = true;           // GPS-Verifikation gesetzt
-          exitPaxMarkerMode();        // sicherheitshalber Marker-Modus beenden
-          setPaxMarkerPos(lng, lat);  // Marker setzen ohne Bearbeitungsmodus
+          paxHasGps = true;                    // GPS-Verifikation gesetzt
+          exitPaxMarkerMode();               // Marker-Modus beenden (GPS = kein manueller Modus)
+          setPaxMarkerPos(lng, lat, true);   // fromGps=true → paxHasGps bleibt true
           map.easeTo({ center: [lng, lat], zoom: 15, duration: 600 });
           updatePaxUI();              // Such-Button entsperren
         },
