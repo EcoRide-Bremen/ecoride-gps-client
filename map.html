@@ -997,14 +997,21 @@
     // Marker per Kartenklick setzen
     document.getElementById("btnPaxMarker")?.addEventListener("click", () => {
       if (paxMarkerMode) {
+        // Modus beenden
         paxMarkerMode = false;
         document.getElementById("btnPaxMarker").classList.remove("active-pax");
         showHint("");
+        updatePaxUI();
         return;
       }
+      // Marker-Modus (wieder) aktivieren:
+      // Zeitfenster zurücksetzen damit isPaxMarkerDraggable() true liefert
+      // und exitPaxMarkerMode() nicht sofort feuert
+      paxTimeMin = null;
       paxMarkerMode = true;
       document.getElementById("btnPaxMarker").classList.add("active-pax");
       showHint("Auf Karte tippen um Treffpunkt zu setzen.");
+      updatePaxUI(); // Draggability sofort aktivieren
     });
 
     // Zeitfenster-Buttons
