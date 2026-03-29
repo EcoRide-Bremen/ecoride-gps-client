@@ -273,8 +273,9 @@
       display: none;
     }
     .pax-match-status.show { display: block; }
-    .pax-match-status.found { color: #4ade80; }
-    .pax-match-status.none  { color: rgba(234,240,255,0.45); }
+    .pax-match-status.found    { color: #4ade80; }
+    .pax-match-status.none     { color: rgba(234,240,255,0.45); }
+    .pax-match-status.cooldown { color: #fbbf24; }
 
     .input-button-group {
       width:100%;
@@ -798,6 +799,14 @@
     // NEU: Mitfahrer-Suche State
     const paxMatchedKeys = new Set();  // driverKeys der gematchten Fahrer
 
+    // Cooldown-Schutz
+    const PAX_COOLDOWN_MS      = 12_000;  // 12s nach Start oder Abbrechen
+    const PAX_MAX_STARTS       = 4;       // max. Neustarts im Zeitfenster
+    const PAX_MAX_WINDOW_MS    = 60_000;  // Zeitfenster für Limit (60s)
+    let paxCooldownUntil       = 0;       // Timestamp bis wann gesperrt
+    let paxCooldownTimer       = null;    // Interval für Countdown-Anzeige
+    const paxStartTimes        = [];      // Timestamps der letzten Suchstarts
+
     // ─────────────────────────────────────────────────
     // MODUS-UMSCHALTER (Fahrer / Mitfahrer)
     // ─────────────────────────────────────────────────
@@ -922,9 +931,14 @@
       lockedHint.classList.toggle("show", paxSearchActive);
 
       // Such-Button & Abbrechen-Button
-      if (searchBtn) searchBtn.disabled = paxSearchActive;
+      const onCooldown = Date.now() < paxCooldownUntil;
+      if (searchBtn) searchBtn.disabled = paxSearchActive || onCooldown;
       if (cancelBtn) cancelBtn.classList.toggle("show", paxSearchActive);
       if (zielInput) zielInput.disabled = paxSearchActive;
+      // Zeitfenster auch bei Cooldown (aber nicht aktiver Suche) sperren
+      if (!paxSearchActive && onCooldown) {
+        timeBtns.forEach(btn => { btn.disabled = true; });
+      }
     }
 
     // GPS-Standort → Marker setzen
@@ -1011,8 +1025,58 @@
       return true;
     }
 
+    // ─── Cooldown-Helfer ───
+    function startPaxCooldown() {
+      if (paxCooldownTimer) { clearInterval(paxCooldownTimer); paxCooldownTimer = null; }
+      paxCooldownUntil = Date.now() + PAX_COOLDOWN_MS;
+      const statusEl = document.getElementById("paxMatchStatus");
+      paxCooldownTimer = setInterval(() => {
+        const remaining = Math.ceil((paxCooldownUntil - Date.now()) / 1000);
+        if (remaining <= 0) {
+          clearInterval(paxCooldownTimer);
+          paxCooldownTimer = null;
+          // Cooldown abgelaufen → UI entsperren
+          updatePaxUI();
+          if (statusEl && statusEl.classList.contains("cooldown")) {
+            statusEl.className = "pax-match-status";
+            statusEl.textContent = "";
+          }
+        } else {
+          if (statusEl) {
+            statusEl.textContent = `Bitte kurz warten… noch ${remaining}s`;
+            statusEl.className = "pax-match-status show cooldown";
+          }
+          updatePaxUI(); // Button+Zeitfenster gesperrt halten
+        }
+      }, 500);
+    }
+
+    function isPaxRateLimited() {
+      const now = Date.now();
+      // Alte Einträge außerhalb des Zeitfensters entfernen
+      while (paxStartTimes.length && now - paxStartTimes[0] > PAX_MAX_WINDOW_MS) {
+        paxStartTimes.shift();
+      }
+      return paxStartTimes.length >= PAX_MAX_STARTS;
+    }
+
     function runPaxSearch() {
       if (!map || paxLat === null || paxLng === null || paxTimeMin === null) return;
+      if (Date.now() < paxCooldownUntil) return; // Cooldown läuft noch
+
+      // Rate-Limit: zu viele Neustarts in kurzer Zeit
+      if (isPaxRateLimited()) {
+        const statusEl = document.getElementById("paxMatchStatus");
+        if (statusEl) {
+          statusEl.textContent = "Zu viele Suchanfragen – bitte kurz warten.";
+          statusEl.className = "pax-match-status show cooldown";
+        }
+        startPaxCooldown();
+        return;
+      }
+
+      // Start-Timestamp erfassen
+      paxStartTimes.push(Date.now());
 
       const zielText = (document.getElementById("paxZielInput")?.value || "").trim();
       const now      = Date.now();
@@ -1028,7 +1092,6 @@
         // 2. Nähe zum Treffpunkt
         const distKm = haversineKm(paxLat, paxLng, pos.lat, pos.lng);
         if (distKm > PAX_MATCH_RADIUS_KM + paxTimeMin * 0.5) continue;
-        // (leicht erweiterter Radius wenn Mitfahrer noch etwas Zeit hat)
 
         // 3. Richtung / Zielgebiet (grob)
         if (!driverHeadsTowardZiel(driverKey, zielText)) continue;
@@ -1051,6 +1114,9 @@
           statusEl.className = "pax-match-status show none";
         }
       }
+
+      // Cooldown starten (Such-Button + Zeitfenster für 12s gesperrt)
+      startPaxCooldown();
     }
 
     function cancelPaxSearch() {
@@ -1060,6 +1126,8 @@
       updatePaxUI();
       const statusEl = document.getElementById("paxMatchStatus");
       if (statusEl) statusEl.className = "pax-match-status";
+      // Auch nach Abbrechen Cooldown starten
+      startPaxCooldown();
     }
 
     // Highlight-Layer auf der Karte aktualisieren
@@ -2199,6 +2267,7 @@
       try { if (map && map.getSource(RIDES_ROUTE_SOURCE)) map.removeSource(RIDES_ROUTE_SOURCE); } catch (_) {}
       try { if (map && map.getLayer(LAYER_PAX_MATCH)) map.removeLayer(LAYER_PAX_MATCH); } catch (_) {}
       try { if (map && map.getSource(PAX_MATCH_SOURCE)) map.removeSource(PAX_MATCH_SOURCE); } catch (_) {}
+      try { if (paxCooldownTimer) { clearInterval(paxCooldownTimer); paxCooldownTimer = null; } } catch (_) {}
       try { if (markerPopup) markerPopup.remove(); } catch (_) {}
       try { if (ridePopup)   ridePopup.remove();   } catch (_) {} // NEU
       try { if (map) map.remove(); } catch (_) {}
