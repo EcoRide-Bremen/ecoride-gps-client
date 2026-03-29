@@ -967,6 +967,7 @@
         updatePaxUI();
         return;
       }
+      exitPaxMarkerMode(); // sicherstellen dass Treffpunkt-Modus beendet ist
       paxTargetMode = true;
       document.getElementById("btnPaxTarget").classList.add("active-pax");
       showHint("Ziel auf der Karte antippen.");
@@ -1116,7 +1117,8 @@
         updatePaxUI();
         return;
       }
-      // Marker-Modus (wieder) aktivieren – Zeitfenster und Zieltext bleiben erhalten
+      // Marker-Modus aktivieren – Ziel-Modus beenden falls aktiv
+      exitPaxTargetMode();
       paxMarkerMode = true;
       document.getElementById("btnPaxMarker").classList.add("active-pax");
       showHint("Auf Karte tippen um Treffpunkt zu setzen.");
@@ -2367,8 +2369,9 @@
       map.on("click", (e) => {
         if (markerPopup) { markerPopup.remove(); markerPopup = null; }
         if (ridePopup)   { ridePopup.remove();   ridePopup   = null; }
-        // Mitfahrer: Treffpunkt per Kartenklick setzen (nur wenn kein Cooldown)
+        // Mitfahrer: Modi sind gegenseitig ausschließend (else if)
         if (paxMarkerMode) {
+          // Treffpunkt per Kartenklick setzen
           if (!isPaxInputLocked()) {
             setPaxMarkerPos(e.lngLat.lng, e.lngLat.lat);
             paxMarkerMode = false;
@@ -2376,9 +2379,8 @@
             showHint("");
           }
           // Bei Cooldown: Modus bleibt aktiv, Klick wird ignoriert
-        }
-        // Mitfahrer: Zielmarker per Kartenklick setzen
-        if (paxTargetMode) {
+        } else if (paxTargetMode) {
+          // Zielmarker per Kartenklick setzen
           if (!isPaxInputLocked() && !paxSearchActive) {
             setPaxTargetPos(e.lngLat.lng, e.lngLat.lat);
             paxTargetMode = false;
