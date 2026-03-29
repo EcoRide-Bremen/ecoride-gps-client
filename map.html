@@ -251,22 +251,13 @@
       letter-spacing: 0.02em;
     }
 
-    /* ── Mitfahrer: Zielgebiet-Input ── */
-    .pax-ziel-input {
-      width: 100%;
-      box-sizing: border-box;
-      max-width: unset;
-      background: rgba(17,24,37,0.35);
-      border: 1px solid rgba(199,223,58,0.22);
-      height: 32px;
-      padding: 0 14px;
-      border-radius: 999px;
-      font-size: 13px;
-      color: #e5e7eb;
-      text-align: left;
+    /* Zielmarker-Button: grüner Akzent zur visuellen Unterscheidung vom Treffpunkt */
+    #btnPaxTarget.active-pax {
+      background: rgba(74,222,128,0.85);
+      color: #0b0f14;
+      border-color: transparent;
     }
-    .pax-ziel-input:disabled { opacity: 0.4; }
-    .pax-ziel-input::placeholder { color: rgba(234,240,255,0.38); }
+    #paxTargetStatus.set { color: #4ade80; }
 
     /* ── Mitfahrer: Such-Buttons ── */
     .pax-search-actions {
@@ -674,13 +665,19 @@
         <div class="pax-locked-hint" id="paxLockedHint">Zum Ändern Suche abbrechen und neu starten</div>
       </div>
 
-      <!-- Block 3: Zielgebiet + Suche (nur wenn Marker + Zeitfenster gesetzt) -->
+      <!-- Block 3: Zielmarker (nur wenn Treffpunkt gesetzt) -->
+      <div id="paxTargetBlock" style="display:none">
+        <hr class="pax-divider" />
+        <div class="pax-block">
+          <div class="pax-block-title">Ziel / Richtung</div>
+          <button class="pax-btn" id="btnPaxTarget">Ziel auf Karte setzen / verschieben</button>
+          <div class="pax-status" id="paxTargetStatus">Kein Ziel gesetzt</div>
+        </div>
+      </div>
+
+      <!-- Block 4: Suche starten (nur wenn Treffpunkt + Ziel gesetzt) -->
       <div id="paxSearchBlock" style="display:none">
         <hr class="pax-divider" />
-        <div class="pax-block" style="padding-bottom:6px">
-          <div class="pax-block-title">In welche Richtung möchtest du?</div>
-          <input id="paxZielInput" class="pax-ziel-input" placeholder="z.B. Bremen-Mitte, Hauptbahnhof…" autocomplete="off" maxlength="40" />
-        </div>
         <div class="pax-search-actions">
           <button class="pax-search-btn" id="btnPaxSearch">Passende Fahrer finden</button>
           <button class="pax-cancel-btn" id="btnPaxCancel">✕ Abbrechen</button>
@@ -829,6 +826,12 @@
     // NEU: Mitfahrer-Suche State
     const paxMatchedKeys = new Set();  // driverKeys der gematchten Fahrer
 
+    // Zielmarker State
+    let paxTargetLat    = null;
+    let paxTargetLng    = null;
+    let paxTargetMarker = null;
+    let paxTargetMode   = false;
+
     // Cooldown-Schutz (nur nach „Abbrechen")
     const PAX_COOLDOWN_MS      = 15_000;  // 15s Cooldown nach Abbrechen
     const PAX_MAX_STARTS       = 3;       // max. 3 Neustarts im Zeitfenster
@@ -919,6 +922,49 @@
       if (btn) btn.classList.remove("active-pax");
     }
 
+    // ── Zielmarker ──
+    function setPaxTargetPos(lng, lat) {
+      if (isPaxInputLocked() || paxSearchActive) return;
+      paxTargetLng = lng; paxTargetLat = lat;
+      if (!paxTargetMarker) {
+        paxTargetMarker = new mapboxgl.Marker({ color: "#4ade80", draggable: true })
+          .setLngLat([lng, lat])
+          .addTo(map);
+        paxTargetMarker.on("dragend", () => {
+          if (isPaxInputLocked() || paxSearchActive) {
+            paxTargetMarker.setLngLat([paxTargetLng, paxTargetLat]);
+            return;
+          }
+          const pos = paxTargetMarker.getLngLat();
+          paxTargetLng = pos.lng; paxTargetLat = pos.lat;
+          updatePaxUI();
+        });
+      } else {
+        paxTargetMarker.setLngLat([lng, lat]);
+      }
+      updatePaxUI();
+    }
+
+    function exitPaxTargetMode() {
+      if (!paxTargetMode) return;
+      paxTargetMode = false;
+      const btn = document.getElementById("btnPaxTarget");
+      if (btn) btn.classList.remove("active-pax");
+    }
+
+    document.getElementById("btnPaxTarget")?.addEventListener("click", () => {
+      if (paxTargetMode) {
+        paxTargetMode = false;
+        document.getElementById("btnPaxTarget").classList.remove("active-pax");
+        updatePaxUI();
+        return;
+      }
+      paxTargetMode = true;
+      document.getElementById("btnPaxTarget").classList.add("active-pax");
+      showHint("Ziel auf der Karte antippen.");
+      updatePaxUI();
+    });
+
     function setPaxMarkerPos(lng, lat) {
       if (isPaxInputLocked()) return; // Cooldown: Marker-Änderung gesperrt
       paxLng = lng; paxLat = lat;
@@ -941,13 +987,15 @@
 
     function updatePaxUI() {
       const statusEl    = document.getElementById("paxMarkerStatus");
-      const timeBlock   = document.getElementById("paxTimeBlock");
-      const lockedHint  = document.getElementById("paxLockedHint");
-      const hintEl      = document.getElementById("paxHint");
-      const searchBlock = document.getElementById("paxSearchBlock");
+      const timeBlock    = document.getElementById("paxTimeBlock");
+      const lockedHint   = document.getElementById("paxLockedHint");
+      const hintEl       = document.getElementById("paxHint");
+      const targetBlock  = document.getElementById("paxTargetBlock");
+      const targetStatus = document.getElementById("paxTargetStatus");
+      const btnTarget    = document.getElementById("btnPaxTarget");
+      const searchBlock  = document.getElementById("paxSearchBlock");
       const searchBtn   = document.getElementById("btnPaxSearch");
       const cancelBtn   = document.getElementById("btnPaxCancel");
-      const zielInput   = document.getElementById("paxZielInput");
       if (!statusEl) return;
 
       const hasMarker = paxLat !== null && paxLng !== null;
@@ -965,16 +1013,40 @@
         hintEl.textContent = "Treffpunkt setzen um passende Fahrer zu sehen.";
       }
 
-      // Suchblock: nur wenn Marker + Zeitfenster gewählt
+      const hasTarget = paxTargetLat !== null && paxTargetLng !== null;
+
+      // Zielblock: sichtbar sobald Treffpunkt gesetzt
+      if (targetBlock) targetBlock.style.display = hasMarker ? "" : "none";
+
+      // Zielstatus
+      if (targetStatus) {
+        if (hasTarget) {
+          targetStatus.textContent = `Ziel gesetzt ✅  (${paxTargetLat.toFixed(5)}, ${paxTargetLng.toFixed(5)})`;
+          targetStatus.className = "pax-status set";
+        } else {
+          targetStatus.textContent = "Kein Ziel gesetzt";
+          targetStatus.className = "pax-status";
+        }
+      }
+
+      // Ziel-Button: gesperrt bei aktiver Suche oder Cooldown
+      if (btnTarget) {
+        btnTarget.disabled = paxSearchActive || onCooldown;
+        btnTarget.classList.toggle("active-pax", paxTargetMode);
+      }
+
+      // Suchblock: nur wenn Treffpunkt + Ziel gesetzt
       if (searchBlock) {
-        searchBlock.style.display = (hasMarker && hasTime) ? "" : "none";
+        searchBlock.style.display = (hasMarker && hasTarget) ? "" : "none";
       }
 
       // Hint-Text je nach Status
-      if (hasMarker && !hasTime) {
-        hintEl.textContent = "Startzeit wählen, dann Suche starten.";
-      } else if (hasMarker && hasTime && !paxSearchActive) {
-        hintEl.textContent = "Zielgebiet eingeben und Suche starten.";
+      if (!hasMarker) {
+        hintEl.textContent = "Treffpunkt setzen um die Suche vorzubereiten.";
+      } else if (hasMarker && !hasTarget) {
+        hintEl.textContent = "Ziel auf der Karte setzen.";
+      } else if (hasMarker && hasTarget && !paxSearchActive) {
+        hintEl.textContent = "Suche starten wenn du bereit bist.";
       } else if (paxSearchActive) {
         hintEl.textContent = "Suche aktiv – passende Fahrer sind hervorgehoben.";
       }
@@ -990,19 +1062,18 @@
       if (btnGps)    btnGps.disabled    = paxSearchActive || onCooldown;
       if (btnMarker) btnMarker.disabled = paxSearchActive || onCooldown;
 
-      // Such-Button: gesperrt wenn aktive Suche, Cooldown, oder Zielfeld ungültig
-      const zielVal = zielInput ? zielInput.value.trim() : "";
-      const zielOk  = validatePaxZiel(zielVal).ok;
-      if (searchBtn) searchBtn.disabled = paxSearchActive || onCooldown || !zielOk;
+      // Such-Button: gesperrt wenn aktive Suche, Cooldown, oder kein Ziel gesetzt
+      const hasTargetForBtn = paxTargetLat !== null && paxTargetLng !== null;
+      if (searchBtn) searchBtn.disabled = paxSearchActive || onCooldown || !hasTargetForBtn;
       if (cancelBtn) cancelBtn.classList.toggle("show", paxSearchActive);
-      if (zielInput) zielInput.disabled = paxSearchActive;
 
       // Marker-Draggability synchron halten
       syncPaxMarkerDraggable();
 
-      // Marker-Setzmodus beenden sobald Suche aktiv oder Cooldown
+      // Modi beenden sobald Suche aktiv oder Cooldown
       if (paxSearchActive || onCooldown) {
         exitPaxMarkerMode();
+        exitPaxTargetMode();
       }
     }
 
@@ -1145,30 +1216,20 @@
 
     // Prüft ob ein Fahrer grob in Richtung Zielgebiet fährt
     // (letzte 2 Routenpunkte → Richtungsvektor)
-    function driverHeadsTowardZiel(driverKey, zielText) {
-      if (!zielText || zielText.length < 2) return true; // kein Ziel → immer OK
+    // Prüft ob Fahrer grob in Richtung Zielmarker fährt (Dot-Produkt)
+    function driverHeadsTowardTarget(driverKey) {
+      if (paxTargetLat === null || paxTargetLng === null) return true;
+      const wantDLng = paxTargetLng - paxLng;
+      const wantDLat = paxTargetLat - paxLat;
+      if (Math.abs(wantDLng) < 0.001 && Math.abs(wantDLat) < 0.001) return true;
       const pts = routePoints.get(driverKey);
-      if (!pts || pts.length < 2) return true; // keine Route → nicht ausschließen
-      // Richtungsvektor aus letzten zwei Punkten
+      if (!pts || pts.length < 2) return true;
       const p1 = pts[pts.length - 2];
       const p2 = pts[pts.length - 1];
-      const dLng = p2.lng - p1.lng;
-      const dLat = p2.lat - p1.lat;
-      // Grobe Himmelsrichtung aus Zieltext (einfaches Keyword-Matching)
-      const z = zielText.toLowerCase();
-      const goesNorth = dLat > 0.0001;
-      const goesSouth = dLat < -0.0001;
-      const goesEast  = dLng > 0.0001;
-      const goesWest  = dLng < -0.0001;
-      const wantNorth = /nord|norden|north/.test(z);
-      const wantSouth = /süd|sued|south/.test(z);
-      const wantEast  = /ost|east|osten/.test(z);
-      const wantWest  = /west|westen/.test(z);
-      if (wantNorth && goesSouth) return false;
-      if (wantSouth && goesNorth) return false;
-      if (wantEast  && goesWest)  return false;
-      if (wantWest  && goesEast)  return false;
-      return true;
+      const drivDLng = p2.lng - p1.lng;
+      const drivDLat = p2.lat - p1.lat;
+      if (Math.abs(drivDLng) < 0.00005 && Math.abs(drivDLat) < 0.00005) return true;
+      return (wantDLng * drivDLng + wantDLat * drivDLat) >= 0;
     }
 
     // ─── Cooldown-Helfer ───
@@ -1208,41 +1269,27 @@
     }
 
     function runPaxSearch() {
-      if (!map || paxLat === null || paxLng === null || paxTimeMin === null) return;
-      if (isPaxInputLocked()) return; // Cooldown nach Abbrechen läuft noch
+      if (!map || paxLat === null || paxLng === null) return;
+      if (paxTargetLat === null || paxTargetLng === null) return;
+      if (isPaxInputLocked()) return;
 
-      // Rate-Limit: zu viele Neustarts in kurzer Zeit
       if (isPaxRateLimited()) {
         const statusEl = document.getElementById("paxMatchStatus");
-        if (statusEl) {
-          statusEl.textContent = "Zu viele Neustarts – bitte kurz warten.";
-          statusEl.className = "pax-match-status show cooldown";
-        }
+        if (statusEl) { statusEl.textContent = "Zu viele Neustarts – bitte kurz warten."; statusEl.className = "pax-match-status show cooldown"; }
         startPaxCooldown();
         return;
       }
 
-      // Start-Timestamp VOR dem Matching erfassen (zählt für nächste Prüfung)
       paxStartTimes.push(Date.now());
-
-      const zielText = (document.getElementById("paxZielInput")?.value || "").trim();
-      const now      = Date.now();
+      const now = Date.now();
       paxMatchedKeys.clear();
 
       for (const [driverKey, pos] of positions.entries()) {
         if (endedDrivers.has(driverKey)) continue;
-
-        // 1. Frisch? (Tracking aktiv)
-        const ageMs = now - (pos.ts || 0);
-        if (ageMs > STALE_MS) continue;
-
-        // 2. Nähe zum Treffpunkt
+        if (now - (pos.ts || 0) > STALE_MS) continue;
         const distKm = haversineKm(paxLat, paxLng, pos.lat, pos.lng);
         if (distKm > PAX_MATCH_RADIUS_KM + paxTimeMin * 0.5) continue;
-
-        // 3. Richtung / Zielgebiet (grob)
-        if (!driverHeadsTowardZiel(driverKey, zielText)) continue;
-
+        if (!driverHeadsTowardTarget(driverKey)) continue;
         paxMatchedKeys.add(driverKey);
       }
 
@@ -1250,7 +1297,6 @@
       refreshPaxMatchLayer();
       updatePaxUI();
 
-      // Status-Feedback (kein Cooldown-Start hier – Eingabe bleibt frei)
       const statusEl = document.getElementById("paxMatchStatus");
       if (statusEl) {
         if (paxMatchedKeys.size > 0) {
@@ -1291,33 +1337,8 @@
       map.getSource(PAX_MATCH_SOURCE).setData({ type: "FeatureCollection", features });
     }
 
-    // Zielfeld-Validierung
-    const PAX_ZIEL_MAX_LEN    = 40;
-    const PAX_ZIEL_MAX_WORDS  = 5;    // max. 5 Wörter
-    const PAX_ZIEL_MAX_PUNCT  = 2;    // max. 2 Satzzeichen (.,!?;:)
-
-    function validatePaxZiel(text) {
-      if (!text || text.length === 0) return { ok: false, hint: "Bitte gib eine Richtung oder ein Zielgebiet ein." };
-      if (text.length > PAX_ZIEL_MAX_LEN) return { ok: false, hint: "Bitte gib nur eine Richtung, einen Ort oder eine Landmarke ein." };
-      const words = text.trim().split(/\s+/);
-      if (words.length > PAX_ZIEL_MAX_WORDS) return { ok: false, hint: "Bitte gib nur eine Richtung, einen Ort oder eine Landmarke ein." };
-      const punctCount = (text.match(/[.,!?;:]/g) || []).length;
-      if (punctCount > PAX_ZIEL_MAX_PUNCT) return { ok: false, hint: "Bitte gib nur eine Richtung, einen Ort oder eine Landmarke ein." };
-      return { ok: true };
-    }
-
-    // Zielfeld: Button live aktualisieren + Validierung bei Klick
-    document.getElementById("paxZielInput")?.addEventListener("input", () => updatePaxUI());
-    document.getElementById("btnPaxSearch")?.addEventListener("click", () => {
-      const zielText = (document.getElementById("paxZielInput")?.value || "").trim();
-      const { ok, hint } = validatePaxZiel(zielText);
-      if (!ok) {
-        const statusEl = document.getElementById("paxMatchStatus");
-        if (statusEl) { statusEl.textContent = hint; statusEl.className = "pax-match-status show cooldown"; }
-        return;
-      }
-      runPaxSearch();
-    });
+    // Such-Buttons
+    document.getElementById("btnPaxSearch")?.addEventListener("click", () => runPaxSearch());
     document.getElementById("btnPaxCancel")?.addEventListener("click", () => cancelPaxSearch());
 
     // ─────────────────────────────────────────────────
@@ -2338,7 +2359,16 @@
             document.getElementById("btnPaxMarker")?.classList.remove("active-pax");
             showHint("");
           }
-          // Bei Cooldown: Marker-Modus bleibt aktiv, Klick wird ignoriert
+          // Bei Cooldown: Modus bleibt aktiv, Klick wird ignoriert
+        }
+        // Mitfahrer: Zielmarker per Kartenklick setzen
+        if (paxTargetMode) {
+          if (!isPaxInputLocked() && !paxSearchActive) {
+            setPaxTargetPos(e.lngLat.lng, e.lngLat.lat);
+            paxTargetMode = false;
+            document.getElementById("btnPaxTarget")?.classList.remove("active-pax");
+            showHint("");
+          }
         }
       });
 
@@ -2440,6 +2470,7 @@
       try { if (map && map.getLayer(LAYER_PAX_MATCH)) map.removeLayer(LAYER_PAX_MATCH); } catch (_) {}
       try { if (map && map.getSource(PAX_MATCH_SOURCE)) map.removeSource(PAX_MATCH_SOURCE); } catch (_) {}
       try { if (paxCooldownTimer) { clearInterval(paxCooldownTimer); paxCooldownTimer = null; } } catch (_) {}
+      try { if (paxTargetMarker) { paxTargetMarker.remove(); paxTargetMarker = null; } } catch (_) {}
       try { if (markerPopup) markerPopup.remove(); } catch (_) {}
       try { if (ridePopup)   ridePopup.remove();   } catch (_) {} // NEU
       try { if (map) map.remove(); } catch (_) {}
