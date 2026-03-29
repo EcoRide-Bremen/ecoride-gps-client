@@ -890,7 +890,7 @@
     let paxMarker      = null;  // Mapbox Marker für Treffpunkt
     let paxLat         = null;
     let paxLng         = null;
-    let paxTimeMin     = null;  // gewähltes Zeitfenster in Minuten (0 = jetzt)
+    let paxTimeMin     = 0;     // gewähltes Zeitfenster in Minuten (0 = jetzt)
     let paxSearchActive = false; // Suche gestartet → Zeitfenster gesperrt
     let paxMarkerMode  = false; // Nutzer kann Marker per Klick setzen
 
@@ -901,8 +901,8 @@
 
     // Gibt true zurück wenn der Marker aktuell verschiebbar sein darf
     function isPaxMarkerDraggable() {
-      // Nur verschiebbar wenn: kein Zeitfenster gewählt, keine aktive Suche, kein Cooldown
-      return paxTimeMin === null && !paxSearchActive && !isPaxInputLocked();
+      // Nur verschiebbar wenn: keine aktive Suche, kein Cooldown
+      return !paxSearchActive && !isPaxInputLocked();
     }
 
     // Draggability des Markers an aktuellen State anpassen
@@ -951,7 +951,7 @@
       if (!statusEl) return;
 
       const hasMarker = paxLat !== null && paxLng !== null;
-      const hasTime   = paxTimeMin !== null;
+      const hasTime   = true; // Stepper startet bei 0 (jetzt), immer gesetzt
 
       if (hasMarker) {
         statusEl.textContent = `Treffpunkt gesetzt ✅  (${paxLat.toFixed(5)}, ${paxLng.toFixed(5)})`;
@@ -1000,8 +1000,8 @@
       // Marker-Draggability synchron halten
       syncPaxMarkerDraggable();
 
-      // Marker-Setzmodus beenden sobald Zeitfenster gewählt, Suche aktiv oder Cooldown
-      if (paxTimeMin !== null || paxSearchActive || onCooldown) {
+      // Marker-Setzmodus beenden sobald Suche aktiv oder Cooldown
+      if (paxSearchActive || onCooldown) {
         exitPaxMarkerMode();
       }
     }
@@ -1030,9 +1030,8 @@
         return;
       }
       // Marker-Modus (wieder) aktivieren:
-      // Zeitfenster zurücksetzen damit isPaxMarkerDraggable() true liefert
-      // und exitPaxMarkerMode() nicht sofort feuert
-      paxTimeMin = null;
+      // Zeitfenster auf Default zurücksetzen
+      paxTimeMin = 0;
       paxMarkerMode = true;
       document.getElementById("btnPaxMarker").classList.add("active-pax");
       showHint("Auf Karte tippen um Treffpunkt zu setzen.");
@@ -1043,7 +1042,7 @@
     // ZEITFENSTER-STEPPER
     // ─────────────────────────────────────────────────
     const PAX_STEP_MIN  = 0;    // frühester Wert: jetzt
-    const PAX_STEP_MAX  = 120;  // spätester Wert: 2 Std
+    const PAX_STEP_MAX  = 180;  // spätester Wert: 3 Std
 
     function formatStepDisplay(min) {
       if (min === null) return "–";
