@@ -1013,6 +1013,9 @@
         hintEl.textContent = "Treffpunkt setzen um passende Fahrer zu sehen.";
       }
 
+      // onCooldown früh deklarieren – wird von mehreren Blöcken unten gebraucht
+      const onCooldown = isPaxInputLocked();
+
       const hasTarget = paxTargetLat !== null && paxTargetLng !== null;
 
       // Zielblock: sichtbar sobald Treffpunkt gesetzt
@@ -1052,7 +1055,6 @@
       }
 
       // Stepper synchronisieren
-      const onCooldown = isPaxInputLocked();
       syncStepperUI();
       lockedHint.classList.toggle("show", paxSearchActive);
 
