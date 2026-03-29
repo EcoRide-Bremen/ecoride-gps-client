@@ -976,7 +976,7 @@
     function setPaxMarkerPos(lng, lat, fromGps = false) {
       if (isPaxInputLocked()) return;
       paxLng = lng; paxLat = lat;
-      if (!fromGps) paxHasGps = false; // manuell gesetzt → GPS-Verifikation aufgehoben
+      // GPS-Verifikation bleibt erhalten – Treffpunkt anpassen hebt Verifikation nicht auf
       if (!paxMarker) {
         paxMarker = new mapboxgl.Marker({ color: "#60a5fa", draggable: isPaxMarkerDraggable() })
           .setLngLat([lng, lat])
@@ -984,7 +984,7 @@
         paxMarker.on("dragend", () => {
           const pos = paxMarker.getLngLat();
           paxLng = pos.lng; paxLat = pos.lat;
-          paxHasGps = false; // manuell verschoben → GPS-Verifikation aufgehoben
+          // paxHasGps bleibt unverändert – Treffpunkt nachjustieren hebt Verifikation nicht auf
           updatePaxUI();
         });
       } else {
