@@ -869,19 +869,28 @@
       return Date.now() < paxCooldownUntil;
     }
 
+    // Gibt true zurück wenn der Marker aktuell verschiebbar sein darf
+    function isPaxMarkerDraggable() {
+      // Nur verschiebbar wenn: kein Zeitfenster gewählt, keine aktive Suche, kein Cooldown
+      return paxTimeMin === null && !paxSearchActive && !isPaxInputLocked();
+    }
+
+    // Draggability des Markers an aktuellen State anpassen
+    function syncPaxMarkerDraggable() {
+      if (!paxMarker) return;
+      paxMarker.setDraggable(isPaxMarkerDraggable());
+    }
+
     function setPaxMarkerPos(lng, lat) {
       if (isPaxInputLocked()) return; // Cooldown: Marker-Änderung gesperrt
       paxLng = lng; paxLat = lat;
       if (!paxMarker) {
-        paxMarker = new mapboxgl.Marker({ color: "#60a5fa", draggable: true })
+        paxMarker = new mapboxgl.Marker({ color: "#60a5fa", draggable: isPaxMarkerDraggable() })
           .setLngLat([lng, lat])
           .addTo(map);
         paxMarker.on("dragend", () => {
-          if (isPaxInputLocked()) {
-            // Marker zurücksetzen wenn Cooldown aktiv
-            paxMarker.setLngLat([paxLng, paxLat]);
-            return;
-          }
+          // Draggability ist bereits deaktiviert wenn nicht erlaubt –
+          // dieser Handler feuert also nur wenn wirklich erlaubt
           const pos = paxMarker.getLngLat();
           paxLng = pos.lng; paxLat = pos.lat;
           updatePaxUI();
@@ -952,6 +961,9 @@
       if (searchBtn) searchBtn.disabled = paxSearchActive || onCooldown;
       if (cancelBtn) cancelBtn.classList.toggle("show", paxSearchActive);
       if (zielInput) zielInput.disabled = paxSearchActive;
+
+      // Marker-Draggability synchron halten
+      syncPaxMarkerDraggable();
     }
 
     // GPS-Standort → Marker setzen
