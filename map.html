@@ -54,6 +54,23 @@
     }
     .toggle-icon { font-size: 12px; margin-left: 10px; transition: transform .25s ease; }
     .panel.collapsed .toggle-icon { transform: rotate(180deg); }
+    .night-btn {
+      background: rgba(17,24,37,0.40) !important;
+      border: 1px solid rgba(199,223,58,0.25) !important;
+      color: var(--text) !important;
+      width: 26px; height: 26px;
+      min-width: unset !important;
+      padding: 0 !important;
+      border-radius: 50%;
+      font-size: 14px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background .2s;
+    }
+    .night-btn:hover { background: rgba(199,223,58,0.18) !important; }
 
     .row {
       display:flex;
@@ -471,7 +488,7 @@
   <div id="map"></div>
 
   <div class="panel collapsed">
-    <p class="title" id="panelTitle">EcoRide – Live-Karte <span class="toggle-icon" aria-hidden="true">▼</span></p>
+    <p class="title" id="panelTitle">EcoRide – Live-Karte <span class="toggle-icon" aria-hidden="true">▼</span> <button class="night-btn" id="btnNightMode" title="Nacht-Modus umschalten" style="margin-left:6px;">🌙</button></p>
 
     <!-- ── Modus-Umschalter ── -->
     <div class="mode-switcher">
@@ -1394,7 +1411,7 @@
       mapboxgl.accessToken = CONFIG.mapboxToken;
       const m = new mapboxgl.Map({
         container: "map",
-        style: "mapbox://styles/mapbox/streets-v12",
+        style: nightMode ? NIGHT_STYLE : DAY_STYLE,
         center: DEFAULT_CENTER,
         zoom: DEFAULT_ZOOM,
       });
@@ -1402,138 +1419,10 @@
 
       m.on("load", () => {
         hideHint();
-
-        // ── Routen-Layer ──
-        if (!m.getSource("er-routes")) {
-          m.addSource("er-routes", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-          m.addLayer({
-            id: "er-routes-line", type: "line", source: "er-routes",
-            layout: { "line-join": "round", "line-cap": "round", "visibility": routesVisible ? "visible" : "none" },
-            paint: { "line-width": 4, "line-opacity": 0.75, "line-color": ["get", "color"] }
-          });
-          m.on("mouseenter", "er-routes-line", () => { m.getCanvas().style.cursor = "pointer"; });
-          m.on("mouseleave", "er-routes-line", () => { m.getCanvas().style.cursor = ""; });
-        }
-
-        // ── Fahrer-Layer (Cluster + Punkte) ──
-        if (!m.getSource(DRIVERS_SOURCE)) {
-          m.addSource(DRIVERS_SOURCE, {
-            type: "geojson",
-            data: { type: "FeatureCollection", features: [] },
-            cluster: true, clusterRadius: 48, clusterMaxZoom: 14
-          });
-          m.addLayer({
-            id: LAYER_CLUSTER_CIRCLE, type: "circle", source: DRIVERS_SOURCE,
-            filter: ["has", "point_count"],
-            paint: {
-              "circle-radius": ["step", ["get", "point_count"], 16, 25, 20, 50, 26, 100, 32],
-              "circle-color": "rgba(199,223,58,0.70)",
-              "circle-stroke-width": 1, "circle-stroke-color": "rgba(17,24,37,0.35)"
-            }
-          });
-          m.addLayer({
-            id: LAYER_CLUSTER_COUNT, type: "symbol", source: DRIVERS_SOURCE,
-            filter: ["has", "point_count"],
-            layout: { "text-field": ["get","point_count_abbreviated"], "text-font": ["DIN Offc Pro Medium","Arial Unicode MS Bold"], "text-size": 12 },
-            paint: { "text-color": "#0b0f14" }
-          });
-          m.addLayer({
-            id: LAYER_POINTS, type: "circle", source: DRIVERS_SOURCE,
-            filter: ["all", ["!", ["has", "point_count"]]],
-            paint: {
-              "circle-radius": 7,
-              "circle-color": ["case", ["==",["get","stale"],1], "rgba(199,223,58,0.35)", "rgba(199,223,58,0.92)"],
-              "circle-opacity": ["case", ["==",["get","stale"],1], 0.65, 1],
-              "circle-stroke-width": 2, "circle-stroke-color": "rgba(199,223,58,0.35)"
-            }
-          });
-          m.addLayer({
-            id: LAYER_POINTS_SELECTED, type: "circle", source: DRIVERS_SOURCE,
-            filter: ["all", ["!", ["has","point_count"]], ["==",["get","driverKey"],"__none__"]],
-            paint: {
-              "circle-radius": 9,
-              "circle-color": ["case", ["==",["get","stale"],1], "rgba(199,223,58,0.75)", "rgba(199,223,58,0.98)"],
-              "circle-stroke-width": 3, "circle-stroke-color": "rgba(255,255,255,0.35)"
-            }
-          });
-
-          m.on("click", LAYER_CLUSTER_CIRCLE, (e) => {
-            const f = e.features?.[0];
-            if (!f) return;
-            m.getSource(DRIVERS_SOURCE).getClusterExpansionZoom(f.properties.cluster_id, (err, zoom) => {
-              if (!err) m.easeTo({ center: f.geometry.coordinates, zoom, duration: 550 });
-            });
-          });
-          m.on("click", LAYER_POINTS, async (e) => {
-            const f = e.features?.[0];
-            if (!f) return;
-            const rawId = f.properties?.rawId ?? "";
-            const df = document.getElementById("driverFilter");
-            if (df) df.value = rawId;
-            currentFilter = String(rawId).trim();
-            currentFilterKey = normId(currentFilter);
-            updateSelectedLayerFilter();
-            m.easeTo({ center: f.geometry.coordinates, zoom: 14, duration: 650 });
-            openMarkerPopupFromFeature(f);
-            await fetchLatest().catch(() => {});
-            await fetchRouteHistory().catch(() => {});
-            refreshDriversSource();
-            onVisibilityOrPanelChange();
-          });
-          m.on("mouseenter", LAYER_CLUSTER_CIRCLE, () => { m.getCanvas().style.cursor = "pointer"; });
-          m.on("mouseleave", LAYER_CLUSTER_CIRCLE, () => { m.getCanvas().style.cursor = ""; });
-          m.on("mouseenter", LAYER_POINTS,         () => { m.getCanvas().style.cursor = "pointer"; });
-          m.on("mouseleave", LAYER_POINTS,         () => { m.getCanvas().style.cursor = ""; });
-        }
-
-        // ── NEU: Ride-Routen-Layer (Linie Fahrer → Ziel) ──
-        if (!m.getSource(RIDES_ROUTE_SOURCE)) {
-          m.addSource(RIDES_ROUTE_SOURCE, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-          m.addLayer({
-            id:     LAYER_RIDE_ROUTES,
-            type:   "line",
-            source: RIDES_ROUTE_SOURCE,
-            layout: { "line-join": "round", "line-cap": "round" },
-            paint: {
-              "line-color":   "#ff9500",
-              "line-width":   3,
-              "line-opacity": 0.65,
-              "line-dasharray": [2, 2]
-            }
-          });
-        }
-
-        // ── NEU: Rides-Ziel-Layer (orange Punkte) ──
-        if (!m.getSource(RIDES_SOURCE)) {
-          m.addSource(RIDES_SOURCE, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-          m.addLayer({
-            id: LAYER_RIDE_DEST, type: "circle", source: RIDES_SOURCE,
-            paint: {
-              "circle-radius":       10,
-              "circle-color":        "#ff9500",
-              "circle-opacity":      0.92,
-              "circle-stroke-width": 2.5,
-              "circle-stroke-color": "rgba(255,255,255,0.80)"
-            }
-          });
-          m.on("click", LAYER_RIDE_DEST, (e) => {
-            e.originalEvent?.stopPropagation();
-            const f = e.features?.[0];
-            if (!f) return;
-            m.easeTo({ center: f.geometry.coordinates, zoom: 14, duration: 550 });
-            openRidePopup(f);
-          });
-          m.on("mouseenter", LAYER_RIDE_DEST, () => { m.getCanvas().style.cursor = "pointer"; });
-          m.on("mouseleave", LAYER_RIDE_DEST, () => { m.getCanvas().style.cursor = ""; });
-        }
-
-        const btn = document.getElementById("btnToggleRoutes");
-        if (btn) btn.textContent = routesVisible ? "Ausblenden" : "Einblenden";
-
-        routesReady = true;
+        initMapboxLayers(m);
         refreshDriversSource();
         refreshRoutesSource();
-        refreshRidesSource(); // NEU
+        refreshRidesSource();
       });
 
       m.on("error", (e) => {
@@ -2083,7 +1972,82 @@
 
     window.addEventListener("beforeunload", cleanup);
     window.addEventListener("pagehide",     cleanup);
+    // ─────────────────────────────────────────────────
+    // NACHT-MODUS
+    // ─────────────────────────────────────────────────
+    const NIGHT_STYLE = "mapbox://styles/mapbox/dark-v11";
+    const DAY_STYLE   = "mapbox://styles/mapbox/streets-v12";
+    let nightMode = localStorage.getItem("er_night_mode") === "1";
+
+    function applyNightMode(on) {
+      nightMode = on;
+      localStorage.setItem("er_night_mode", on ? "1" : "0");
+      const btn = document.getElementById("btnNightMode");
+      if (btn) btn.textContent = on ? "☀️" : "🌙";
+      if (!map) return;
+      map.setStyle(on ? NIGHT_STYLE : DAY_STYLE);
+      // Layers nach Style-Wechsel neu hinzufügen
+      map.once("style.load", () => {
+        routesReady = false;
+        initMapboxLayers(map);
+        refreshDriversSource();
+        refreshRoutesSource();
+        refreshRidesSource();
+      });
+    }
+
+    function initMapboxLayers(m) {
+      // Routen
+      if (!m.getSource("er-routes")) {
+        m.addSource("er-routes", { type:"geojson", data:{type:"FeatureCollection",features:[]} });
+        m.addLayer({ id:"er-routes-line", type:"line", source:"er-routes",
+          layout:{"line-join":"round","line-cap":"round","visibility": routesVisible ? "visible" : "none"},
+          paint:{"line-width":4,"line-opacity":0.75,"line-color":["get","color"]} });
+        m.on("mouseenter","er-routes-line",()=>{m.getCanvas().style.cursor="pointer";});
+        m.on("mouseleave","er-routes-line",()=>{m.getCanvas().style.cursor="";});
+      }
+      // Fahrer
+      if (!m.getSource(DRIVERS_SOURCE)) {
+        m.addSource(DRIVERS_SOURCE,{type:"geojson",data:{type:"FeatureCollection",features:[]},cluster:true,clusterRadius:48,clusterMaxZoom:14});
+        m.addLayer({id:LAYER_CLUSTER_CIRCLE,type:"circle",source:DRIVERS_SOURCE,filter:["has","point_count"],paint:{"circle-radius":["step",["get","point_count"],16,25,20,50,26,100,32],"circle-color":"rgba(199,223,58,0.70)","circle-stroke-width":1,"circle-stroke-color":"rgba(17,24,37,0.35)"}});
+        m.addLayer({id:LAYER_CLUSTER_COUNT,type:"symbol",source:DRIVERS_SOURCE,filter:["has","point_count"],layout:{"text-field":["get","point_count_abbreviated"],"text-font":["DIN Offc Pro Medium","Arial Unicode MS Bold"],"text-size":12},paint:{"text-color":"#0b0f14"}});
+        m.addLayer({id:LAYER_POINTS,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]]],paint:{"circle-radius":7,"circle-color":["case",["==",["get","stale"],1],"rgba(199,223,58,0.35)","rgba(199,223,58,0.92)"],"circle-opacity":["case",["==",["get","stale"],1],0.65,1],"circle-stroke-width":2,"circle-stroke-color":"rgba(199,223,58,0.35)"}});
+        m.addLayer({id:LAYER_POINTS_SELECTED,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","driverKey"],"__none__"]],paint:{"circle-radius":9,"circle-color":["case",["==",["get","stale"],1],"rgba(199,223,58,0.75)","rgba(199,223,58,0.98)"],"circle-stroke-width":3,"circle-stroke-color":"rgba(255,255,255,0.35)"}});
+        m.on("click",LAYER_CLUSTER_CIRCLE,(e)=>{const f=e.features?.[0];if(!f)return;m.getSource(DRIVERS_SOURCE).getClusterExpansionZoom(f.properties.cluster_id,(err,zoom)=>{if(!err)m.easeTo({center:f.geometry.coordinates,zoom,duration:550});});});
+        m.on("click",LAYER_POINTS,async(e)=>{const f=e.features?.[0];if(!f)return;const rawId=f.properties?.rawId??"";const df=document.getElementById("driverFilter");if(df)df.value=rawId;currentFilter=String(rawId).trim();currentFilterKey=normId(currentFilter);updateSelectedLayerFilter();m.easeTo({center:f.geometry.coordinates,zoom:14,duration:650});openMarkerPopupFromFeature(f);await fetchLatest().catch(()=>{});await fetchRouteHistory().catch(()=>{});refreshDriversSource();onVisibilityOrPanelChange();});
+        m.on("mouseenter",LAYER_CLUSTER_CIRCLE,()=>{m.getCanvas().style.cursor="pointer";});
+        m.on("mouseleave",LAYER_CLUSTER_CIRCLE,()=>{m.getCanvas().style.cursor="";});
+        m.on("mouseenter",LAYER_POINTS,()=>{m.getCanvas().style.cursor="pointer";});
+        m.on("mouseleave",LAYER_POINTS,()=>{m.getCanvas().style.cursor="";});
+      }
+      // Ride-Routen
+      if (!m.getSource(RIDES_ROUTE_SOURCE)) {
+        m.addSource(RIDES_ROUTE_SOURCE,{type:"geojson",data:{type:"FeatureCollection",features:[]}});
+        m.addLayer({id:LAYER_RIDE_ROUTES,type:"line",source:RIDES_ROUTE_SOURCE,layout:{"line-join":"round","line-cap":"round"},paint:{"line-color":"#ff9500","line-width":3,"line-opacity":0.65,"line-dasharray":[2,2]}});
+      }
+      // Ride-Ziele
+      if (!m.getSource(RIDES_SOURCE)) {
+        m.addSource(RIDES_SOURCE,{type:"geojson",data:{type:"FeatureCollection",features:[]}});
+        m.addLayer({id:LAYER_RIDE_DEST,type:"circle",source:RIDES_SOURCE,paint:{"circle-radius":10,"circle-color":"#ff9500","circle-opacity":0.92,"circle-stroke-width":2.5,"circle-stroke-color":"rgba(255,255,255,0.80)"}});
+        m.on("click",LAYER_RIDE_DEST,(e)=>{e.originalEvent?.stopPropagation();const f=e.features?.[0];if(!f)return;m.easeTo({center:f.geometry.coordinates,zoom:14,duration:550});openRidePopup(f);});
+        m.on("mouseenter",LAYER_RIDE_DEST,()=>{m.getCanvas().style.cursor="pointer";});
+        m.on("mouseleave",LAYER_RIDE_DEST,()=>{m.getCanvas().style.cursor="";});
+      }
+      const btn=document.getElementById("btnToggleRoutes");
+      if(btn)btn.textContent=routesVisible?"Ausblenden":"Einblenden";
+      routesReady=true;
+    }
+
     document.addEventListener("DOMContentLoaded", initMap);
+    document.addEventListener("DOMContentLoaded", () => {
+      // Gespeicherten Modus sofort anwenden (vor Map-Init)
+      const btn = document.getElementById("btnNightMode");
+      if (btn) btn.textContent = nightMode ? "☀️" : "🌙";
+      document.getElementById("btnNightMode")?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        applyNightMode(!nightMode);
+      });
+    });
   </script>
 </body>
 </html>
