@@ -649,7 +649,7 @@
         <hr class="pax-divider" />
         <div class="pax-block" style="padding-bottom:6px">
           <div class="pax-block-title">In welche Richtung möchtest du?</div>
-          <input id="paxZielInput" class="pax-ziel-input" placeholder="z.B. Bremen-Mitte, Hauptbahnhof…" autocomplete="off" />
+          <input id="paxZielInput" class="pax-ziel-input" placeholder="z.B. Bremen-Mitte, Hauptbahnhof…" autocomplete="off" maxlength="40" />
         </div>
         <div class="pax-search-actions">
           <button class="pax-search-btn" id="btnPaxSearch">Passende Fahrer finden</button>
@@ -965,9 +965,10 @@
       if (btnGps)    btnGps.disabled    = paxSearchActive || onCooldown;
       if (btnMarker) btnMarker.disabled = paxSearchActive || onCooldown;
 
-      // Such-Button: gesperrt wenn aktive Suche, Cooldown, oder Zielfeld leer
-      const zielLeer = !zielInput || zielInput.value.trim().length === 0;
-      if (searchBtn) searchBtn.disabled = paxSearchActive || onCooldown || zielLeer;
+      // Such-Button: gesperrt wenn aktive Suche, Cooldown, oder Zielfeld ungültig
+      const zielVal = zielInput ? zielInput.value.trim() : "";
+      const zielOk  = validatePaxZiel(zielVal).ok;
+      if (searchBtn) searchBtn.disabled = paxSearchActive || onCooldown || !zielOk;
       if (cancelBtn) cancelBtn.classList.toggle("show", paxSearchActive);
       if (zielInput) zielInput.disabled = paxSearchActive;
 
@@ -1184,16 +1185,29 @@
       map.getSource(PAX_MATCH_SOURCE).setData({ type: "FeatureCollection", features });
     }
 
-    // Zielfeld: Button live aktualisieren + Hinweis bei Klick auf gesperrten Button
+    // Zielfeld-Validierung
+    const PAX_ZIEL_MAX_LEN    = 40;
+    const PAX_ZIEL_MAX_WORDS  = 5;    // max. 5 Wörter
+    const PAX_ZIEL_MAX_PUNCT  = 2;    // max. 2 Satzzeichen (.,!?;:)
+
+    function validatePaxZiel(text) {
+      if (!text || text.length === 0) return { ok: false, hint: "Bitte gib eine Richtung oder ein Zielgebiet ein." };
+      if (text.length > PAX_ZIEL_MAX_LEN) return { ok: false, hint: "Bitte gib nur eine Richtung, einen Ort oder eine Landmarke ein." };
+      const words = text.trim().split(/\s+/);
+      if (words.length > PAX_ZIEL_MAX_WORDS) return { ok: false, hint: "Bitte gib nur eine Richtung, einen Ort oder eine Landmarke ein." };
+      const punctCount = (text.match(/[.,!?;:]/g) || []).length;
+      if (punctCount > PAX_ZIEL_MAX_PUNCT) return { ok: false, hint: "Bitte gib nur eine Richtung, einen Ort oder eine Landmarke ein." };
+      return { ok: true };
+    }
+
+    // Zielfeld: Button live aktualisieren + Validierung bei Klick
     document.getElementById("paxZielInput")?.addEventListener("input", () => updatePaxUI());
-    document.getElementById("btnPaxSearch")?.addEventListener("click", (e) => {
+    document.getElementById("btnPaxSearch")?.addEventListener("click", () => {
       const zielText = (document.getElementById("paxZielInput")?.value || "").trim();
-      if (!zielText) {
+      const { ok, hint } = validatePaxZiel(zielText);
+      if (!ok) {
         const statusEl = document.getElementById("paxMatchStatus");
-        if (statusEl) {
-          statusEl.textContent = "Bitte gib eine Richtung oder ein Zielgebiet ein.";
-          statusEl.className = "pax-match-status show cooldown";
-        }
+        if (statusEl) { statusEl.textContent = hint; statusEl.className = "pax-match-status show cooldown"; }
         return;
       }
       runPaxSearch();
