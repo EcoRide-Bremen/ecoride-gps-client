@@ -923,18 +923,23 @@
     }
 
     // ── Zielmarker ──
+    function isPaxTargetDraggable() {
+      return !paxSearchActive && !isPaxInputLocked();
+    }
+
+    function syncPaxTargetMarkerDraggable() {
+      if (!paxTargetMarker) return;
+      paxTargetMarker.setDraggable(isPaxTargetDraggable());
+    }
+
     function setPaxTargetPos(lng, lat) {
       if (isPaxInputLocked() || paxSearchActive) return;
       paxTargetLng = lng; paxTargetLat = lat;
       if (!paxTargetMarker) {
-        paxTargetMarker = new mapboxgl.Marker({ color: "#4ade80", draggable: true })
+        paxTargetMarker = new mapboxgl.Marker({ color: "#4ade80", draggable: isPaxTargetDraggable() })
           .setLngLat([lng, lat])
           .addTo(map);
         paxTargetMarker.on("dragend", () => {
-          if (isPaxInputLocked() || paxSearchActive) {
-            paxTargetMarker.setLngLat([paxTargetLng, paxTargetLat]);
-            return;
-          }
           const pos = paxTargetMarker.getLngLat();
           paxTargetLng = pos.lng; paxTargetLat = pos.lat;
           updatePaxUI();
@@ -1069,8 +1074,9 @@
       if (searchBtn) searchBtn.disabled = paxSearchActive || onCooldown || !hasTargetForBtn;
       if (cancelBtn) cancelBtn.classList.toggle("show", paxSearchActive);
 
-      // Marker-Draggability synchron halten
+      // Draggability beider Marker synchron halten
       syncPaxMarkerDraggable();
+      syncPaxTargetMarkerDraggable();
 
       // Modi beenden sobald Suche aktiv oder Cooldown
       if (paxSearchActive || onCooldown) {
