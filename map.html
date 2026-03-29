@@ -927,7 +927,8 @@
 
     // ── Zielmarker ──
     function isPaxTargetDraggable() {
-      return !paxSearchActive && !isPaxInputLocked();
+      // Nur draggable wenn explizit im Ziel-Bearbeitungsmodus
+      return paxTargetMode && !paxSearchActive && !isPaxInputLocked();
     }
 
     function syncPaxTargetMarkerDraggable() {
