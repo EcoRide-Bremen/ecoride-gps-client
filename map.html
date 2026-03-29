@@ -799,13 +799,13 @@
     // NEU: Mitfahrer-Suche State
     const paxMatchedKeys = new Set();  // driverKeys der gematchten Fahrer
 
-    // Cooldown-Schutz
-    const PAX_COOLDOWN_MS      = 12_000;  // 12s nach Start oder Abbrechen
-    const PAX_MAX_STARTS       = 4;       // max. Neustarts im Zeitfenster
+    // Cooldown-Schutz (nur nach „Abbrechen")
+    const PAX_COOLDOWN_MS      = 15_000;  // 15s Cooldown nach Abbrechen
+    const PAX_MAX_STARTS       = 3;       // max. 3 Neustarts im Zeitfenster
     const PAX_MAX_WINDOW_MS    = 60_000;  // Zeitfenster für Limit (60s)
     let paxCooldownUntil       = 0;       // Timestamp bis wann gesperrt
     let paxCooldownTimer       = null;    // Interval für Countdown-Anzeige
-    const paxStartTimes        = [];      // Timestamps der letzten Suchstarts
+    const paxStartTimes        = [];      // Timestamps der Suchstarts (für Rate-Limit)
 
     // ─────────────────────────────────────────────────
     // MODUS-UMSCHALTER (Fahrer / Mitfahrer)
@@ -935,10 +935,7 @@
       if (searchBtn) searchBtn.disabled = paxSearchActive || onCooldown;
       if (cancelBtn) cancelBtn.classList.toggle("show", paxSearchActive);
       if (zielInput) zielInput.disabled = paxSearchActive;
-      // Zeitfenster auch bei Cooldown (aber nicht aktiver Suche) sperren
-      if (!paxSearchActive && onCooldown) {
-        timeBtns.forEach(btn => { btn.disabled = true; });
-      }
+      // Zeitfenster: nur bei aktiver Suche sperren – Cooldown lässt Eingabe frei
     }
 
     // GPS-Standort → Marker setzen
@@ -1062,20 +1059,20 @@
 
     function runPaxSearch() {
       if (!map || paxLat === null || paxLng === null || paxTimeMin === null) return;
-      if (Date.now() < paxCooldownUntil) return; // Cooldown läuft noch
+      if (Date.now() < paxCooldownUntil) return; // Cooldown nach Abbrechen läuft noch
 
-      // Rate-Limit: zu viele Neustarts in kurzer Zeit
+      // Rate-Limit: zu viele Neustarts nach Abbrechen in kurzer Zeit
       if (isPaxRateLimited()) {
         const statusEl = document.getElementById("paxMatchStatus");
         if (statusEl) {
-          statusEl.textContent = "Zu viele Suchanfragen – bitte kurz warten.";
+          statusEl.textContent = "Zu viele Neustarts – bitte kurz warten.";
           statusEl.className = "pax-match-status show cooldown";
         }
         startPaxCooldown();
         return;
       }
 
-      // Start-Timestamp erfassen
+      // Start-Timestamp für Rate-Limit erfassen
       paxStartTimes.push(Date.now());
 
       const zielText = (document.getElementById("paxZielInput")?.value || "").trim();
@@ -1103,7 +1100,7 @@
       refreshPaxMatchLayer();
       updatePaxUI();
 
-      // Status-Feedback
+      // Status-Feedback (kein Cooldown-Start hier – Eingabe bleibt frei)
       const statusEl = document.getElementById("paxMatchStatus");
       if (statusEl) {
         if (paxMatchedKeys.size > 0) {
@@ -1114,9 +1111,6 @@
           statusEl.className = "pax-match-status show none";
         }
       }
-
-      // Cooldown starten (Such-Button + Zeitfenster für 12s gesperrt)
-      startPaxCooldown();
     }
 
     function cancelPaxSearch() {
@@ -1125,8 +1119,8 @@
       refreshPaxMatchLayer();
       updatePaxUI();
       const statusEl = document.getElementById("paxMatchStatus");
-      if (statusEl) statusEl.className = "pax-match-status";
-      // Auch nach Abbrechen Cooldown starten
+      if (statusEl) { statusEl.textContent = ""; statusEl.className = "pax-match-status"; }
+      // Cooldown NUR hier starten – Eingabephase (Zeitfenster, Zieltext) bleibt frei
       startPaxCooldown();
     }
 
