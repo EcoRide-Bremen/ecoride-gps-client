@@ -648,7 +648,7 @@
       <div id="paxSearchBlock" style="display:none">
         <hr class="pax-divider" />
         <div class="pax-block" style="padding-bottom:6px">
-          <div class="pax-block-title">Wohin fährst du? (Richtung / Ort)</div>
+          <div class="pax-block-title">In welche Richtung möchtest du?</div>
           <input id="paxZielInput" class="pax-ziel-input" placeholder="z.B. Bremen-Mitte, Hauptbahnhof…" autocomplete="off" />
         </div>
         <div class="pax-search-actions">
@@ -957,8 +957,9 @@
       if (btnGps)    btnGps.disabled    = paxSearchActive || onCooldown;
       if (btnMarker) btnMarker.disabled = paxSearchActive || onCooldown;
 
-      // Such-Button & Abbrechen-Button
-      if (searchBtn) searchBtn.disabled = paxSearchActive || onCooldown;
+      // Such-Button: gesperrt wenn aktive Suche, Cooldown, oder Zielfeld leer
+      const zielLeer = !zielInput || zielInput.value.trim().length === 0;
+      if (searchBtn) searchBtn.disabled = paxSearchActive || onCooldown || zielLeer;
       if (cancelBtn) cancelBtn.classList.toggle("show", paxSearchActive);
       if (zielInput) zielInput.disabled = paxSearchActive;
 
@@ -1170,8 +1171,20 @@
       map.getSource(PAX_MATCH_SOURCE).setData({ type: "FeatureCollection", features });
     }
 
-    // Such-Buttons verdrahten
-    document.getElementById("btnPaxSearch")?.addEventListener("click", () => runPaxSearch());
+    // Zielfeld: Button live aktualisieren + Hinweis bei Klick auf gesperrten Button
+    document.getElementById("paxZielInput")?.addEventListener("input", () => updatePaxUI());
+    document.getElementById("btnPaxSearch")?.addEventListener("click", (e) => {
+      const zielText = (document.getElementById("paxZielInput")?.value || "").trim();
+      if (!zielText) {
+        const statusEl = document.getElementById("paxMatchStatus");
+        if (statusEl) {
+          statusEl.textContent = "Bitte gib eine Richtung oder ein Zielgebiet ein.";
+          statusEl.className = "pax-match-status show cooldown";
+        }
+        return;
+      }
+      runPaxSearch();
+    });
     document.getElementById("btnPaxCancel")?.addEventListener("click", () => cancelPaxSearch());
 
     // ─────────────────────────────────────────────────
