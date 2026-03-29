@@ -1029,9 +1029,7 @@
         updatePaxUI();
         return;
       }
-      // Marker-Modus (wieder) aktivieren:
-      // Zeitfenster auf Default zurücksetzen
-      paxTimeMin = 0;
+      // Marker-Modus (wieder) aktivieren – Zeitfenster und Zieltext bleiben erhalten
       paxMarkerMode = true;
       document.getElementById("btnPaxMarker").classList.add("active-pax");
       showHint("Auf Karte tippen um Treffpunkt zu setzen.");
