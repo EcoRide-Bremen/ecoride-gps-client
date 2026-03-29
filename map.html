@@ -211,6 +211,71 @@
       padding: 0 10px 8px;
     }
 
+    /* ── Mitfahrer: Zielgebiet-Input ── */
+    .pax-ziel-input {
+      width: 100%;
+      box-sizing: border-box;
+      max-width: unset;
+      background: rgba(17,24,37,0.35);
+      border: 1px solid rgba(199,223,58,0.22);
+      height: 32px;
+      padding: 0 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      color: #e5e7eb;
+      text-align: left;
+    }
+    .pax-ziel-input:disabled { opacity: 0.4; }
+    .pax-ziel-input::placeholder { color: rgba(234,240,255,0.38); }
+
+    /* ── Mitfahrer: Such-Buttons ── */
+    .pax-search-actions {
+      display: flex;
+      gap: 8px;
+      padding: 8px 10px 4px;
+      box-sizing: border-box;
+    }
+    .pax-search-btn {
+      flex: 1;
+      height: 34px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      background: rgba(199,223,58,0.88);
+      color: #0b0f14;
+      transition: opacity .2s;
+    }
+    .pax-search-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .pax-cancel-btn {
+      flex: 0 0 auto;
+      height: 34px;
+      padding: 0 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid rgba(239,68,68,0.35);
+      background: rgba(239,68,68,0.12);
+      color: #f87171;
+      display: none;
+    }
+    .pax-cancel-btn.show { display: flex; align-items: center; justify-content: center; }
+
+    /* ── Mitfahrer: Trefferzähler ── */
+    .pax-match-status {
+      font-size: 12px;
+      text-align: center;
+      padding: 4px 10px 2px;
+      min-height: 20px;
+      color: rgba(234,240,255,0.70);
+      display: none;
+    }
+    .pax-match-status.show { display: block; }
+    .pax-match-status.found { color: #4ade80; }
+    .pax-match-status.none  { color: rgba(234,240,255,0.45); }
+
     .input-button-group {
       width:100%;
       max-width: 260px;
@@ -578,6 +643,20 @@
         <div class="pax-locked-hint" id="paxLockedHint">Zum Ändern Suche abbrechen und neu starten</div>
       </div>
 
+      <!-- Block 3: Zielgebiet + Suche (nur wenn Marker + Zeitfenster gesetzt) -->
+      <div id="paxSearchBlock" style="display:none">
+        <hr class="pax-divider" />
+        <div class="pax-block" style="padding-bottom:6px">
+          <div class="pax-block-title">Wohin fährst du? (Richtung / Ort)</div>
+          <input id="paxZielInput" class="pax-ziel-input" placeholder="z.B. Bremen-Mitte, Hauptbahnhof…" autocomplete="off" />
+        </div>
+        <div class="pax-search-actions">
+          <button class="pax-search-btn" id="btnPaxSearch">Passende Fahrer finden</button>
+          <button class="pax-cancel-btn" id="btnPaxCancel">✕ Abbrechen</button>
+        </div>
+        <div class="pax-match-status" id="paxMatchStatus"></div>
+      </div>
+
       <p class="passenger-hint" id="paxHint">Treffpunkt setzen um passende Fahrer zu sehen.</p>
     </div><!-- /passengerPanel -->
 
@@ -638,6 +717,14 @@
     // NEU: Ride-Routen (Linie Fahrer → Ziel)
     const RIDES_ROUTE_SOURCE    = "er-ride-routes";
     const LAYER_RIDE_ROUTES     = "er-ride-routes-line";
+
+    // NEU: Mitfahrer-Suche: Highlight-Layer
+    const PAX_MATCH_SOURCE      = "er-pax-match";
+    const LAYER_PAX_MATCH       = "er-pax-match-ring";
+
+    // Matching-Konstanten
+    const PAX_MATCH_RADIUS_KM   = 5.0;   // Fahrer muss innerhalb 5 km vom Treffpunkt sein
+    const PAX_MATCH_TIME_SLACK  = 10;    // +10 Min Puffer auf Zeitfenster
 
     // BBox / Debounce
     const BBOX_DEBOUNCE_MS        = 350;
@@ -707,6 +794,9 @@
 
     // NEU: Mitfahrer-Identität (localStorage-basiert)
     let mitfahrerId = localStorage.getItem("er_mitfahrer_id") || null;
+
+    // NEU: Mitfahrer-Suche State
+    const paxMatchedKeys = new Set();  // driverKeys der gematchten Fahrer
 
     // ─────────────────────────────────────────────────
     // MODUS-UMSCHALTER (Fahrer / Mitfahrer)
@@ -788,18 +878,39 @@
       const lockedHint  = document.getElementById("paxLockedHint");
       const hintEl      = document.getElementById("paxHint");
       const timeBtns    = document.querySelectorAll(".pax-time-btn");
+      const searchBlock = document.getElementById("paxSearchBlock");
+      const searchBtn   = document.getElementById("btnPaxSearch");
+      const cancelBtn   = document.getElementById("btnPaxCancel");
+      const zielInput   = document.getElementById("paxZielInput");
       if (!statusEl) return;
 
-      if (paxLat !== null && paxLng !== null) {
+      const hasMarker = paxLat !== null && paxLng !== null;
+      const hasTime   = paxTimeMin !== null;
+
+      if (hasMarker) {
         statusEl.textContent = `Treffpunkt gesetzt ✅  (${paxLat.toFixed(5)}, ${paxLng.toFixed(5)})`;
         statusEl.className = "pax-status set";
         timeBlock.style.display = "";
-        hintEl.textContent = "Zeitfenster wählen, dann sind passende Fahrer sichtbar.";
       } else {
         statusEl.textContent = "Kein Treffpunkt gesetzt";
         statusEl.className = "pax-status";
         timeBlock.style.display = "none";
+        if (searchBlock) searchBlock.style.display = "none";
         hintEl.textContent = "Treffpunkt setzen um passende Fahrer zu sehen.";
+      }
+
+      // Suchblock: nur wenn Marker + Zeitfenster gewählt
+      if (searchBlock) {
+        searchBlock.style.display = (hasMarker && hasTime) ? "" : "none";
+      }
+
+      // Hint-Text je nach Status
+      if (hasMarker && !hasTime) {
+        hintEl.textContent = "Zeitfenster wählen, dann sind passende Fahrer sichtbar.";
+      } else if (hasMarker && hasTime && !paxSearchActive) {
+        hintEl.textContent = "Zielgebiet eingeben und Suche starten.";
+      } else if (paxSearchActive) {
+        hintEl.textContent = "Suche aktiv – passende Fahrer sind hervorgehoben.";
       }
 
       // Zeitfenster-Buttons: Auswahl anzeigen + Sperre
@@ -809,6 +920,11 @@
         btn.disabled = paxSearchActive;
       });
       lockedHint.classList.toggle("show", paxSearchActive);
+
+      // Such-Button & Abbrechen-Button
+      if (searchBtn) searchBtn.disabled = paxSearchActive;
+      if (cancelBtn) cancelBtn.classList.toggle("show", paxSearchActive);
+      if (zielInput) zielInput.disabled = paxSearchActive;
     }
 
     // GPS-Standort → Marker setzen
@@ -852,6 +968,120 @@
       paxTimeMin = parseInt(btn.dataset.val);
       updatePaxUI();
     });
+
+    // ─────────────────────────────────────────────────
+    // MITFAHRER-SUCHE: MATCHING
+    // ─────────────────────────────────────────────────
+
+    // Haversine-Distanz in km
+    function haversineKm(lat1, lng1, lat2, lng2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLng = (lng2 - lng1) * Math.PI / 180;
+      const a = Math.sin(dLat/2)**2
+              + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    // Prüft ob ein Fahrer grob in Richtung Zielgebiet fährt
+    // (letzte 2 Routenpunkte → Richtungsvektor)
+    function driverHeadsTowardZiel(driverKey, zielText) {
+      if (!zielText || zielText.length < 2) return true; // kein Ziel → immer OK
+      const pts = routePoints.get(driverKey);
+      if (!pts || pts.length < 2) return true; // keine Route → nicht ausschließen
+      // Richtungsvektor aus letzten zwei Punkten
+      const p1 = pts[pts.length - 2];
+      const p2 = pts[pts.length - 1];
+      const dLng = p2.lng - p1.lng;
+      const dLat = p2.lat - p1.lat;
+      // Grobe Himmelsrichtung aus Zieltext (einfaches Keyword-Matching)
+      const z = zielText.toLowerCase();
+      const goesNorth = dLat > 0.0001;
+      const goesSouth = dLat < -0.0001;
+      const goesEast  = dLng > 0.0001;
+      const goesWest  = dLng < -0.0001;
+      const wantNorth = /nord|norden|north/.test(z);
+      const wantSouth = /süd|sued|south/.test(z);
+      const wantEast  = /ost|east|osten/.test(z);
+      const wantWest  = /west|westen/.test(z);
+      if (wantNorth && goesSouth) return false;
+      if (wantSouth && goesNorth) return false;
+      if (wantEast  && goesWest)  return false;
+      if (wantWest  && goesEast)  return false;
+      return true;
+    }
+
+    function runPaxSearch() {
+      if (!map || paxLat === null || paxLng === null || paxTimeMin === null) return;
+
+      const zielText = (document.getElementById("paxZielInput")?.value || "").trim();
+      const now      = Date.now();
+      paxMatchedKeys.clear();
+
+      for (const [driverKey, pos] of positions.entries()) {
+        if (endedDrivers.has(driverKey)) continue;
+
+        // 1. Frisch? (Tracking aktiv)
+        const ageMs = now - (pos.ts || 0);
+        if (ageMs > STALE_MS) continue;
+
+        // 2. Nähe zum Treffpunkt
+        const distKm = haversineKm(paxLat, paxLng, pos.lat, pos.lng);
+        if (distKm > PAX_MATCH_RADIUS_KM + paxTimeMin * 0.5) continue;
+        // (leicht erweiterter Radius wenn Mitfahrer noch etwas Zeit hat)
+
+        // 3. Richtung / Zielgebiet (grob)
+        if (!driverHeadsTowardZiel(driverKey, zielText)) continue;
+
+        paxMatchedKeys.add(driverKey);
+      }
+
+      paxSearchActive = true;
+      refreshPaxMatchLayer();
+      updatePaxUI();
+
+      // Status-Feedback
+      const statusEl = document.getElementById("paxMatchStatus");
+      if (statusEl) {
+        if (paxMatchedKeys.size > 0) {
+          statusEl.textContent = `${paxMatchedKeys.size} passende${paxMatchedKeys.size === 1 ? "r" : ""} Fahrer gefunden ✅`;
+          statusEl.className = "pax-match-status show found";
+        } else {
+          statusEl.textContent = "Keine passenden Fahrer in der Nähe.";
+          statusEl.className = "pax-match-status show none";
+        }
+      }
+    }
+
+    function cancelPaxSearch() {
+      paxSearchActive = false;
+      paxMatchedKeys.clear();
+      refreshPaxMatchLayer();
+      updatePaxUI();
+      const statusEl = document.getElementById("paxMatchStatus");
+      if (statusEl) statusEl.className = "pax-match-status";
+    }
+
+    // Highlight-Layer auf der Karte aktualisieren
+    function refreshPaxMatchLayer() {
+      if (!map || !map.getSource(PAX_MATCH_SOURCE)) return;
+      const features = [];
+      if (paxSearchActive) {
+        for (const [driverKey, pos] of positions.entries()) {
+          if (!paxMatchedKeys.has(driverKey)) continue;
+          features.push({
+            type: "Feature",
+            properties: { driverKey },
+            geometry: { type: "Point", coordinates: [pos.lng, pos.lat] }
+          });
+        }
+      }
+      map.getSource(PAX_MATCH_SOURCE).setData({ type: "FeatureCollection", features });
+    }
+
+    // Such-Buttons verdrahten
+    document.getElementById("btnPaxSearch")?.addEventListener("click", () => runPaxSearch());
+    document.getElementById("btnPaxCancel")?.addEventListener("click", () => cancelPaxSearch());
 
     // ─────────────────────────────────────────────────
     // UTILS
@@ -992,6 +1222,8 @@
       setCount(feats.length);
       setSafeTextContent("impactMarkers", String(feats.length));
       pulse("impactMarkers");
+      // Mitfahrer-Suche: Highlight nach Positions-Update synchron halten
+      if (paxSearchActive) refreshPaxMatchLayer();
     }
 
     // ─────────────────────────────────────────────────
@@ -1965,6 +2197,8 @@
       try { if (ridesPolTimer) clearInterval(ridesPolTimer); } catch (_) {}
       try { if (map && map.getLayer(LAYER_RIDE_ROUTES)) map.removeLayer(LAYER_RIDE_ROUTES); } catch (_) {}
       try { if (map && map.getSource(RIDES_ROUTE_SOURCE)) map.removeSource(RIDES_ROUTE_SOURCE); } catch (_) {}
+      try { if (map && map.getLayer(LAYER_PAX_MATCH)) map.removeLayer(LAYER_PAX_MATCH); } catch (_) {}
+      try { if (map && map.getSource(PAX_MATCH_SOURCE)) map.removeSource(PAX_MATCH_SOURCE); } catch (_) {}
       try { if (markerPopup) markerPopup.remove(); } catch (_) {}
       try { if (ridePopup)   ridePopup.remove();   } catch (_) {} // NEU
       try { if (map) map.remove(); } catch (_) {}
@@ -2032,6 +2266,20 @@
         m.on("click",LAYER_RIDE_DEST,(e)=>{e.originalEvent?.stopPropagation();const f=e.features?.[0];if(!f)return;m.easeTo({center:f.geometry.coordinates,zoom:14,duration:550});openRidePopup(f);});
         m.on("mouseenter",LAYER_RIDE_DEST,()=>{m.getCanvas().style.cursor="pointer";});
         m.on("mouseleave",LAYER_RIDE_DEST,()=>{m.getCanvas().style.cursor="";});
+      }
+      // Mitfahrer-Match-Highlight (Ring um passende Fahrer)
+      if (!m.getSource(PAX_MATCH_SOURCE)) {
+        m.addSource(PAX_MATCH_SOURCE,{type:"geojson",data:{type:"FeatureCollection",features:[]}});
+        m.addLayer({
+          id: LAYER_PAX_MATCH, type:"circle", source:PAX_MATCH_SOURCE,
+          paint:{
+            "circle-radius": 14,
+            "circle-color":  "rgba(96,165,250,0.0)",
+            "circle-stroke-width": 3,
+            "circle-stroke-color": "#60a5fa",
+            "circle-stroke-opacity": 0.92,
+          }
+        });
       }
       const btn=document.getElementById("btnToggleRoutes");
       if(btn)btn.textContent=routesVisible?"Ausblenden":"Einblenden";
