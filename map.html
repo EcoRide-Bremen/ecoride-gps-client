@@ -918,6 +918,7 @@
     let paxTargetLng    = null;
     let paxTargetMarker = null;
     let paxTargetMode   = false;
+    let paxTimeOpen     = false;  // Stepper manuell geöffnet → updatePaxUI respektiert das
 
     // GPS-Verifikation: Suche und Anfrage nur mit echtem GPS-Standort möglich
     let paxHasGps = false;
@@ -1216,8 +1217,9 @@
         b2val.className = "pax-acc-value set";
       }
       if (b2body) {
-        // Offen wenn: kein Ziel gesetzt (Zeit ist nächster Schritt) ODER kein Marker
-        const b2open = hasMarker && !hasTarget;
+        // Offen wenn: (Zeit ist nächster Schritt = Marker da, Ziel fehlt)
+        // ODER manuell geöffnet (paxTimeOpen)
+        const b2open = hasMarker && (!hasTarget || paxTimeOpen);
         b2body.classList.toggle("pax-closed", !b2open);
       }
       if (b2hdr) b2hdr.classList.toggle("locked", locked);
@@ -1271,13 +1273,10 @@
         updatePaxUI();
       });
 
-      // Header 2: Startzeit → Body togglen
+      // Header 2: Startzeit → paxTimeOpen togglen, aktueller Wert bleibt erhalten
       document.getElementById("paxAccHeader2")?.addEventListener("click", () => {
         if (paxSearchActive || Date.now() < paxCooldownUntil) return;
-        const body = document.getElementById("paxTimeBlock");
-        if (!body) return;
-        const isOpen = !body.classList.contains("pax-closed");
-        body.classList.toggle("pax-closed", isOpen);
+        paxTimeOpen = !paxTimeOpen;
         updatePaxUI();
       });
 
@@ -1539,8 +1538,9 @@
 
     function cancelPaxSearch() {
       paxSearchActive = false;
+      paxTimeOpen = false;
       paxMatchedKeys.clear();
-      clearManualOpen(); // manualOpen-Flags zurücksetzen → Blöcke wieder normal steuern
+      clearManualOpen();
       refreshPaxMatchLayer();
       updatePaxUI();
       const statusEl = document.getElementById("paxMatchStatus");
