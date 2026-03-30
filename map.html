@@ -122,6 +122,28 @@
     .mode-panel { margin-top: 8px; }
 
     /* ── Mitfahrer-Panel ── */
+    /* ── Accordion-Step-Flow ── */
+    .pax-step-section {
+      overflow: hidden;
+      transition: max-height 0.3s ease, opacity 0.25s ease;
+      max-height: 300px;   /* offen */
+      opacity: 1;
+    }
+    .pax-step-section.pax-collapsed {
+      max-height: 0;
+      opacity: 0;
+      pointer-events: none;
+    }
+    /* Kompakte Statuszeile (sichtbar wenn Block zugeklappt und Wert gesetzt) */
+    .pax-step-summary {
+      display: none;
+      font-size: 12px;
+      color: #4ade80;
+      padding: 4px 10px 2px;
+      box-sizing: border-box;
+    }
+    .pax-step-summary.show { display: block; }
+
     .pax-block {
       padding: 8px 10px 0;
       box-sizing: border-box;
@@ -644,15 +666,19 @@
     <div class="mode-panel" id="passengerPanel" style="display:none">
 
       <!-- Block 1: Standort / Treffpunkt -->
-      <div class="pax-block">
-        <div class="pax-block-title">Treffpunkt</div>
-        <button class="pax-btn" id="btnPaxGps">Meinen Standort verwenden</button>
-        <button class="pax-btn" id="btnPaxMarker">Marker setzen / verschieben</button>
-        <div class="pax-status" id="paxMarkerStatus">Kein Treffpunkt gesetzt</div>
+      <div id="paxSection1" class="pax-step-section">
+        <div class="pax-block">
+          <div class="pax-block-title">Treffpunkt</div>
+          <button class="pax-btn" id="btnPaxGps">Meinen Standort verwenden</button>
+          <button class="pax-btn" id="btnPaxMarker">Marker setzen / verschieben</button>
+          <div class="pax-status" id="paxMarkerStatus">Kein Treffpunkt gesetzt</div>
+        </div>
       </div>
+      <!-- Kompakte Zusammenfassung Block 1 -->
+      <div class="pax-step-summary" id="paxSummary1"></div>
 
       <!-- Block 2: Zeitfenster – Stepper -->
-      <div id="paxTimeBlock" style="display:none">
+      <div id="paxTimeBlock" class="pax-step-section pax-collapsed" style="display:none">
         <hr class="pax-divider" />
         <div class="pax-block" style="padding-bottom:6px">
           <div class="pax-block-title">Wann willst du die Fahrt starten?</div>
@@ -664,9 +690,11 @@
         </div>
         <div class="pax-locked-hint" id="paxLockedHint">Zum Ändern Suche abbrechen und neu starten</div>
       </div>
+      <!-- Kompakte Zusammenfassung Block 2 -->
+      <div class="pax-step-summary" id="paxSummary2"></div>
 
       <!-- Block 3: Zielmarker (nur wenn Treffpunkt gesetzt) -->
-      <div id="paxTargetBlock" style="display:none">
+      <div id="paxTargetBlock" class="pax-step-section pax-collapsed" style="display:none">
         <hr class="pax-divider" />
         <div class="pax-block">
           <div class="pax-block-title">Ziel / Richtung</div>
@@ -674,9 +702,11 @@
           <div class="pax-status" id="paxTargetStatus">Kein Ziel gesetzt</div>
         </div>
       </div>
+      <!-- Kompakte Zusammenfassung Block 3 -->
+      <div class="pax-step-summary" id="paxSummary3"></div>
 
       <!-- Block 4: Suche starten (nur wenn Treffpunkt + Ziel gesetzt) -->
-      <div id="paxSearchBlock" style="display:none">
+      <div id="paxSearchBlock" class="pax-step-section pax-collapsed" style="display:none">
         <hr class="pax-divider" />
         <div class="pax-search-actions">
           <button class="pax-search-btn" id="btnPaxSearch">Passende Fahrer finden</button>
@@ -1089,6 +1119,80 @@
       if (paxSearchActive || onCooldown) {
         exitPaxMarkerMode();
         exitPaxTargetMode();
+      }
+
+      // ── Accordion-Step-Flow ──
+      // Schritt 1: offen solange kein Treffpunkt gesetzt; danach zugeklappt + Summary
+      const sec1 = document.getElementById("paxSection1");
+      const sum1 = document.getElementById("paxSummary1");
+      if (sec1) {
+        if (hasMarker) {
+          sec1.classList.add("pax-collapsed");
+          if (sum1) {
+            sum1.textContent = `Treffpunkt ✅`;
+            sum1.classList.add("show");
+          }
+        } else {
+          sec1.classList.remove("pax-collapsed");
+          if (sum1) sum1.classList.remove("show");
+        }
+      }
+
+      // Schritt 2: sichtbar+offen sobald Treffpunkt gesetzt; zugeklappt+Summary sobald Zeit gewählt und Ziel folgt
+      const timeBlockEl = document.getElementById("paxTimeBlock");
+      const sum2 = document.getElementById("paxSummary2");
+      if (timeBlockEl) {
+        if (!hasMarker) {
+          timeBlockEl.style.display = "none";
+          timeBlockEl.classList.add("pax-collapsed");
+          if (sum2) sum2.classList.remove("show");
+        } else if (hasMarker && !hasTarget) {
+          // Treffpunkt gesetzt, noch kein Ziel → Zeit-Block offen
+          timeBlockEl.style.display = "";
+          timeBlockEl.classList.remove("pax-collapsed");
+          if (sum2) sum2.classList.remove("show");
+        } else if (hasMarker && hasTarget) {
+          // Ziel gesetzt → Zeit-Block zuklappen, Summary zeigen
+          timeBlockEl.style.display = "";
+          timeBlockEl.classList.add("pax-collapsed");
+          if (sum2) {
+            const timeLabel = paxTimeMin === 0 ? "jetzt" : `in ${formatStepDisplay(paxTimeMin)}`;
+            sum2.textContent = `Start: ${timeLabel} ✅`;
+            sum2.classList.add("show");
+          }
+        }
+      }
+
+      // Schritt 3: sichtbar+offen sobald Treffpunkt gesetzt; zugeklappt sobald Ziel gesetzt
+      const targetBlockEl = document.getElementById("paxTargetBlock");
+      const sum3 = document.getElementById("paxSummary3");
+      if (targetBlockEl) {
+        if (!hasMarker) {
+          targetBlockEl.style.display = "none";
+          targetBlockEl.classList.add("pax-collapsed");
+          if (sum3) sum3.classList.remove("show");
+        } else if (hasMarker && !hasTarget) {
+          // Treffpunkt gesetzt → Ziel-Block offen
+          targetBlockEl.style.display = "";
+          targetBlockEl.classList.remove("pax-collapsed");
+          if (sum3) sum3.classList.remove("show");
+        } else {
+          // Ziel gesetzt → Ziel-Block zuklappen, Summary zeigen
+          targetBlockEl.style.display = "";
+          targetBlockEl.classList.add("pax-collapsed");
+          if (sum3) {
+            sum3.textContent = `Ziel: gesetzt ✅`;
+            sum3.classList.add("show");
+          }
+        }
+      }
+
+      // Schritt 4: Such-Block nur sichtbar wenn beide gesetzt
+      const searchBlockEl = document.getElementById("paxSearchBlock");
+      if (searchBlockEl) {
+        const showSearch = hasMarker && hasTarget;
+        searchBlockEl.style.display = showSearch ? "" : "none";
+        searchBlockEl.classList.toggle("pax-collapsed", !showSearch);
       }
     }
 
