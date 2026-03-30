@@ -647,6 +647,14 @@
       button { height: 36px; font-size: 14px; }
       .hint-inline { max-width: 160px; }
     }
+
+    /* Mobile: Mapbox-Controls ausblenden */
+    @media (max-width: 900px) {
+      .mapboxgl-ctrl-bottom-right,
+      .mapboxgl-ctrl-bottom-left,
+      .mapboxgl-ctrl-logo,
+      .mapboxgl-ctrl-attrib { display: none !important; }
+    }
   </style>
 </head>
 
@@ -2134,7 +2142,7 @@
         center: DEFAULT_CENTER,
         zoom: DEFAULT_ZOOM,
       });
-      m.addControl(new mapboxgl.NavigationControl(), "bottom-right");
+      // NavigationControl bewusst entfernt: Mobile nutzt Pinch-to-Zoom
 
       m.on("load", () => {
         hideHint();
