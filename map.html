@@ -125,8 +125,8 @@
     /* ── Accordion-Step-Flow ── */
     .pax-step-section {
       overflow: hidden;
-      transition: max-height 0.3s ease, opacity 0.25s ease;
-      max-height: 300px;   /* offen */
+      transition: max-height 0.28s ease, opacity 0.22s ease;
+      max-height: 300px;
       opacity: 1;
     }
     .pax-step-section.pax-collapsed {
@@ -134,35 +134,45 @@
       opacity: 0;
       pointer-events: none;
     }
-    /* Kompakte Statuszeile (sichtbar wenn Block zugeklappt und Wert gesetzt) */
+    /* Kompakte Statuszeile – klickbar zum Aufklappen */
     .pax-step-summary {
       display: none;
-      font-size: 12px;
+      font-size: 11.5px;
       color: #4ade80;
-      padding: 4px 10px 2px;
+      padding: 2px 10px 1px;
       box-sizing: border-box;
+      cursor: pointer;
+      opacity: 0.85;
     }
-    .pax-step-summary.show { display: block; }
+    .pax-step-summary.show { display: flex; align-items: center; gap: 6px; }
+    .pax-step-summary::after {
+      content: "✎";
+      font-size: 10px;
+      opacity: 0.5;
+      margin-left: auto;
+    }
 
+    /* ── Komprimierte Block-Abstände ── */
     .pax-block {
-      padding: 8px 10px 0;
+      padding: 4px 10px 0;
       box-sizing: border-box;
       width: 100%;
     }
     .pax-block-title {
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: .05em;
-      opacity: 0.45;
-      margin-bottom: 6px;
+      opacity: 0.40;
+      margin-bottom: 4px;
     }
+    /* Schlankere Buttons */
     .pax-btn {
       width: 100%;
       box-sizing: border-box;
-      height: 32px;
+      height: 28px;
       border-radius: 999px;
-      font-size: 12.5px;
+      font-size: 12px;
       font-weight: 600;
       cursor: pointer;
       border: 1px solid rgba(199,223,58,0.25);
@@ -172,23 +182,24 @@
       align-items: center;
       justify-content: center;
       gap: 6px;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
     .pax-btn.active-pax {
       background: rgba(199,223,58,0.85);
       color: #0b0f14;
       border-color: transparent;
     }
+    /* Kompakter Status */
     .pax-status {
-      font-size: 12px;
-      padding: 6px 4px;
-      color: rgba(234,240,255,0.75);
+      font-size: 11px;
+      padding: 3px 4px;
+      color: rgba(234,240,255,0.70);
     }
     .pax-status.set { color: #4ade80; }
     .pax-divider {
       border: none;
       border-top: 1px solid rgba(255,255,255,0.07);
-      margin: 8px 10px;
+      margin: 5px 10px;
     }
     .pax-time-grid {
       display: flex;
@@ -218,28 +229,28 @@
       cursor: not-allowed;
     }
     .pax-locked-hint {
-      font-size: 11px;
+      font-size: 10px;
       opacity: 0.5;
       text-align: center;
-      padding: 4px 10px 0;
+      padding: 2px 10px 0;
       display: none;
     }
     .pax-locked-hint.show { display: block; }
     .passenger-hint {
-      font-size: 11px;
+      font-size: 10.5px;
       opacity: 0.5;
       text-align: center;
-      margin-top: 8px;
-      padding: 0 10px 8px;
+      margin-top: 4px;
+      padding: 0 10px 4px;
     }
 
-    /* ── Mitfahrer: Zeitfenster-Stepper ── */
+    /* ── Mitfahrer: Zeitfenster-Stepper (kompakter) ── */
     .pax-stepper {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 10px;
-      padding: 6px 10px 8px;
+      gap: 8px;
+      padding: 4px 10px 6px;
     }
     .pax-step-btn {
       width: 38px; height: 38px;
@@ -284,15 +295,15 @@
     /* ── Mitfahrer: Such-Buttons ── */
     .pax-search-actions {
       display: flex;
-      gap: 8px;
-      padding: 8px 10px 4px;
+      gap: 6px;
+      padding: 4px 10px 4px;
       box-sizing: border-box;
     }
     .pax-search-btn {
       flex: 1;
-      height: 34px;
+      height: 30px;
       border-radius: 999px;
-      font-size: 13px;
+      font-size: 12.5px;
       font-weight: 700;
       cursor: pointer;
       border: none;
@@ -303,8 +314,8 @@
     .pax-search-btn:disabled { opacity: 0.35; cursor: not-allowed; }
     .pax-cancel-btn {
       flex: 0 0 auto;
-      height: 34px;
-      padding: 0 14px;
+      height: 30px;
+      padding: 0 12px;
       border-radius: 999px;
       font-size: 12px;
       font-weight: 600;
@@ -1126,19 +1137,20 @@
       const sec1 = document.getElementById("paxSection1");
       const sum1 = document.getElementById("paxSummary1");
       if (sec1) {
-        if (hasMarker) {
-          sec1.classList.add("pax-collapsed");
-          if (sum1) {
+        // Nur auto-zuklappen wenn Treffpunkt gesetzt UND kein Bearbeitungs-Modus aktiv
+        const sec1ShouldCollapse = hasMarker && !paxMarkerMode;
+        sec1.classList.toggle("pax-collapsed", sec1ShouldCollapse);
+        if (sum1) {
+          if (hasMarker) {
             sum1.textContent = `Treffpunkt ✅`;
             sum1.classList.add("show");
+          } else {
+            sum1.classList.remove("show");
           }
-        } else {
-          sec1.classList.remove("pax-collapsed");
-          if (sum1) sum1.classList.remove("show");
         }
       }
 
-      // Schritt 2: sichtbar+offen sobald Treffpunkt gesetzt; zugeklappt+Summary sobald Zeit gewählt und Ziel folgt
+      // Schritt 2: Zeit-Block — offen wenn Treffpunkt gesetzt und kein Ziel, oder explizit aufgeklappt
       const timeBlockEl = document.getElementById("paxTimeBlock");
       const sum2 = document.getElementById("paxSummary2");
       if (timeBlockEl) {
@@ -1147,14 +1159,15 @@
           timeBlockEl.classList.add("pax-collapsed");
           if (sum2) sum2.classList.remove("show");
         } else if (hasMarker && !hasTarget) {
-          // Treffpunkt gesetzt, noch kein Ziel → Zeit-Block offen
           timeBlockEl.style.display = "";
           timeBlockEl.classList.remove("pax-collapsed");
           if (sum2) sum2.classList.remove("show");
-        } else if (hasMarker && hasTarget) {
-          // Ziel gesetzt → Zeit-Block zuklappen, Summary zeigen
-          timeBlockEl.style.display = "";
-          timeBlockEl.classList.add("pax-collapsed");
+        } else {
+          // Ziel gesetzt → Zeit-Block zuklappen (nicht wenn Nutzer explizit aufgeklappt hat)
+          if (!timeBlockEl.dataset.manualOpen) {
+            timeBlockEl.style.display = "";
+            timeBlockEl.classList.add("pax-collapsed");
+          }
           if (sum2) {
             const timeLabel = paxTimeMin === 0 ? "jetzt" : `in ${formatStepDisplay(paxTimeMin)}`;
             sum2.textContent = `Start: ${timeLabel} ✅`;
@@ -1163,7 +1176,7 @@
         }
       }
 
-      // Schritt 3: sichtbar+offen sobald Treffpunkt gesetzt; zugeklappt sobald Ziel gesetzt
+      // Schritt 3: Ziel-Block — offen wenn Treffpunkt gesetzt und kein Ziel, oder explizit aufgeklappt
       const targetBlockEl = document.getElementById("paxTargetBlock");
       const sum3 = document.getElementById("paxSummary3");
       if (targetBlockEl) {
@@ -1172,17 +1185,18 @@
           targetBlockEl.classList.add("pax-collapsed");
           if (sum3) sum3.classList.remove("show");
         } else if (hasMarker && !hasTarget) {
-          // Treffpunkt gesetzt → Ziel-Block offen
           targetBlockEl.style.display = "";
           targetBlockEl.classList.remove("pax-collapsed");
           if (sum3) sum3.classList.remove("show");
         } else {
-          // Ziel gesetzt → Ziel-Block zuklappen, Summary zeigen
+          // Ziel gesetzt → zuklappen, außer Ziel-Modus aktiv oder manuell aufgeklappt
+          const targetShouldCollapse = !paxTargetMode && !targetBlockEl.dataset.manualOpen;
           targetBlockEl.style.display = "";
-          targetBlockEl.classList.add("pax-collapsed");
+          targetBlockEl.classList.toggle("pax-collapsed", targetShouldCollapse);
           if (sum3) {
             sum3.textContent = `Ziel: gesetzt ✅`;
-            sum3.classList.add("show");
+            if (hasTarget) sum3.classList.add("show");
+            else sum3.classList.remove("show");
           }
         }
       }
@@ -1194,6 +1208,61 @@
         searchBlockEl.style.display = showSearch ? "" : "none";
         searchBlockEl.classList.toggle("pax-collapsed", !showSearch);
       }
+    }
+
+    // ── Summary-Klick-Handler: Block wieder aufklappen + Marker-Modus aktivieren ──
+    document.addEventListener("DOMContentLoaded", () => {
+      // Summary 1: Treffpunkt aufklappen → Marker-Bearbeitungs-Modus
+      document.getElementById("paxSummary1")?.addEventListener("click", () => {
+        if (paxSearchActive || (Date.now() < paxCooldownUntil)) return;
+        // Section 1 aufklappen
+        const sec1 = document.getElementById("paxSection1");
+        if (sec1) sec1.classList.remove("pax-collapsed");
+        // Marker-Modus aktivieren
+        paxMarkerMode = true;
+        const btn = document.getElementById("btnPaxMarker");
+        if (btn) btn.classList.add("active-pax");
+        showHint("Treffpunkt verschieben oder neu setzen.");
+        updatePaxUI();
+      });
+
+      // Summary 2: Zeit aufklappen
+      document.getElementById("paxSummary2")?.addEventListener("click", () => {
+        if (paxSearchActive || (Date.now() < paxCooldownUntil)) return;
+        const el = document.getElementById("paxTimeBlock");
+        if (!el) return;
+        el.style.display = "";
+        el.dataset.manualOpen = "1";
+        el.classList.remove("pax-collapsed");
+        const sum2 = document.getElementById("paxSummary2");
+        if (sum2) sum2.classList.remove("show");
+      });
+
+      // Summary 3: Ziel aufklappen → Ziel-Marker-Modus
+      document.getElementById("paxSummary3")?.addEventListener("click", () => {
+        if (paxSearchActive || (Date.now() < paxCooldownUntil)) return;
+        const el = document.getElementById("paxTargetBlock");
+        if (!el) return;
+        el.style.display = "";
+        el.dataset.manualOpen = "1";
+        el.classList.remove("pax-collapsed");
+        const sum3 = document.getElementById("paxSummary3");
+        if (sum3) sum3.classList.remove("show");
+        // Ziel-Modus aktivieren
+        paxTargetMode = true;
+        const btn = document.getElementById("btnPaxTarget");
+        if (btn) btn.classList.add("active-pax");
+        showHint("Ziel auf der Karte antippen.");
+        updatePaxUI();
+      });
+    });
+
+    // manualOpen zurücksetzen wenn Suche abgebrochen oder Panel resettet
+    function clearManualOpen() {
+      const t = document.getElementById("paxTimeBlock");
+      const g = document.getElementById("paxTargetBlock");
+      if (t) delete t.dataset.manualOpen;
+      if (g) delete g.dataset.manualOpen;
     }
 
     // GPS-Standort → Marker setzen (aktiviert keinen Verschiebe-Modus)
@@ -1435,6 +1504,7 @@
     function cancelPaxSearch() {
       paxSearchActive = false;
       paxMatchedKeys.clear();
+      clearManualOpen(); // manualOpen-Flags zurücksetzen → Blöcke wieder normal steuern
       refreshPaxMatchLayer();
       updatePaxUI();
       const statusEl = document.getElementById("paxMatchStatus");
