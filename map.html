@@ -122,34 +122,70 @@
     .mode-panel { margin-top: 8px; }
 
     /* ── Mitfahrer-Panel ── */
-    /* ── Accordion-Step-Flow ── */
-    .pax-step-section {
+    /* ── Editable-Accordion: Header immer sichtbar, Body collapsible ── */
+    .pax-acc-block {
+      border-top: 1px solid rgba(255,255,255,0.07);
+      margin-top: 2px;
+    }
+    .pax-acc-block:first-child { border-top: none; margin-top: 4px; }
+
+    /* Header: immer sichtbar, klickbar zum Auf-/Zuklappen */
+    .pax-acc-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px 4px;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      box-sizing: border-box;
+      width: 100%;
+    }
+    .pax-acc-header:active { opacity: 0.75; }
+    /* Sperren wenn Suche aktiv */
+    .pax-acc-header.locked { cursor: default; opacity: 0.6; pointer-events: none; }
+
+    .pax-acc-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: rgba(234,240,255,0.40);
+      flex-shrink: 0;
+      min-width: 70px;
+    }
+    .pax-acc-value {
+      font-size: 11.5px;
+      color: rgba(234,240,255,0.55);
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .pax-acc-value.set { color: #4ade80; }
+    .pax-acc-edit {
+      font-size: 11px;
+      color: rgba(199,223,58,0.50);
+      flex-shrink: 0;
+      transition: color .15s;
+    }
+    .pax-acc-header:not(.locked):hover .pax-acc-edit { color: rgba(199,223,58,0.90); }
+
+    /* Body: collapsible */
+    .pax-acc-body {
       overflow: hidden;
       transition: max-height 0.28s ease, opacity 0.22s ease;
       max-height: 300px;
       opacity: 1;
     }
-    .pax-step-section.pax-collapsed {
+    .pax-acc-body.pax-closed {
       max-height: 0;
       opacity: 0;
       pointer-events: none;
     }
-    /* Kompakte Statuszeile – klickbar zum Aufklappen */
-    .pax-step-summary {
-      display: none;
-      font-size: 11.5px;
-      color: #4ade80;
-      padding: 2px 10px 1px;
+    .pax-acc-inner {
+      padding: 2px 10px 6px;
       box-sizing: border-box;
-      cursor: pointer;
-      opacity: 0.85;
-    }
-    .pax-step-summary.show { display: flex; align-items: center; gap: 6px; }
-    .pax-step-summary::after {
-      content: "✎";
-      font-size: 10px;
-      opacity: 0.5;
-      margin-left: auto;
     }
 
     /* ── Komprimierte Block-Abstände ── */
@@ -676,49 +712,59 @@
     <!-- ── MITFAHRER-PANEL ── -->
     <div class="mode-panel" id="passengerPanel" style="display:none">
 
-      <!-- Block 1: Standort / Treffpunkt -->
-      <div id="paxSection1" class="pax-step-section">
-        <div class="pax-block">
-          <div class="pax-block-title">Treffpunkt</div>
-          <button class="pax-btn" id="btnPaxGps">Meinen Standort verwenden</button>
-          <button class="pax-btn" id="btnPaxMarker">Marker setzen / verschieben</button>
-          <div class="pax-status" id="paxMarkerStatus">Kein Treffpunkt gesetzt</div>
+      <!-- Accordion Block 1: Treffpunkt – Header immer sichtbar -->
+      <div class="pax-acc-block" id="paxAccBlock1">
+        <div class="pax-acc-header" id="paxAccHeader1" role="button" aria-expanded="true">
+          <span class="pax-acc-label">Treffpunkt</span>
+          <span class="pax-acc-value" id="paxAccVal1">nicht gesetzt</span>
+          <span class="pax-acc-edit">✎</span>
+        </div>
+        <div class="pax-acc-body" id="paxAccBody1">
+          <div class="pax-acc-inner">
+            <button class="pax-btn" id="btnPaxGps">📍 GPS-Standort verwenden</button>
+            <button class="pax-btn" id="btnPaxMarker">Marker setzen / verschieben</button>
+            <div class="pax-status" id="paxMarkerStatus">Kein Treffpunkt gesetzt</div>
+          </div>
         </div>
       </div>
-      <!-- Kompakte Zusammenfassung Block 1 -->
-      <div class="pax-step-summary" id="paxSummary1"></div>
 
-      <!-- Block 2: Zeitfenster – Stepper -->
-      <div id="paxTimeBlock" class="pax-step-section pax-collapsed" style="display:none">
-        <hr class="pax-divider" />
-        <div class="pax-block" style="padding-bottom:6px">
-          <div class="pax-block-title">Wann willst du die Fahrt starten?</div>
+      <!-- Accordion Block 2: Startzeit – sichtbar sobald Treffpunkt gesetzt -->
+      <div class="pax-acc-block" id="paxAccBlock2" style="display:none">
+        <div class="pax-acc-header" id="paxAccHeader2" role="button" aria-expanded="false">
+          <span class="pax-acc-label">Startzeit</span>
+          <span class="pax-acc-value" id="paxAccVal2">nicht gesetzt</span>
+          <span class="pax-acc-edit">✎</span>
         </div>
-        <div class="pax-stepper" id="paxStepper">
-          <button class="pax-step-btn" id="btnStepMinus" aria-label="Früher">−</button>
-          <div class="pax-step-display" id="paxStepDisplay">–</div>
-          <button class="pax-step-btn" id="btnStepPlus" aria-label="Später">+</button>
-        </div>
-        <div class="pax-locked-hint" id="paxLockedHint">Zum Ändern Suche abbrechen und neu starten</div>
-      </div>
-      <!-- Kompakte Zusammenfassung Block 2 -->
-      <div class="pax-step-summary" id="paxSummary2"></div>
-
-      <!-- Block 3: Zielmarker (nur wenn Treffpunkt gesetzt) -->
-      <div id="paxTargetBlock" class="pax-step-section pax-collapsed" style="display:none">
-        <hr class="pax-divider" />
-        <div class="pax-block">
-          <div class="pax-block-title">Ziel / Richtung</div>
-          <button class="pax-btn" id="btnPaxTarget">Ziel auf Karte setzen / verschieben</button>
-          <div class="pax-status" id="paxTargetStatus">Kein Ziel gesetzt</div>
+        <div class="pax-acc-body pax-closed" id="paxTimeBlock">
+          <div class="pax-acc-inner">
+            <div class="pax-stepper" id="paxStepper">
+              <button class="pax-step-btn" id="btnStepMinus" aria-label="Früher">−</button>
+              <div class="pax-step-display" id="paxStepDisplay">jetzt</div>
+              <button class="pax-step-btn" id="btnStepPlus" aria-label="Später">+</button>
+            </div>
+            <div class="pax-locked-hint" id="paxLockedHint">Suche abbrechen zum Ändern</div>
+          </div>
         </div>
       </div>
-      <!-- Kompakte Zusammenfassung Block 3 -->
-      <div class="pax-step-summary" id="paxSummary3"></div>
 
-      <!-- Block 4: Suche starten (nur wenn Treffpunkt + Ziel gesetzt) -->
-      <div id="paxSearchBlock" class="pax-step-section pax-collapsed" style="display:none">
-        <hr class="pax-divider" />
+      <!-- Accordion Block 3: Ziel – sichtbar sobald Treffpunkt gesetzt -->
+      <div class="pax-acc-block" id="paxAccBlock3" style="display:none">
+        <div class="pax-acc-header" id="paxAccHeader3" role="button" aria-expanded="false">
+          <span class="pax-acc-label">Ziel</span>
+          <span class="pax-acc-value" id="paxAccVal3">nicht gesetzt</span>
+          <span class="pax-acc-edit">✎</span>
+        </div>
+        <div class="pax-acc-body pax-closed" id="paxTargetBlock">
+          <div class="pax-acc-inner">
+            <button class="pax-btn" id="btnPaxTarget">Ziel auf Karte setzen / verschieben</button>
+            <div class="pax-status" id="paxTargetStatus">Kein Ziel gesetzt</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Block 4: Suche starten – sichtbar wenn Treffpunkt + Ziel gesetzt -->
+      <div id="paxSearchBlock" style="display:none">
+        <div class="pax-divider"></div>
         <div class="pax-search-actions">
           <button class="pax-search-btn" id="btnPaxSearch">Passende Fahrer finden</button>
           <button class="pax-cancel-btn" id="btnPaxCancel">✕ Abbrechen</button>
@@ -1132,138 +1178,128 @@
         exitPaxTargetMode();
       }
 
-      // ── Accordion-Step-Flow ──
-      // Schritt 1: offen solange kein Treffpunkt gesetzt; danach zugeklappt + Summary
-      const sec1 = document.getElementById("paxSection1");
-      const sum1 = document.getElementById("paxSummary1");
-      if (sec1) {
-        // Nur auto-zuklappen wenn Treffpunkt gesetzt UND kein Bearbeitungs-Modus aktiv
-        const sec1ShouldCollapse = hasMarker && !paxMarkerMode;
-        sec1.classList.toggle("pax-collapsed", sec1ShouldCollapse);
-        if (sum1) {
-          if (hasMarker) {
-            sum1.textContent = `Treffpunkt ✅`;
-            sum1.classList.add("show");
-          } else {
-            sum1.classList.remove("show");
-          }
-        }
-      }
+      // ── Editable-Accordion: Header-Werte + Body-Sichtbarkeit ──
+      // Regel: Body offen wenn gerade aktiver Schritt; geschlossen wenn fertig.
+      // Header IMMER klickbar (außer Suche aktiv) → öffnet Body + aktiviert Modus.
 
-      // Schritt 2: Zeit-Block — offen wenn Treffpunkt gesetzt und kein Ziel, oder explizit aufgeklappt
-      const timeBlockEl = document.getElementById("paxTimeBlock");
-      const sum2 = document.getElementById("paxSummary2");
-      if (timeBlockEl) {
-        if (!hasMarker) {
-          timeBlockEl.style.display = "none";
-          timeBlockEl.classList.add("pax-collapsed");
-          if (sum2) sum2.classList.remove("show");
-        } else if (hasMarker && !hasTarget) {
-          timeBlockEl.style.display = "";
-          timeBlockEl.classList.remove("pax-collapsed");
-          if (sum2) sum2.classList.remove("show");
+      const locked = paxSearchActive || onCooldown;
+
+      // --- Block 1: Treffpunkt ---
+      const b1val  = document.getElementById("paxAccVal1");
+      const b1body = document.getElementById("paxAccBody1");
+      const b1hdr  = document.getElementById("paxAccHeader1");
+      if (b1val) {
+        if (hasMarker) {
+          b1val.textContent = "gesetzt ✅";
+          b1val.className = "pax-acc-value set";
         } else {
-          // Ziel gesetzt → Zeit-Block zuklappen (nicht wenn Nutzer explizit aufgeklappt hat)
-          if (!timeBlockEl.dataset.manualOpen) {
-            timeBlockEl.style.display = "";
-            timeBlockEl.classList.add("pax-collapsed");
-          }
-          if (sum2) {
-            const timeLabel = paxTimeMin === 0 ? "jetzt" : `in ${formatStepDisplay(paxTimeMin)}`;
-            sum2.textContent = `Start: ${timeLabel} ✅`;
-            sum2.classList.add("show");
-          }
+          b1val.textContent = "nicht gesetzt";
+          b1val.className = "pax-acc-value";
         }
       }
+      if (b1body) {
+        // Offen wenn: kein Marker gesetzt ODER Marker-Bearbeitungs-Modus aktiv
+        const b1open = !hasMarker || paxMarkerMode;
+        b1body.classList.toggle("pax-closed", !b1open);
+      }
+      if (b1hdr) b1hdr.classList.toggle("locked", locked);
 
-      // Schritt 3: Ziel-Block — offen wenn Treffpunkt gesetzt und kein Ziel, oder explizit aufgeklappt
-      const targetBlockEl = document.getElementById("paxTargetBlock");
-      const sum3 = document.getElementById("paxSummary3");
-      if (targetBlockEl) {
-        if (!hasMarker) {
-          targetBlockEl.style.display = "none";
-          targetBlockEl.classList.add("pax-collapsed");
-          if (sum3) sum3.classList.remove("show");
-        } else if (hasMarker && !hasTarget) {
-          targetBlockEl.style.display = "";
-          targetBlockEl.classList.remove("pax-collapsed");
-          if (sum3) sum3.classList.remove("show");
+      // --- Block 2: Startzeit ---
+      const b2block = document.getElementById("paxAccBlock2");
+      const b2val   = document.getElementById("paxAccVal2");
+      const b2body  = document.getElementById("paxTimeBlock");
+      const b2hdr   = document.getElementById("paxAccHeader2");
+      if (b2block) b2block.style.display = hasMarker ? "" : "none";
+      if (b2val) {
+        const timeLabel = paxTimeMin === 0 ? "jetzt" : formatStepDisplay(paxTimeMin);
+        b2val.textContent = timeLabel;
+        b2val.className = "pax-acc-value set";
+      }
+      if (b2body) {
+        // Offen wenn: kein Ziel gesetzt (Zeit ist nächster Schritt) ODER kein Marker
+        const b2open = hasMarker && !hasTarget;
+        b2body.classList.toggle("pax-closed", !b2open);
+      }
+      if (b2hdr) b2hdr.classList.toggle("locked", locked);
+
+      // --- Block 3: Ziel ---
+      const b3block = document.getElementById("paxAccBlock3");
+      const b3val   = document.getElementById("paxAccVal3");
+      const b3body  = document.getElementById("paxTargetBlock");
+      const b3hdr   = document.getElementById("paxAccHeader3");
+      if (b3block) b3block.style.display = hasMarker ? "" : "none";
+      if (b3val) {
+        if (hasTarget) {
+          b3val.textContent = "gesetzt ✅";
+          b3val.className = "pax-acc-value set";
         } else {
-          // Ziel gesetzt → zuklappen, außer Ziel-Modus aktiv oder manuell aufgeklappt
-          const targetShouldCollapse = !paxTargetMode && !targetBlockEl.dataset.manualOpen;
-          targetBlockEl.style.display = "";
-          targetBlockEl.classList.toggle("pax-collapsed", targetShouldCollapse);
-          if (sum3) {
-            sum3.textContent = `Ziel: gesetzt ✅`;
-            if (hasTarget) sum3.classList.add("show");
-            else sum3.classList.remove("show");
-          }
+          b3val.textContent = "nicht gesetzt";
+          b3val.className = "pax-acc-value";
         }
       }
+      if (b3body) {
+        // Offen wenn: Marker gesetzt, Ziel noch nicht gesetzt, ODER Ziel-Modus aktiv
+        const b3open = hasMarker && (!hasTarget || paxTargetMode);
+        b3body.classList.toggle("pax-closed", !b3open);
+      }
+      if (b3hdr) b3hdr.classList.toggle("locked", locked);
 
-      // Schritt 4: Such-Block nur sichtbar wenn beide gesetzt
+      // --- Block 4: Such-Block ---
       const searchBlockEl = document.getElementById("paxSearchBlock");
       if (searchBlockEl) {
-        const showSearch = hasMarker && hasTarget;
-        searchBlockEl.style.display = showSearch ? "" : "none";
-        searchBlockEl.classList.toggle("pax-collapsed", !showSearch);
+        searchBlockEl.style.display = (hasMarker && hasTarget) ? "" : "none";
       }
     }
 
-    // ── Summary-Klick-Handler: Block wieder aufklappen + Marker-Modus aktivieren ──
-    document.addEventListener("DOMContentLoaded", () => {
-      // Summary 1: Treffpunkt aufklappen → Marker-Bearbeitungs-Modus
-      document.getElementById("paxSummary1")?.addEventListener("click", () => {
-        if (paxSearchActive || (Date.now() < paxCooldownUntil)) return;
-        // Section 1 aufklappen
-        const sec1 = document.getElementById("paxSection1");
-        if (sec1) sec1.classList.remove("pax-collapsed");
-        // Marker-Modus aktivieren
-        paxMarkerMode = true;
-        const btn = document.getElementById("btnPaxMarker");
-        if (btn) btn.classList.add("active-pax");
-        showHint("Treffpunkt verschieben oder neu setzen.");
+    // ── Accordion-Header-Klick-Handler (einmal beim Start registrieren) ──
+    function initAccordionHandlers() {
+      // Header 1: Treffpunkt → Marker-Modus aktivieren
+      document.getElementById("paxAccHeader1")?.addEventListener("click", () => {
+        if (paxSearchActive || Date.now() < paxCooldownUntil) return;
+        // Body aufklappen durch Marker-Modus einschalten
+        if (!paxMarkerMode) {
+          exitPaxTargetMode();
+          paxMarkerMode = true;
+          const btn = document.getElementById("btnPaxMarker");
+          if (btn) btn.classList.add("active-pax");
+          showHint("Treffpunkt auf der Karte setzen oder verschieben.");
+        } else {
+          // Nochmal klicken → Modus beenden, Body bleibt wenn Marker fehlt
+          exitPaxMarkerMode();
+          hideHint();
+        }
         updatePaxUI();
       });
 
-      // Summary 2: Zeit aufklappen
-      document.getElementById("paxSummary2")?.addEventListener("click", () => {
-        if (paxSearchActive || (Date.now() < paxCooldownUntil)) return;
-        const el = document.getElementById("paxTimeBlock");
-        if (!el) return;
-        el.style.display = "";
-        el.dataset.manualOpen = "1";
-        el.classList.remove("pax-collapsed");
-        const sum2 = document.getElementById("paxSummary2");
-        if (sum2) sum2.classList.remove("show");
-      });
-
-      // Summary 3: Ziel aufklappen → Ziel-Marker-Modus
-      document.getElementById("paxSummary3")?.addEventListener("click", () => {
-        if (paxSearchActive || (Date.now() < paxCooldownUntil)) return;
-        const el = document.getElementById("paxTargetBlock");
-        if (!el) return;
-        el.style.display = "";
-        el.dataset.manualOpen = "1";
-        el.classList.remove("pax-collapsed");
-        const sum3 = document.getElementById("paxSummary3");
-        if (sum3) sum3.classList.remove("show");
-        // Ziel-Modus aktivieren
-        paxTargetMode = true;
-        const btn = document.getElementById("btnPaxTarget");
-        if (btn) btn.classList.add("active-pax");
-        showHint("Ziel auf der Karte antippen.");
+      // Header 2: Startzeit → Body togglen
+      document.getElementById("paxAccHeader2")?.addEventListener("click", () => {
+        if (paxSearchActive || Date.now() < paxCooldownUntil) return;
+        const body = document.getElementById("paxTimeBlock");
+        if (!body) return;
+        const isOpen = !body.classList.contains("pax-closed");
+        body.classList.toggle("pax-closed", isOpen);
         updatePaxUI();
       });
-    });
 
-    // manualOpen zurücksetzen wenn Suche abgebrochen oder Panel resettet
-    function clearManualOpen() {
-      const t = document.getElementById("paxTimeBlock");
-      const g = document.getElementById("paxTargetBlock");
-      if (t) delete t.dataset.manualOpen;
-      if (g) delete g.dataset.manualOpen;
+      // Header 3: Ziel → Ziel-Modus aktivieren
+      document.getElementById("paxAccHeader3")?.addEventListener("click", () => {
+        if (paxSearchActive || Date.now() < paxCooldownUntil) return;
+        if (!paxTargetMode) {
+          exitPaxMarkerMode();
+          paxTargetMode = true;
+          const btn = document.getElementById("btnPaxTarget");
+          if (btn) btn.classList.add("active-pax");
+          showHint("Ziel auf der Karte antippen.");
+        } else {
+          exitPaxTargetMode();
+          hideHint();
+        }
+        updatePaxUI();
+      });
     }
+
+    // clearManualOpen als No-Op erhalten (cancelPaxSearch ruft es auf)
+    function clearManualOpen() {}
 
     // GPS-Standort → Marker setzen (aktiviert keinen Verschiebe-Modus)
     document.getElementById("btnPaxGps")?.addEventListener("click", () => {
@@ -2753,6 +2789,7 @@
 
     document.addEventListener("DOMContentLoaded", initMap);
     document.addEventListener("DOMContentLoaded", () => {
+      initAccordionHandlers();
       // Gespeicherten Modus sofort anwenden (vor Map-Init)
       const btn = document.getElementById("btnNightMode");
       if (btn) btn.textContent = nightMode ? "☀️" : "🌙";
