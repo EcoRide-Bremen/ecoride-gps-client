@@ -2412,7 +2412,9 @@
       // Kein BBox-Filter: Fahrer-Position kann außerhalb der sichtbaren Karte liegen
       // während die Route durch den sichtbaren Bereich führt → würde Route verschwinden lassen
       // Rides sind durch LIMIT 200 begrenzt, BBox daher nicht nötig
-      let query = sb.from("v_aktive_fahrten").select("*");
+      // Nur Rides mit frischer Position laden (STALE_MS-Filter gegen Altzustände)
+      const staleIso = new Date(Date.now() - STALE_MS).toISOString();
+      let query = sb.from("v_aktive_fahrten").select("*").gte("updated_at", staleIso);
 
       const { data, error } = await query.limit(200);
       if (seq !== ridesFetchSeq) return;
