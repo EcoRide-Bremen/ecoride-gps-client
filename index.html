@@ -8,390 +8,422 @@
   <!-- Supabase JS v2 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+  <!-- Mapbox GL -->
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.17.0/mapbox-gl.css" rel="stylesheet" />
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.17.0/mapbox-gl.js"></script>
+
   <style>
-    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:0;padding:24px;background:#0f1115;color:#fff}
-    .wrap{max-width:720px;margin:0 auto}
-    .muted{opacity:.75;font-size:14px}
-    .card{background:#161a22;border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:16px;margin-bottom:16px}
-    .card-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.5;margin:0 0 12px}
-    .row{display:flex;flex-direction:column;gap:6px;margin:12px 0}
-    .row.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-    .row.three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
-    label{font-size:13px;opacity:.7}
-    input{padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#0f1115;color:#fff;font-size:15px;width:100%;box-sizing:border-box}
-    input:disabled{opacity:.35;cursor:not-allowed}
-    input[type=number]{-moz-appearance:textfield}
-    button{padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);cursor:pointer;font-size:14px;font-weight:600;width:100%}
-    button:disabled{opacity:.35;cursor:not-allowed}
-    .primary{background:#c7d92c;color:#000}
-    .secondary{background:#0f1115;color:#fff}
-    .danger{background:#ef4444;color:#fff;border-color:#ef4444}
-    .success{background:#22c55e;color:#000;border-color:#22c55e}
-    .status{display:grid;gap:6px;margin-top:12px;padding:12px;border-radius:12px;background:#0f1115;border:1px solid rgba(255,255,255,.08);font-size:13px}
-    .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700}
-    .badge-aktiv{background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.4);color:#22c55e}
-    .badge-bereit{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:#aaa}
-    .badge-aus{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#f87171}
-    .badge-tracking{background:rgba(234,179,8,.15);border:1px solid rgba(234,179,8,.4);color:#facc15}
-    /* Innere Sektionen ein-/ausblenden */
-    .state-idle .show-tracking,.state-idle .show-ride { display:none !important; }
-    .state-tracking .show-idle,.state-tracking .show-ride { display:none !important; }
-    .state-ride .show-idle,.state-ride .show-tracking { display:none !important; }
-    /* Card-Sichtbarkeit: rideCard erst ab TRACKING sichtbar */
-    .state-idle #rideCard { display:none !important; }
-    .ride-id{font-size:11px;opacity:.55;word-break:break-all;margin-top:4px}
-    .hint{margin-top:8px;padding:10px 12px;border-radius:12px;background:rgba(199,217,44,.10);border:1px solid rgba(199,217,44,.30);font-size:13px;color:rgba(199,217,44,.9)}
-    .hint.error{background:rgba(239,68,68,.10);border-color:rgba(239,68,68,.30);color:#f87171}
-    .log{margin-top:12px;background:#0b0d12;border:1px solid rgba(255,255,255,.08);padding:12px;border-radius:12px;min-height:100px;max-height:200px;overflow-y:auto;white-space:pre-wrap;font-size:12px;font-family:monospace}
-    .divider{border:none;border-top:1px solid rgba(255,255,255,.07);margin:16px 0}
-    /* Routen-Auswahl */
-    .route-list{display:flex;flex-direction:column;gap:8px;margin:12px 0}
-    .route-item{padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#0f1115;cursor:pointer;transition:border-color .2s,background .2s}
-    .route-item:hover{border-color:rgba(199,217,44,.4);background:rgba(199,217,44,.06)}
-    .route-item.selected{border-color:rgba(199,217,44,.8);background:rgba(199,217,44,.12)}
-    .route-item-header{display:flex;justify-content:space-between;align-items:center;gap:8px}
-    .route-label{font-size:13px;font-weight:700;color:#c7d92c}
-    .route-meta{font-size:12px;opacity:.7;display:flex;gap:10px}
-    .route-loading{font-size:13px;opacity:.6;text-align:center;padding:12px}
+    /* ── Base ── */
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body, #app {
+      height: 100%; margin: 0; padding: 0;
+      font-family: system-ui, Segoe UI, Roboto, Arial, sans-serif;
+      background: #0b0f14; color: #eaf0ff;
+      overflow: hidden;
+    }
+    #app { position: relative; }
+
+    /* ── Karte ── */
+    #map-container, #map {
+      position: absolute;
+      inset: 0;
+    }
+
+    /* ── Bottom Sheet ── */
+    #route-sheet {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      border-radius: 20px 20px 0 0;
+      background: rgba(14, 19, 30, 0.97);
+      border-top: 1px solid rgba(255,255,255,0.10);
+      box-shadow: 0 -8px 32px rgba(0,0,0,0.5);
+      display: flex;
+      flex-direction: column;
+      transition: height 200ms ease;
+      z-index: 10;
+      overflow: hidden;
+    }
+    .sheet-open    { height: 58vh; }
+    .sheet-mid     { height: 30vh; }
+    .sheet-compact { height: 10vh; }
+
+    /* ── Handle ── */
+    .sheet-handle {
+      flex-shrink: 0;
+      width: 48px; height: 5px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.18);
+      margin: 10px auto 8px;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    /* ── Sheet Summary (compact) ── */
+    #sheet-summary {
+      flex-shrink: 0;
+      font-size: 13px;
+      padding: 0 16px 6px;
+      color: rgba(234,240,255,0.75);
+      min-height: 0;
+    }
+
+    /* ── Sheet Content (scrollbar) ── */
+    #sheet-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 16px;
+      -webkit-overflow-scrolling: touch;
+    }
+    #sheet-content::-webkit-scrollbar { width: 3px; }
+    #sheet-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 999px; }
+
+    /* compact: content + actions verstecken */
+    .sheet-compact #sheet-content { display: none; }
+    .sheet-compact #sheet-actions { display: none; }
+
+    /* ── Sheet Actions ── */
+    #sheet-actions {
+      flex-shrink: 0;
+      padding: 10px 16px 16px;
+      border-top: 1px solid rgba(255,255,255,0.07);
+    }
+
+    /* ── Utility ── */
+    .muted { opacity: .65; font-size: 13px; }
+    .divider { border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 10px 0; }
+    .row { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
+    .row.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    label { font-size: 12px; opacity: .6; }
+    input {
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(17,24,37,0.6);
+      color: #eaf0ff;
+      font-size: 14px;
+      width: 100%;
+    }
+    input:disabled { opacity: .35; cursor: not-allowed; }
+    input[type=number] { -moz-appearance: textfield; }
+    button {
+      padding: 11px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.12);
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      width: 100%;
+      transition: opacity .15s;
+    }
+    button:disabled { opacity: .35; cursor: not-allowed; }
+    button:active { opacity: .75; }
+    .btn-primary  { background: #c7d92c; color: #0b0f14; border: none; }
+    .btn-secondary{ background: rgba(17,24,37,0.6); color: #eaf0ff; }
+    .btn-danger   { background: #ef4444; color: #fff; border-color: #ef4444; }
+    .btn-success  { background: #22c55e; color: #000; border-color: #22c55e; }
+
+    /* ── Badges ── */
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+    .badge-aktiv    { background: rgba(34,197,94,.15); border: 1px solid rgba(34,197,94,.4); color: #22c55e; }
+    .badge-aus      { background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.3); color: #f87171; }
+    .badge-tracking { background: rgba(234,179,8,.15); border: 1px solid rgba(234,179,8,.4); color: #facc15; }
+
+    /* ── Status-Block ── */
+    .status-block {
+      background: rgba(17,24,37,0.5);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 13px;
+      display: grid;
+      gap: 5px;
+      margin: 8px 0;
+    }
+
+    /* ── Hint ── */
+    #rideHint {
+      margin: 6px 0;
+      padding: 9px 12px;
+      border-radius: 10px;
+      background: rgba(199,217,44,.10);
+      border: 1px solid rgba(199,217,44,.30);
+      font-size: 13px;
+      color: rgba(199,217,44,.9);
+      display: none;
+    }
+    #rideHint.error { background: rgba(239,68,68,.10); border-color: rgba(239,68,68,.30); color: #f87171; }
+
+    /* ── Log ── */
+    #log {
+      background: #0b0d12;
+      border: 1px solid rgba(255,255,255,.07);
+      padding: 10px;
+      border-radius: 10px;
+      min-height: 60px;
+      max-height: 120px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      font-size: 11px;
+      font-family: monospace;
+      color: rgba(234,240,255,0.6);
+      margin: 8px 0;
+    }
+
+    /* ── Route Cards ── */
+    .route-cards { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+    .route-card {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.04);
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+    }
+    .route-card:hover { background: rgba(199,217,44,0.07); border-color: rgba(199,217,44,0.25); }
+    .route-card.active { border-color: #c7d92c; background: rgba(199,217,44,0.10); }
+    .route-card-label { font-size: 13px; font-weight: 700; color: #c7d92c; margin-bottom: 4px; }
+    .route-card-meta  { font-size: 12px; opacity: .65; }
+    .route-loading { font-size: 13px; opacity: .55; text-align: center; padding: 16px 0; }
+
+    /* ── Ride ID ── */
+    .ride-id { font-size: 11px; opacity: .45; word-break: break-all; margin-top: 4px; }
+
+    /* ── State visibility ── */
+    .state-idle .show-tracking, .state-idle .show-ride { display: none !important; }
+    .state-tracking .show-idle, .state-tracking .show-ride { display: none !important; }
+    .state-ride .show-idle, .state-ride .show-tracking { display: none !important; }
+    .state-idle #rideSection { display: none !important; }
+
+    /* ── Mapbox overrides ── */
+    @media (max-width: 900px) {
+      .mapboxgl-ctrl-bottom-right, .mapboxgl-ctrl-bottom-left,
+      .mapboxgl-ctrl-logo, .mapboxgl-ctrl-attrib { display: none !important; }
+    }
   </style>
 </head>
 
 <body>
-  <div class="wrap state-idle">
-    <h1 style="margin-bottom:4px">EcoRide GPS-Client</h1>
-    <p class="muted">Fahrer-App: GPS tracken + Fahrt anbieten</p>
+  <div id="app" class="state-idle">
 
-    <!-- ══════════════════════════════════════
-         ZUSTANDSANZEIGE (oben, immer sichtbar)
-    ═══════════════════════════════════════ -->
-    <div class="card" id="stateCard">
-      <div class="card-title">Fahrer-Status</div>
-      <div class="status">
-        <div><b>Zustand:</b> <span id="stState"><span class="badge badge-aus">IDLE</span></span></div>
-        <div><b>Wake-Lock:</b> <span id="stWake">AUS</span></div>
-        <div><b>PWA:</b> <span id="stPwa">bereit</span></div>
-      </div>
+    <!-- Karte (immer sichtbar) -->
+    <div id="map-container">
+      <div id="map"></div>
     </div>
 
-    <!-- ══════════════════════════════════════
-         KARTE 1: GPS-TRACKING (IDLE → TRACKING)
-    ═══════════════════════════════════════ -->
-    <div class="card" id="trackCard">
-      <div class="card-title">GPS-Tracking</div>
+    <!-- Bottom Sheet -->
+    <section id="route-sheet" class="sheet sheet-open">
 
-      <!-- IDLE: Driver ID + Tracking starten -->
-      <div class="show-idle">
-        <div class="row">
-          <label>Driver ID</label>
-          <input id="driverId" placeholder="z.B. Test_Bre" />
-        </div>
-        <div class="row two">
-          <button id="btnTrackStart" class="primary">Tracking starten</button>
-          <button id="btnWake" class="secondary">Wake-Lock: AUS</button>
-        </div>
-      </div>
+      <!-- Drag Handle -->
+      <div id="sheet-handle" class="sheet-handle"></div>
 
-      <!-- TRACKING: Status + Tracking beenden -->
-      <div class="show-tracking">
-        <div class="status">
-          <div><b>Tracking:</b> <span class="badge badge-tracking">AKTIV</span></div>
-          <div><b>Fahrer:</b> <span id="stTrackDriver">–</span></div>
-        </div>
-        <div class="row two" style="margin-top:12px">
-          <button id="btnTrackStop" class="secondary">Tracking beenden</button>
-          <button id="btnWake2" class="secondary">Wake-Lock: AUS</button>
-        </div>
-      </div>
+      <!-- Compact Summary -->
+      <div id="sheet-summary"></div>
 
-      <pre id="log" class="log"></pre>
-    </div>
+      <!-- Scrollbarer Inhalt -->
+      <div id="sheet-content">
 
-    <!-- ══════════════════════════════════════
-         KARTE 2: FAHRT ANBIETEN (TRACKING → AKTIVE FAHRT)
-    ═══════════════════════════════════════ -->
-    <div class="card" id="rideCard">
-      <div class="card-title">Fahrt anbieten</div>
-
-      <div id="rideHint" class="hint" style="display:none"></div>
-
-      <!-- TRACKING: Fahrt starten (Formular) -->
-      <div class="show-tracking" id="rideForm">
-        <div class="row two">
-          <div>
-            <label>Ziel – Breitengrad (lat)</label>
-            <input id="zielLat" type="number" step="0.000001" placeholder="53.0832" />
+        <!-- Fahrer-Status (immer sichtbar) -->
+        <div class="status-block" style="margin-top:4px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:11px;opacity:.5;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Fahrer-Status</span>
+            <span id="stState"><span class="badge badge-aus">IDLE</span></span>
           </div>
-          <div>
-            <label>Ziel – Längengrad (lng)</label>
-            <input id="zielLng" type="number" step="0.000001" placeholder="8.8133" />
-          </div>
-        </div>
-        <p class="muted" style="margin:0 0 8px;font-size:12px">💡 Tipp: Bremen Hbf = 53.0832 / 8.8133 · Google Maps → Rechtsklick → Koordinaten kopieren</p>
-
-        <div class="row two">
-          <div>
-            <label>Sitzplätze (1–8)</label>
-            <input id="plaetze" type="number" min="1" max="8" value="2" />
-          </div>
-          <div>
-            <label>Preis (€)</label>
-            <input id="preis" type="number" min="0" step="0.50" value="0.00" />
+          <div style="display:flex;gap:12px;font-size:12px;opacity:.6">
+            <span>Wake: <span id="stWake">AUS</span></span>
+            <span>PWA: <span id="stPwa">–</span></span>
           </div>
         </div>
 
-        <!-- Routenvorschau: wird nach Ziel-Eingabe geladen -->
-        <div id="routePickerBlock" style="display:none">
-          <hr class="divider" />
-          <div style="font-size:13px;font-weight:700;margin-bottom:4px">Route auswählen</div>
-          <div id="routeList" class="route-list"></div>
+        <!-- IDLE: Driver ID + Tracking starten -->
+        <div class="show-idle">
+          <div class="row">
+            <label>Driver ID</label>
+            <input id="driverId" placeholder="z.B. Test_Bre" />
+          </div>
+          <div class="row two">
+            <button id="btnTrackStart" class="btn-primary">Tracking starten</button>
+            <button id="btnWake" class="btn-secondary">Wake-Lock: AUS</button>
+          </div>
+          <pre id="log" class="log"></pre>
         </div>
 
-        <div class="row">
-          <button id="btnRoutePreview" class="secondary">Routen berechnen</button>
+        <!-- TRACKING: Ziel + Routen -->
+        <div class="show-tracking">
+          <div class="status-block">
+            <div>Tracking: <span class="badge badge-tracking">AKTIV</span></div>
+            <div style="font-size:12px;opacity:.65">Fahrer: <span id="stTrackDriver">–</span></div>
+          </div>
+          <pre id="logTracking" class="log"></pre>
+
+          <div id="rideSection">
+            <hr class="divider" />
+            <div style="font-size:12px;font-weight:700;opacity:.5;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Fahrt anbieten</div>
+
+            <div id="rideHint"></div>
+
+            <div class="row two">
+              <div>
+                <label>Ziel – Lat</label>
+                <input id="zielLat" type="number" step="0.000001" placeholder="53.0832" />
+              </div>
+              <div>
+                <label>Ziel – Lng</label>
+                <input id="zielLng" type="number" step="0.000001" placeholder="8.8133" />
+              </div>
+            </div>
+            <p class="muted" style="margin:2px 0 8px;font-size:11px">💡 Bremen Hbf = 53.0832 / 8.8133</p>
+            <div class="row two">
+              <div>
+                <label>Sitzplätze (1–8)</label>
+                <input id="plaetze" type="number" min="1" max="8" value="2" />
+              </div>
+              <div>
+                <label>Preis (€)</label>
+                <input id="preis" type="number" min="0" step="0.50" value="0.00" />
+              </div>
+            </div>
+
+            <!-- Route Cards -->
+            <div id="routeCardsBlock" style="display:none">
+              <hr class="divider" />
+              <div style="font-size:12px;font-weight:700;margin-bottom:6px">Route wählen</div>
+              <div id="route-cards" class="route-cards"></div>
+            </div>
+          </div>
+
+          <div class="row two" style="margin-top:10px">
+            <button id="btnTrackStop" class="btn-secondary">Tracking beenden</button>
+            <button id="btnWake2" class="btn-secondary">Wake-Lock: AUS</button>
+          </div>
         </div>
-        <div class="row">
-          <button id="btnRideStart" class="success" disabled>Fahrt starten</button>
+
+        <!-- AKTIVE FAHRT -->
+        <div class="show-ride">
+          <div class="status-block">
+            <div>Fahrt: <span class="badge badge-aktiv">AKTIV</span></div>
+            <div style="font-size:12px;opacity:.65">Fahrer: <span id="stRideDriver">–</span></div>
+            <div style="font-size:12px;opacity:.65">Plätze: <span id="stRidePlaetze">–</span></div>
+            <div style="font-size:12px;opacity:.65">Preis: <span id="stRidePreis">–</span></div>
+            <div class="ride-id">ride_id: <span id="stRideId">–</span></div>
+          </div>
+        </div>
+
+      </div><!-- /sheet-content -->
+
+      <!-- Aktionen -->
+      <div id="sheet-actions">
+        <!-- IDLE: leer -->
+        <div class="show-idle" style="height:4px"></div>
+
+        <!-- TRACKING: Routen berechnen + Fahrt starten -->
+        <div class="show-tracking">
+          <div class="row two" style="margin:0">
+            <button id="btnRoutePreview" class="btn-secondary">Routen berechnen</button>
+            <button id="btnRideStart" class="btn-success" disabled>Fahrt starten</button>
+          </div>
+        </div>
+
+        <!-- RIDE: Fahrt beenden -->
+        <div class="show-ride">
+          <button id="btnRideStop" class="btn-danger">Fahrt beenden</button>
         </div>
       </div>
 
-      <!-- AKTIVE FAHRT: Status + beenden -->
-      <div class="show-ride" id="rideStatus">
-        <div class="status">
-          <div><b>Fahrt:</b> <span class="badge badge-aktiv">AKTIV</span></div>
-          <div><b>Fahrer:</b> <span id="stRideDriver">–</span></div>
-          <div><b>Plätze:</b> <span id="stRidePlaetze">–</span></div>
-          <div><b>Preis:</b> <span id="stRidePreis">–</span></div>
-          <div class="ride-id">ride_id: <span id="stRideId">–</span></div>
-        </div>
-        <div class="row" style="margin-top:12px">
-          <button id="btnRideStop" class="danger">Fahrt beenden</button>
-        </div>
-      </div>
-    </div>
-
-  </div><!-- /wrap -->
+    </section>
+  </div><!-- /app -->
 
   <script>
     /****************************************************
-     * EcoRide GPS-Client + Fahrer-Flow
+     * EcoRide GPS-Client + Bottom Sheet
      ****************************************************/
 
-    // ── SUPABASE ──────────────────────────────────────
-    const SUPABASE_URL     = "https://ihpszsoivqcrkkiucjvv.supabase.co";
-    const SUPABASE_ANON_KEY =
-      "SUPABASE_KEY_PLACEHOLDER";
+    // ── CONFIG ────────────────────────────────────────
+    const MAPBOX_TOKEN   = "MAPBOX_TOKEN_PLACEHOLDER";
+    const SUPABASE_URL   = "https://ihpszsoivqcrkkiucjvv.supabase.co";
+    const SUPABASE_KEY   = "SUPABASE_KEY_PLACEHOLDER";
 
-    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const sb  = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const app = document.getElementById('app');
+    const el  = id => document.getElementById(id);
 
-    // ── ZUSTANDSAUTOMAT ───────────────────────────────
-    // Zustände: "idle" | "tracking" | "ride"
-    let appState = "idle";
+    // ── APP STATE ─────────────────────────────────────
+    let appState = 'idle'; // 'idle' | 'tracking' | 'ride'
 
     // ── SHEET STATE (Phase 1) ─────────────────────────
-    // 'idle' | 'destination' | 'routes' | 'active'
-    let sheetState = 'idle';
+    // 'open' | 'mid' | 'compact'
+    let sheetState = 'open';
 
-    function setSheetState(s) {
-      sheetState = s;
-      const block = document.getElementById('routePickerBlock');
-      if (block) block.style.display = s === 'routes' ? '' : 'none';
-      const btnPrev = document.getElementById('btnRoutePreview');
-      if (btnPrev) btnPrev.style.display = (s === 'destination' || s === 'routes') ? '' : 'none';
+    function applySheetState(state) {
+      const sheet = el('route-sheet');
+      sheet.classList.remove('sheet-open', 'sheet-mid', 'sheet-compact');
+      sheet.classList.add('sheet-' + state);
+      sheetState = state;
+      renderSheetSummary();
     }
 
-    // ── ROUTE AUSWAHL STATE (Phase 2) ─────────────────
-    // Einzige Auswahl-Wahrheit. Format: String-Index '0'|'1'|'2'
+    // ── ROUTE STATE (Phase 2) ─────────────────────────
+    // selectedRouteId = einzige Auswahl-Wahrheit
     let selectedRouteId = null;
+    let availableRoutes = []; // [{ routeId, label, coords, distanceM, durationS }]
 
+    function setSelectedRoute(routeId) {
+      selectedRouteId = routeId;
+      renderRouteCards();
+      updateStartRideButton();
+      renderSheetSummary();
+    }
+
+    function updateStartRideButton() {
+      const btn = el('btnRideStart');
+      if (btn) btn.disabled = !selectedRouteId;
+    }
+
+    // ── APP STATE MACHINE ─────────────────────────────
     function setState(newState) {
       appState = newState;
-      if (newState === 'idle')     setSheetState('idle');
-      if (newState === 'tracking') setSheetState('destination');
-      if (newState === 'ride')     setSheetState('active');
-      const wrap = document.querySelector(".wrap");
-      wrap.classList.remove("state-idle", "state-tracking", "state-ride");
-      wrap.classList.add("state-" + newState);
+      app.classList.remove('state-idle', 'state-tracking', 'state-ride');
+      app.classList.add('state-' + newState);
 
-      const badges = { idle: "badge-aus", tracking: "badge-tracking", ride: "badge-aktiv" };
-      const labels = { idle: "IDLE", tracking: "TRACKING", ride: "AKTIVE FAHRT" };
-      el("stState").innerHTML = `<span class="badge ${badges[newState]}">${labels[newState]}</span>`;
-      log("Zustand → " + newState.toUpperCase());
+      const badges = { idle: 'badge-aus', tracking: 'badge-tracking', ride: 'badge-aktiv' };
+      const labels = { idle: 'IDLE', tracking: 'TRACKING', ride: 'AKTIVE FAHRT' };
+      el('stState').innerHTML = `<span class="badge ${badges[newState]}">${labels[newState]}</span>`;
+      log('Zustand → ' + newState.toUpperCase());
+
+      // Sheet bei Zustandswechsel öffnen
+      if (newState === 'tracking') applySheetState('open');
+      if (newState === 'ride')     applySheetState('mid');
+      if (newState === 'idle')     applySheetState('open');
     }
 
-    // ── GPS STATE ─────────────────────────────────────
-    let watchId        = null;
-    let lastPos        = null;
-    let lastSend       = 0;
-    const SEND_EVERY_MS = 1500;
-
-    // ── RIDE STATE ────────────────────────────────────
-    let activeRideId   = null;
-
-    // ── WAKE LOCK ─────────────────────────────────────
-    let wakeLock             = null;
-    let wakeListenerAttached = false;
-
-    // ── ELEMENTE ──────────────────────────────────────
-    const el = id => document.getElementById(id);
-
-    const driverInput    = el("driverId");
-    const btnTrackStart  = el("btnTrackStart");
-    const btnTrackStop   = el("btnTrackStop");
-    const btnWake        = el("btnWake");
-    const btnWake2       = el("btnWake2");
-    const stWake         = el("stWake");
-    const stPwa          = el("stPwa");
-    const logEl          = el("log");
-
-    const zielLatInput = el("zielLat");
-    const zielLngInput = el("zielLng");
-    const plaetzeInput = el("plaetze");
-    const preisInput   = el("preis");
-    const btnRideStart = el("btnRideStart");
-    const btnRideStop  = el("btnRideStop");
-    const rideHint     = el("rideHint");
-
-    // ── LOG ───────────────────────────────────────────
-    function log(msg) {
-      const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
-      console.log(line);
-      logEl.textContent = line + "\n" + (logEl.textContent || "");
+    // ── RENDER: Sheet Summary (compact) ──────────────
+    function renderSheetSummary() {
+      const summary = el('sheet-summary');
+      if (sheetState !== 'compact' || !selectedRouteId) { summary.innerHTML = ''; return; }
+      const route = availableRoutes.find(r => r.routeId === selectedRouteId);
+      if (!route) { summary.innerHTML = ''; return; }
+      summary.innerHTML = `<strong>${route.label}</strong> · ${fmtDur(route.durationS)} · ${fmtDist(route.distanceM)}`;
     }
 
-    // ── HINT ──────────────────────────────────────────
-    function showHint(msg, isError = false) {
-      rideHint.textContent = msg;
-      rideHint.className   = isError ? "hint error" : "hint";
-      rideHint.style.display = "block";
-    }
-    function hideHint() {
-      rideHint.style.display = "none";
-    }
-
-    // ── PWA STATUS ────────────────────────────────────
-    function updatePwaStatus() {
-      const standalone =
-        window.matchMedia("(display-mode: standalone)").matches ||
-        window.navigator.standalone === true;
-      stPwa.textContent = standalone ? "aktiv" : "bereit";
-    }
-    updatePwaStatus();
-
-    // ── SUPABASE: DELETE POSITION (Bug 1) ────────────
-    async function deletePosition(driverId) {
-      if (!driverId) return;
-      const { error } = await sb
-        .from("live_positions")
-        .delete()
-        .eq("driver_id", driverId);
-      if (error) log("DELETE ERROR: " + error.message);
-      else        log("Position gelöscht ✅ " + driverId);
+    // ── RENDER: Route Cards ───────────────────────────
+    function renderRouteCards() {
+      const container = el('route-cards');
+      const block = el('routeCardsBlock');
+      container.innerHTML = '';
+      if (!availableRoutes.length) { block.style.display = 'none'; return; }
+      block.style.display = '';
+      availableRoutes.forEach(route => {
+        const card = document.createElement('div');
+        card.className = 'route-card' + (route.routeId === selectedRouteId ? ' active' : '');
+        card.innerHTML = `<div class="route-card-label">${route.label}</div>`
+          + `<div class="route-card-meta">📐 ${fmtDist(route.distanceM)} · ⏱ ${fmtDur(route.durationS)}</div>`;
+        card.onclick = () => setSelectedRoute(route.routeId);
+        container.appendChild(card);
+      });
     }
 
-    // ── SUPABASE: GPS WRITE ───────────────────────────
-    async function sendToSupabase(driverId, pos) {
-      const now = Date.now();
-      if (now - lastSend < SEND_EVERY_MS) return;
-      lastSend = now;
-
-      const payload = {
-        driver_id:  driverId,
-        lat:        pos.coords.latitude,
-        lng:        pos.coords.longitude,
-        accuracy:   pos.coords.accuracy,
-        speed:      pos.coords.speed,
-        heading:    pos.coords.heading,
-        updated_at: new Date().toISOString(),
-      };
-
-      const { error } = await sb
-        .from("live_positions")
-        .upsert(payload, { onConflict: "driver_id" });
-
-      if (error) log("SUPABASE ERROR: " + error.message);
-      else        log("SENT ✅ " + driverId);
-    }
-
-    // ── GPS TRACKING ──────────────────────────────────
-    function startTracking() {
-      const driverId = driverInput.value.trim();
-      if (!driverId)               return alert("Bitte Driver ID eingeben.");
-      if (!navigator.geolocation)  return alert("GPS wird nicht unterstützt.");
-
-      if (watchId !== null) {
-        navigator.geolocation.clearWatch(watchId);
-        watchId = null;
-        log("Alter GPS-Watcher gestoppt vor Neustart.");
-      }
-
-      log("Tracking START…");
-      el("stTrackDriver").textContent = driverId;
-      driverInput.disabled = true;
-
-      watchId = navigator.geolocation.watchPosition(
-        pos => {
-          lastPos = pos;
-          log(`GPS ${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)} (${Math.round(pos.coords.accuracy)}m)`);
-          sendToSupabase(driverId, pos);
-        },
-        err => {
-          log("GPS Fehler: " + err.message);
-          alert("GPS Fehler: " + err.message);
-          stopTracking();
-        },
-        { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
-      );
-
-      setState("tracking");
-    }
-
-    async function stopTracking() {
-      if (watchId !== null) {
-        navigator.geolocation.clearWatch(watchId);
-        watchId = null;
-        log("GPS-Watcher gestoppt.");
-      }
-
-      lastPos  = null;
-      lastSend = 0;
-      driverInput.disabled = false;
-
-      const driverId = driverInput.value.trim();
-      if (driverId) await deletePosition(driverId);
-
-      log("✅ Tracking vollständig gestoppt.");
-      setState("idle");
-    }
-
-    // Tab-Rückkehr: GPS-Watcher neu starten wenn Tracking aktiv
-    document.addEventListener("visibilitychange", () => {
-      if (appState !== "tracking" && appState !== "ride") return;
-      if (document.visibilityState !== "visible") return;
-      if (watchId !== null) return;
-      log("App zurück → GPS-Watcher neu starten");
-      startTracking();
-    });
-
-    // ── OSRM: ALTERNATIVROUTEN ─────────────────────
-    async function fetchOsrmRoutes(startLng, startLat, zielLng, zielLat) {
-      const url = `https://router.project-osrm.org/route/v1/driving/` +
-                  `${startLng},${startLat};${zielLng},${zielLat}` +
-                  `?overview=full&geometries=geojson&alternatives=true`;
-      const res  = await fetch(url, { signal: AbortSignal.timeout(8000) });
-      if (!res.ok) throw new Error("OSRM HTTP " + res.status);
-      const json = await res.json();
-      if (!Array.isArray(json?.routes) || json.routes.length === 0) throw new Error("OSRM: keine Routen");
-      return json.routes.map(r => ({
-        coords:    r.geometry?.coordinates ?? [],
-        distanceM: r.distance ?? 0,
-        durationS: r.duration ?? 0,
-      })).filter(r => r.coords.length >= 2);
-    }
-
+    // ── FORMAT HELPERS ────────────────────────────────
     function fmtDist(m) { return m >= 1000 ? (m/1000).toFixed(1)+' km' : Math.round(m)+' m'; }
     function fmtDur(s)  { const min=Math.round(s/60); return min>=60 ? Math.floor(min/60)+' Std '+(min%60)+' Min' : min+' Min'; }
-
-    let fetchedRoutes = [];
 
     function getRouteLabel(idx, routes) {
       if (routes.length === 1) return 'Schnellste Route';
@@ -402,240 +434,350 @@
       return 'Alternative Route';
     }
 
-    function renderRouteList(routes) {
-      const listEl = document.getElementById('routeList');
-      const block  = document.getElementById('routePickerBlock');
-      listEl.innerHTML = '';
-      selectedRouteId = null;
-      document.getElementById('btnRideStart').disabled = true;
-      if (!routes || routes.length === 0) {
-        listEl.innerHTML = "<div class='route-loading'>Keine Routen gefunden.</div>";
-        block.style.display = '';
-        return;
-      }
-      routes.forEach((route, idx) => {
-        const label = getRouteLabel(idx, routes);
-        const item  = document.createElement('div');
-        item.className = 'route-item';
-        item.innerHTML = `<div class="route-item-header"><span class="route-label">${label}</span></div>`
-          + `<div class="route-meta"><span>📐 ${fmtDist(route.distanceM)}</span><span>⏱ ${fmtDur(route.durationS)}</span></div>`;
-        item.addEventListener('click', () => {
-          document.querySelectorAll('.route-item').forEach(el => el.classList.remove('selected'));
-          item.classList.add('selected');
-          selectedRouteId = String(idx);
-          document.getElementById('btnRideStart').disabled = false;
-        });
-        listEl.appendChild(item);
+    // ── GPS STATE ─────────────────────────────────────
+    let watchId    = null;
+    let lastPos    = null;
+    let lastSend   = 0;
+    const SEND_MS  = 1500;
+    let activeRideId = null;
+
+    // ── WAKE LOCK ─────────────────────────────────────
+    let wakeLock = null;
+    let wakeListenerAttached = false;
+
+    // ── LOG ───────────────────────────────────────────
+    function log(msg) {
+      const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      console.log(line);
+      ['log', 'logTracking'].forEach(id => {
+        const logEl = el(id);
+        if (logEl) logEl.textContent = line + '\n' + (logEl.textContent || '');
       });
-      block.style.display = '';
     }
 
-    document.getElementById('btnRoutePreview')?.addEventListener('click', async () => {
+    // ── HINT ──────────────────────────────────────────
+    function showHint(msg, isError = false) {
+      const h = el('rideHint');
+      h.textContent = msg; h.className = isError ? 'error' : '';
+      h.style.display = 'block';
+    }
+    function hideHint() { el('rideHint').style.display = 'none'; }
+
+    // ── PWA ───────────────────────────────────────────
+    function updatePwaStatus() {
+      const s = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+      el('stPwa').textContent = s ? 'aktiv' : 'bereit';
+    }
+    updatePwaStatus();
+
+    // ── SUPABASE ──────────────────────────────────────
+    async function deletePosition(driverId) {
+      if (!driverId) return;
+      const { error } = await sb.from('live_positions').delete().eq('driver_id', driverId);
+      if (error) log('DELETE ERROR: ' + error.message);
+      else        log('Position gelöscht ✅ ' + driverId);
+    }
+
+    async function sendToSupabase(driverId, pos) {
+      const now = Date.now();
+      if (now - lastSend < SEND_MS) return;
+      lastSend = now;
+      const { error } = await sb.from('live_positions').upsert({
+        driver_id: driverId,
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy,
+        speed: pos.coords.speed,
+        heading: pos.coords.heading,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'driver_id' });
+      if (error) log('SUPABASE ERROR: ' + error.message);
+      else        log('SENT ✅ ' + driverId);
+    }
+
+    // ── GPS TRACKING ──────────────────────────────────
+    function startTracking() {
+      const driverId = el('driverId').value.trim();
+      if (!driverId)             return alert('Bitte Driver ID eingeben.');
+      if (!navigator.geolocation) return alert('GPS nicht unterstützt.');
+      if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+
+      log('Tracking START…');
+      el('stTrackDriver').textContent = driverId;
+      el('driverId').disabled = true;
+
+      watchId = navigator.geolocation.watchPosition(
+        pos => {
+          lastPos = pos;
+          log(`GPS ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`);
+          sendToSupabase(driverId, pos);
+          // Karte auf Position zentrieren
+          if (map) map.easeTo({ center: [pos.coords.longitude, pos.coords.latitude], duration: 600 });
+        },
+        err => { log('GPS Fehler: ' + err.message); stopTracking(); },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+      );
+
+      setState('tracking');
+    }
+
+    async function stopTracking() {
+      if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+      lastPos = null; lastSend = 0;
+      el('driverId').disabled = false;
+      const driverId = el('driverId').value.trim();
+      if (driverId) await deletePosition(driverId);
+      setState('idle');
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if ((appState === 'tracking' || appState === 'ride') && document.visibilityState === 'visible' && watchId === null) {
+        log('App zurück → GPS-Watcher neu starten');
+        startTracking();
+      }
+    });
+
+    // ── OSRM: ALTERNATIVROUTEN ────────────────────────
+    async function fetchOsrmRoutes(startLng, startLat, zielLng, zielLat) {
+      const url = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${zielLng},${zielLat}?overview=full&geometries=geojson&alternatives=true`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) throw new Error('OSRM HTTP ' + res.status);
+      const json = await res.json();
+      if (!Array.isArray(json?.routes) || !json.routes.length) throw new Error('OSRM: keine Routen');
+      return json.routes.map((r, idx) => ({
+        routeId:   String(idx),
+        label:     '', // wird nach dem Mapping gesetzt
+        coords:    r.geometry?.coordinates ?? [],
+        distanceM: r.distance ?? 0,
+        durationS: r.duration ?? 0,
+      })).filter(r => r.coords.length >= 2);
+    }
+
+    // ── Routen berechnen ──────────────────────────────
+    el('btnRoutePreview')?.addEventListener('click', async () => {
       if (!lastPos) return showHint('Noch keine GPS-Position. Bitte kurz warten.', true);
-      const zielLat = parseFloat(document.getElementById('zielLat').value);
-      const zielLng = parseFloat(document.getElementById('zielLng').value);
-      if (isNaN(zielLat)||isNaN(zielLng)) return showHint('Bitte Ziel-Koordinaten eingeben.', true);
-      if (zielLat<-90||zielLat>90)         return showHint('Lat muss zwischen -90 und 90 liegen.', true);
-      if (zielLng<-180||zielLng>180)        return showHint('Lng muss zwischen -180 und 180 liegen.', true);
-      const btn = document.getElementById('btnRoutePreview');
+      const zLat = parseFloat(el('zielLat').value);
+      const zLng = parseFloat(el('zielLng').value);
+      if (isNaN(zLat)||isNaN(zLng)) return showHint('Bitte Ziel-Koordinaten eingeben.', true);
+      if (zLat<-90||zLat>90)        return showHint('Lat muss zwischen -90 und 90 liegen.', true);
+      if (zLng<-180||zLng>180)      return showHint('Lng muss zwischen -180 und 180 liegen.', true);
+
+      const btn = el('btnRoutePreview');
       btn.disabled = true; btn.textContent = 'Berechne…';
-      const listEl = document.getElementById('routeList');
-      listEl.innerHTML = "<div class='route-loading'>Routen werden geladen…</div>";
-      document.getElementById('routePickerBlock').style.display = '';
+      el('route-cards').innerHTML = "<div class='route-loading'>Routen werden geladen…</div>";
+      el('routeCardsBlock').style.display = '';
+
       try {
-        fetchedRoutes = await fetchOsrmRoutes(lastPos.coords.longitude, lastPos.coords.latitude, zielLng, zielLat);
-        log(`${fetchedRoutes.length} Route(n) geladen`);
-        renderRouteList(fetchedRoutes);
-        setSheetState('routes');
+        const routes = await fetchOsrmRoutes(lastPos.coords.longitude, lastPos.coords.latitude, zLng, zLat);
+        // Label setzen
+        routes.forEach((r, idx) => { r.label = getRouteLabel(idx, routes); });
+        availableRoutes = routes;
+        selectedRouteId = null;
+        renderRouteCards();
+        updateStartRideButton();
+        applySheetState('open');
+        log(`${routes.length} Route(n) geladen`);
+        // Zielmarker auf Karte
+        if (map) {
+          map.easeTo({ center: [zLng, zLat], zoom: 12, duration: 700 });
+        }
       } catch (e) {
         log('Routen-Fehler: ' + e.message);
-        listEl.innerHTML = "<div class='route-loading'>Fehler – bitte erneut versuchen.</div>";
+        el('route-cards').innerHTML = "<div class='route-loading'>Fehler – bitte erneut versuchen.</div>";
       } finally {
         btn.disabled = false; btn.textContent = 'Routen berechnen';
       }
     });
 
-    // ── RIDE: START ───────────────────────────────────
+    // ── RIDE START ────────────────────────────────────
     async function startRide() {
-      if (appState !== "tracking") return;
-      const driverId = driverInput.value.trim();
-      const zielLat  = parseFloat(zielLatInput.value);
-      const zielLng  = parseFloat(zielLngInput.value);
-      const plaetze  = parseInt(plaetzeInput.value);
-      const preis    = parseFloat(preisInput.value);
+      if (appState !== 'tracking') return;
+      const driverId = el('driverId').value.trim();
+      const zLat = parseFloat(el('zielLat').value);
+      const zLng = parseFloat(el('zielLng').value);
+      const plaetze = parseInt(el('plaetze').value);
+      const preis = parseFloat(el('preis').value);
 
-      if (!driverId)                                    return showHint("Driver ID fehlt.", true);
-      if (isNaN(zielLat) || isNaN(zielLng))            return showHint("Bitte Ziel-Koordinaten eingeben.", true);
-      if (zielLat < -90  || zielLat > 90)              return showHint("Lat muss zwischen -90 und 90 liegen.", true);
-      if (zielLng < -180 || zielLng > 180)             return showHint("Lng muss zwischen -180 und 180 liegen.", true);
-      if (isNaN(plaetze) || plaetze < 1 || plaetze > 8) return showHint("Sitzplätze: 1–8.", true);
-      if (isNaN(preis)   || preis < 0)                 return showHint("Preis darf nicht negativ sein.", true);
-      if (!lastPos) return showHint("Noch keine GPS-Position. Bitte kurz warten.", true);
+      if (!driverId)                         return showHint('Driver ID fehlt.', true);
+      if (isNaN(zLat)||isNaN(zLng))          return showHint('Bitte Ziel-Koordinaten eingeben.', true);
+      if (zLat<-90||zLat>90)                 return showHint('Lat muss zwischen -90 und 90 liegen.', true);
+      if (zLng<-180||zLng>180)               return showHint('Lng muss zwischen -180 und 180 liegen.', true);
+      if (isNaN(plaetze)||plaetze<1||plaetze>8) return showHint('Sitzplätze: 1–8.', true);
+      if (isNaN(preis)||preis<0)              return showHint('Preis darf nicht negativ sein.', true);
+      if (!lastPos)                           return showHint('Noch keine GPS-Position.', true);
 
-      const startLat = lastPos.coords.latitude;
-      const startLng = lastPos.coords.longitude;
+      // Gewählte Route aus availableRoutes holen
+      const selectedRoute = availableRoutes.find(r => r.routeId === selectedRouteId);
+      const routePunkte = selectedRoute
+        ? selectedRoute.coords
+        : [[lastPos.coords.longitude, lastPos.coords.latitude], [zLng, zLat]];
 
-      // Gewählte Route aus der Vorschau verwenden
-      let routePunkte;
-      if (selectedRouteId !== null && fetchedRoutes[Number(selectedRouteId)]) {
-        routePunkte = fetchedRoutes[Number(selectedRouteId)].coords;
-        log(`Route übernommen (${routePunkte.length} Punkte)`);
-      } else {
-        // Fallback: Luftlinie
-        log("Keine Route gewählt – Luftlinie als Fallback");
-        routePunkte = [[startLng, startLat], [zielLng, zielLat]];
-      }
+      if (!selectedRoute) log('Keine Route gewählt – Luftlinie als Fallback');
+      else log(`Route übernommen (${routePunkte.length} Punkte)`);
 
-      btnRideStart.disabled = true;
-      btnRideStart.textContent = "Starte…";
+      el('btnRideStart').disabled = true;
+      el('btnRideStart').textContent = 'Starte…';
       hideHint();
 
-      const { data, error } = await sb
-        .from("rides")
-        .insert({
-          driver_id:    driverId,
-          start_lat:    startLat,
-          start_lng:    startLng,
-          ziel_lat:     zielLat,
-          ziel_lng:     zielLng,
-          route_punkte: routePunkte,
-          plaetze:      plaetze,
-          preis:        preis,
-          status:       "aktiv",
-        })
-        .select("id, ziel_lat, ziel_lng, start_lat, start_lng, route_punkte")
-        .single();
+      const { data, error } = await sb.from('rides').insert({
+        driver_id: driverId,
+        start_lat: lastPos.coords.latitude,
+        start_lng: lastPos.coords.longitude,
+        ziel_lat:  zLat,
+        ziel_lng:  zLng,
+        route_punkte: routePunkte,
+        plaetze, preis,
+        status: 'aktiv',
+      }).select('id').single();
 
-      btnRideStart.disabled = false;
-      btnRideStart.textContent = "Fahrt starten";
+      el('btnRideStart').disabled = false;
+      el('btnRideStart').textContent = 'Fahrt starten';
 
-      if (error) {
-        log("RIDE INSERT ERROR: " + error.message);
-        showHint("Fehler beim Starten: " + error.message, true);
-        return;
-      }
+      if (error) { log('RIDE INSERT ERROR: ' + error.message); showHint('Fehler beim Starten: ' + error.message, true); return; }
 
       activeRideId = data.id;
-      log("FAHRT GESTARTET ✅ ride_id=" + activeRideId);
-      showHint("Fahrt läuft! Mitfahrer können dich jetzt auf der Karte sehen.");
+      log('FAHRT GESTARTET ✅ ride_id=' + activeRideId);
+      showHint('Fahrt läuft! Mitfahrer können dich jetzt sehen.');
 
-      el("stRideDriver").textContent  = driverId;
-      el("stRidePlaetze").textContent = plaetze + " Platz/Plätze";
-      el("stRidePreis").textContent   = preis.toFixed(2) + " €";
-      el("stRideId").textContent      = activeRideId;
+      el('stRideDriver').textContent  = driverId;
+      el('stRidePlaetze').textContent = plaetze + ' Platz/Plätze';
+      el('stRidePreis').textContent   = preis.toFixed(2) + ' €';
+      el('stRideId').textContent      = activeRideId;
 
-      setState("ride");
+      setState('ride');
     }
 
-    // ── RIDE: STOP ────────────────────────────────────
+    // ── RIDE STOP ─────────────────────────────────────
     async function endRide() {
-      log("endRide() aufgerufen — activeRideId=" + activeRideId);
-      if (!activeRideId) { log("endRide() abgebrochen: keine activeRideId"); return; }
-
+      if (!activeRideId) return;
       const rideId = activeRideId;
       activeRideId = null;
-      selectedRouteId = null; fetchedRoutes = [];
+      selectedRouteId = null;
+      availableRoutes = [];
 
-      const { data, error, status, statusText } = await sb
-        .from("rides")
-        .update({ status: "abgeschlossen", beendet_am: new Date().toISOString() })
-        .eq("id", rideId)
-        .select("id, status, beendet_am");
+      const { error } = await sb.from('rides')
+        .update({ status: 'abgeschlossen', beendet_am: new Date().toISOString() })
+        .eq('id', rideId);
 
-      log("UPDATE Antwort → status=" + status + " statusText=" + statusText);
+      if (error) log('RIDE UPDATE ERROR: ' + error.message);
+      else        log('FAHRT BEENDET ✅ ride_id=' + rideId);
 
-      if (error) {
-        log("RIDE UPDATE ERROR: " + JSON.stringify(error));
-        showHint("Fehler beim Beenden: " + error.message, true);
-      } else if (!data || data.length === 0) {
-        log("⚠️ UPDATE: keine Zeile geändert! RLS oder falsche ID?");
-        showHint("Achtung: Fahrt wurde nicht in DB beendet (RLS?).", true);
-      } else {
-        log("FAHRT BEENDET ✅ ride_id=" + rideId);
-      }
-
-      // Fahrt beenden = Tracking beenden = IDLE (alles aus)
-      showHint("Fahrt beendet – Tracking gestoppt.");
-      await stopTracking(); // setzt auch setState("idle")
+      showHint('Fahrt beendet – Tracking gestoppt.');
+      await stopTracking();
     }
 
     // ── WAKE LOCK ─────────────────────────────────────
     function setWakeUi(on) {
-      stWake.textContent  = on ? "AN" : "AUS";
-      btnWake.textContent = `Wake-Lock: ${on ? "AN" : "AUS"}`;
+      el('stWake').textContent = on ? 'AN' : 'AUS';
+      ['btnWake','btnWake2'].forEach(id => { const b=el(id); if(b) b.textContent='Wake-Lock: '+(on?'AN':'AUS'); });
     }
 
     async function requestWakeLock() {
-      wakeLock = await navigator.wakeLock.request("screen");
+      wakeLock = await navigator.wakeLock.request('screen');
       setWakeUi(true);
-      log("Wake-Lock AN");
-
-      wakeLock.addEventListener("release", () => {
-        wakeLock = null;
-        setWakeUi(false);
-        log("Wake-Lock released");
-      });
+      log('Wake-Lock AN');
+      wakeLock.addEventListener('release', () => { wakeLock = null; setWakeUi(false); log('Wake-Lock released'); });
     }
 
     async function toggleWakeLock() {
-      if (window.self !== window.top) {
-        alert("Wake-Lock im iframe nicht verfügbar. Bitte Full Page nutzen.");
-        return;
-      }
-      if (!("wakeLock" in navigator)) {
-        alert("Wake-Lock wird in diesem Browser/Gerät nicht unterstützt.");
-        return;
-      }
-
+      if (window.self !== window.top) { alert('Wake-Lock im iframe nicht verfügbar.'); return; }
+      if (!('wakeLock' in navigator)) { alert('Wake-Lock nicht unterstützt.'); return; }
       if (!wakeLock) {
         try {
           await requestWakeLock();
           if (!wakeListenerAttached) {
             wakeListenerAttached = true;
-            document.addEventListener("visibilitychange", async () => {
-              if (document.visibilityState === "visible" && !wakeLock) {
-                try {
-                  await requestWakeLock();
-                  log("Wake-Lock re-acquired");
-                } catch (e) {
-                  wakeLock = null;
-                  setWakeUi(false);
-                  log("Wake-Lock re-acquire failed: " + e.message);
-                }
+            document.addEventListener('visibilitychange', async () => {
+              if (document.visibilityState === 'visible' && !wakeLock) {
+                try { await requestWakeLock(); log('Wake-Lock re-acquired'); }
+                catch(e) { wakeLock = null; setWakeUi(false); }
               }
             });
           }
-        } catch (e) {
-          wakeLock = null;
-          setWakeUi(false);
-          log("WakeLock Fehler: " + e.message);
-        }
+        } catch(e) { wakeLock = null; setWakeUi(false); log('WakeLock Fehler: ' + e.message); }
         return;
       }
-
-      try {
-        await wakeLock.release();
-        wakeLock = null;
-        setWakeUi(false);
-        log("Wake-Lock AUS");
-      } catch (e) {
-        wakeLock = null;
-        setWakeUi(false);
-        log("WakeLock release Fehler: " + e.message);
-      }
+      try { await wakeLock.release(); wakeLock = null; setWakeUi(false); log('Wake-Lock AUS'); }
+      catch(e) { wakeLock = null; setWakeUi(false); }
     }
 
     // ── BUTTONS ───────────────────────────────────────
-    btnTrackStart.addEventListener("click", startTracking);
-    btnTrackStop.addEventListener("click",  async () => await stopTracking());
-    btnWake.addEventListener("click",  toggleWakeLock);
-    btnWake2.addEventListener("click", toggleWakeLock);
-    btnRideStart.addEventListener("click", startRide);
-    btnRideStop.addEventListener("click",  async () => await endRide());
+    el('btnTrackStart').addEventListener('click', startTracking);
+    el('btnTrackStop').addEventListener('click',  () => stopTracking());
+    el('btnWake').addEventListener('click',  toggleWakeLock);
+    el('btnWake2').addEventListener('click', toggleWakeLock);
+    el('btnRideStart').addEventListener('click', startRide);
+    el('btnRideStop').addEventListener('click',  () => endRide());
+
+    // ── DRAG HANDLE: Snap-Points ──────────────────────
+    (function initDragHandle() {
+      const handle = el('sheet-handle');
+      const sheet  = el('route-sheet');
+      let startY = 0, startH = 0, dragging = false;
+
+      function getH() { return sheet.getBoundingClientRect().height; }
+      function snapToState() {
+        const h = getH();
+        const vh = window.innerHeight;
+        if (h > vh * 0.44) applySheetState('open');
+        else if (h > vh * 0.20) applySheetState('mid');
+        else applySheetState('compact');
+      }
+
+      handle.addEventListener('mousedown', e => {
+        dragging = true; startY = e.clientY; startH = getH();
+        sheet.style.transition = 'none';
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+      handle.addEventListener('touchstart', e => {
+        dragging = true; startY = e.touches[0].clientY; startH = getH();
+        sheet.style.transition = 'none';
+      }, { passive: true });
+      handle.addEventListener('touchmove', e => {
+        if (!dragging) return;
+        const dy = startY - e.touches[0].clientY;
+        const newH = Math.max(60, Math.min(window.innerHeight * 0.85, startH + dy));
+        sheet.style.height = newH + 'px';
+      }, { passive: true });
+      handle.addEventListener('touchend', () => {
+        if (!dragging) return;
+        dragging = false;
+        sheet.style.transition = '';
+        sheet.style.height = '';
+        snapToState();
+      });
+
+      function onMove(e) {
+        if (!dragging) return;
+        const dy = startY - e.clientY;
+        const newH = Math.max(60, Math.min(window.innerHeight * 0.85, startH + dy));
+        sheet.style.height = newH + 'px';
+      }
+      function onUp() {
+        dragging = false;
+        sheet.style.transition = '';
+        sheet.style.height = '';
+        snapToState();
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      }
+    })();
+
+    // ── MAPBOX ────────────────────────────────────────
+    let map = null;
+    mapboxgl.accessToken = MAPBOX_TOKEN;
+    map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/dark-v11',
+      center: [8.8, 53.1],
+      zoom: 10,
+    });
+    map.on('error', e => log('Mapbox Fehler: ' + (e?.error?.message || '?')));
 
     // ── INIT ──────────────────────────────────────────
-    setState("idle");
-    log("EcoRide GPS-Client bereit ✅");
+    setState('idle');
+    log('EcoRide GPS-Client bereit ✅');
   </script>
 </body>
 </html>
