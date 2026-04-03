@@ -1,0 +1,10 @@
+// config.js.example – Vorlage für lokale Konfiguration
+// 1. Diese Datei kopieren: cp config.js.example config.js
+// 2. Echte Keys eintragen
+// 3. config.js wird NICHT in Git eingecheckt (.gitignore)
+
+window.ER_CONFIG = {
+  mapboxToken:    "pk.DEIN_MAPBOX_TOKEN",
+  supabaseUrl:    "https://DEIN_PROJEKT.supabase.co",
+  supabaseAnonKey: "DEIN_SUPABASE_ANON_KEY"
+};
