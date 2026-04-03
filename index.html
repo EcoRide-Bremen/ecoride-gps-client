@@ -187,8 +187,27 @@
     // Zustände: "idle" | "tracking" | "ride"
     let appState = "idle";
 
+    // ── SHEET STATE (Phase 1) ─────────────────────────
+    // 'idle' | 'destination' | 'routes' | 'active'
+    let sheetState = 'idle';
+
+    function setSheetState(s) {
+      sheetState = s;
+      const block = document.getElementById('routePickerBlock');
+      if (block) block.style.display = s === 'routes' ? '' : 'none';
+      const btnPrev = document.getElementById('btnRoutePreview');
+      if (btnPrev) btnPrev.style.display = (s === 'destination' || s === 'routes') ? '' : 'none';
+    }
+
+    // ── ROUTE AUSWAHL STATE (Phase 2) ─────────────────
+    // Einzige Auswahl-Wahrheit. Format: String-Index '0'|'1'|'2'
+    let selectedRouteId = null;
+
     function setState(newState) {
       appState = newState;
+      if (newState === 'idle')     setSheetState('idle');
+      if (newState === 'tracking') setSheetState('destination');
+      if (newState === 'ride')     setSheetState('active');
       const wrap = document.querySelector(".wrap");
       wrap.classList.remove("state-idle", "state-tracking", "state-ride");
       wrap.classList.add("state-" + newState);
@@ -372,8 +391,7 @@
     function fmtDist(m) { return m >= 1000 ? (m/1000).toFixed(1)+' km' : Math.round(m)+' m'; }
     function fmtDur(s)  { const min=Math.round(s/60); return min>=60 ? Math.floor(min/60)+' Std '+(min%60)+' Min' : min+' Min'; }
 
-    let fetchedRoutes    = [];
-    let selectedRouteIdx = null;
+    let fetchedRoutes = [];
 
     function getRouteLabel(idx, routes) {
       if (routes.length === 1) return 'Schnellste Route';
@@ -388,7 +406,7 @@
       const listEl = document.getElementById('routeList');
       const block  = document.getElementById('routePickerBlock');
       listEl.innerHTML = '';
-      selectedRouteIdx = null;
+      selectedRouteId = null;
       document.getElementById('btnRideStart').disabled = true;
       if (!routes || routes.length === 0) {
         listEl.innerHTML = "<div class='route-loading'>Keine Routen gefunden.</div>";
@@ -404,7 +422,7 @@
         item.addEventListener('click', () => {
           document.querySelectorAll('.route-item').forEach(el => el.classList.remove('selected'));
           item.classList.add('selected');
-          selectedRouteIdx = idx;
+          selectedRouteId = String(idx);
           document.getElementById('btnRideStart').disabled = false;
         });
         listEl.appendChild(item);
@@ -428,6 +446,7 @@
         fetchedRoutes = await fetchOsrmRoutes(lastPos.coords.longitude, lastPos.coords.latitude, zielLng, zielLat);
         log(`${fetchedRoutes.length} Route(n) geladen`);
         renderRouteList(fetchedRoutes);
+        setSheetState('routes');
       } catch (e) {
         log('Routen-Fehler: ' + e.message);
         listEl.innerHTML = "<div class='route-loading'>Fehler – bitte erneut versuchen.</div>";
@@ -458,8 +477,8 @@
 
       // Gewählte Route aus der Vorschau verwenden
       let routePunkte;
-      if (selectedRouteIdx !== null && fetchedRoutes[selectedRouteIdx]) {
-        routePunkte = fetchedRoutes[selectedRouteIdx].coords;
+      if (selectedRouteId !== null && fetchedRoutes[Number(selectedRouteId)]) {
+        routePunkte = fetchedRoutes[Number(selectedRouteId)].coords;
         log(`Route übernommen (${routePunkte.length} Punkte)`);
       } else {
         // Fallback: Luftlinie
@@ -515,6 +534,7 @@
 
       const rideId = activeRideId;
       activeRideId = null;
+      selectedRouteId = null; fetchedRoutes = [];
 
       const { data, error, status, statusText } = await sb
         .from("rides")
