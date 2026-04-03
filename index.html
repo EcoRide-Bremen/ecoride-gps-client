@@ -338,11 +338,9 @@
      ****************************************************/
 
     // ── CONFIG ────────────────────────────────────────
-    const MAPBOX_TOKEN   = "MAPBOX_TOKEN_PLACEHOLDER";
-    const SUPABASE_URL   = "https://ihpszsoivqcrkkiucjvv.supabase.co";
-    const SUPABASE_KEY   = "SUPABASE_KEY_PLACEHOLDER";
+    const CONFIG = window.ER_CONFIG ?? { mapboxToken: "MAPBOX_TOKEN_PLACEHOLDER", supabaseUrl: "https://ihpszsoivqcrkkiucjvv.supabase.co", supabaseAnonKey: "SUPABASE_KEY_PLACEHOLDER" };
 
-    const sb  = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const sb  = window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey);
     const app = document.getElementById('app');
     const el  = id => document.getElementById(id);
 
@@ -766,7 +764,7 @@
 
     // ── MAPBOX ────────────────────────────────────────
     let map = null;
-    mapboxgl.accessToken = MAPBOX_TOKEN;
+    mapboxgl.accessToken = CONFIG.mapboxToken;
     map = new mapboxgl.Map({
       container: 'map',
       style: 'mapbox://styles/mapbox/dark-v11',
