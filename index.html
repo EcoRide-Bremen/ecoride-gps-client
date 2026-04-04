@@ -272,6 +272,10 @@
               </div>
             </div>
             <p class="muted" style="margin:2px 0 8px;font-size:11px">💡 Bremen Hbf = 53.0832 / 8.8133</p>
+            <div class="row">
+              <label>Wann willst du losfahren?</label>
+              <input id="abfahrtZeit" type="time" />
+            </div>
             <div class="row two">
               <div>
                 <label>Sitzplätze (1–8)</label>
@@ -593,6 +597,7 @@
       const zLng = parseFloat(el('zielLng').value);
       const plaetze = parseInt(el('plaetze').value);
       const preis = parseFloat(el('preis').value);
+      const abfahrtZeit = el('abfahrtZeit').value || null;
 
       if (!driverId)                         return showHint('Driver ID fehlt.', true);
       if (isNaN(zLat)||isNaN(zLng))          return showHint('Bitte Ziel-Koordinaten eingeben.', true);
@@ -623,6 +628,7 @@
         ziel_lng:  zLng,
         route_punkte: routePunkte,
         plaetze, preis,
+        departure_time: abfahrtZeit,
         status: 'aktiv',
       }).select('id').single();
 
@@ -683,14 +689,15 @@
         });
 
         // Unsichtbarer Hit-Layer für bessere Treffbarkeit auf Mobile
+        // WICHTIG: opacity 0.001 statt 0 – Mapbox registriert bei opacity=0 keine Click-Events!
         const hid = 'route-hit-' + route.routeId;
         map.addLayer({
           id: hid, type: 'line', source: sid,
           layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: { 'line-width': 20, 'line-opacity': 0 }
+          paint: { 'line-width': 40, 'line-opacity': 0.001 }
         });
 
-        // Click-Handler auf Hit-Layer (bessere Trefferquote)
+        // Click-Handler NUR auf Hit-Layer (sichtbare Linie hat keinen Handler)
         const handler = () => selectRoute(route.routeId);
         _routeClickHandlers[hid] = handler;
         map.on('click', hid, handler);
