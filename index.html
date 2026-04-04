@@ -654,10 +654,12 @@
         map.off('click', lid, _routeClickHandlers[lid]);
         delete _routeClickHandlers[lid];
       });
-      // Alle möglichen route-line-* Layer entfernen
+      // Alle möglichen route-line-* und route-hit-* Layer entfernen
       ['0','1','2'].forEach(id => {
-        const lid = 'route-line-' + id;
-        const sid = 'route-src-'  + id;
+        const lid  = 'route-line-' + id;
+        const hid  = 'route-hit-'  + id;
+        const sid  = 'route-src-'  + id;
+        if (map.getLayer(hid)) map.removeLayer(hid);
         if (map.getLayer(lid)) map.removeLayer(lid);
         if (map.getSource(sid)) map.removeSource(sid);
       });
@@ -680,12 +682,20 @@
           paint: { 'line-color': 'rgba(255,255,255,0.45)', 'line-width': 3, 'line-opacity': 0.7 }
         });
 
-        // Click-Handler speichern für späteres Cleanup
+        // Unsichtbarer Hit-Layer für bessere Treffbarkeit auf Mobile
+        const hid = 'route-hit-' + route.routeId;
+        map.addLayer({
+          id: hid, type: 'line', source: sid,
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-width': 20, 'line-opacity': 0 }
+        });
+
+        // Click-Handler auf Hit-Layer (bessere Trefferquote)
         const handler = () => selectRoute(route.routeId);
-        _routeClickHandlers[lid] = handler;
-        map.on('click', lid, handler);
-        map.on('mouseenter', lid, () => { map.getCanvas().style.cursor = 'pointer'; });
-        map.on('mouseleave', lid, () => { map.getCanvas().style.cursor = ''; });
+        _routeClickHandlers[hid] = handler;
+        map.on('click', hid, handler);
+        map.on('mouseenter', hid, () => { map.getCanvas().style.cursor = 'pointer'; });
+        map.on('mouseleave', hid, () => { map.getCanvas().style.cursor = ''; });
       });
 
       // Karte auf alle Routen zoomen
