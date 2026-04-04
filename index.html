@@ -372,6 +372,7 @@
       renderRouteCards();
       updateStartRideButton();
       renderSheetSummary();
+      renderRouteLines();
     }
 
     function updateStartRideButton() {
@@ -526,6 +527,9 @@
       if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
       lastPos = null; lastSend = 0;
       el('driverId').disabled = false;
+      clearRouteLines();
+      selectedRouteId = null;
+      availableRoutes = [];
       const driverId = el('driverId').value.trim();
       if (driverId) await deletePosition(driverId);
       setState('idle');
@@ -578,10 +582,7 @@
         updateStartRideButton();
         applySheetState('open');
         log(`${routes.length} Route(n) geladen`);
-        // Zielmarker auf Karte
-        if (map) {
-          map.easeTo({ center: [zLng, zLat], zoom: 12, duration: 700 });
-        }
+        renderRouteLines();
       } catch (e) {
         log('Routen-Fehler: ' + e.message);
         el('route-cards').innerHTML = "<div class='route-loading'>Fehler – bitte erneut versuchen.</div>";
@@ -648,11 +649,73 @@
       setState('ride');
     }
 
+    // ── ROUTEN AUF KARTE ──────────────────────────────
+    function clearRouteLines() {
+      if (!map) return;
+      availableRoutes.forEach(r => {
+        const lid = 'route-line-' + r.routeId;
+        const sid = 'route-src-'  + r.routeId;
+        if (map.getLayer(lid)) map.removeLayer(lid);
+        if (map.getSource(sid)) map.removeSource(sid);
+      });
+    }
+
+    function renderRouteLines() {
+      if (!map) return;
+      // Alle alten Layer entfernen
+      clearRouteLines();
+      if (!availableRoutes.length) return;
+
+      availableRoutes.forEach(route => {
+        const sid = 'route-src-'  + route.routeId;
+        const lid = 'route-line-' + route.routeId;
+        const isActive = route.routeId === selectedRouteId;
+        const noSelection = selectedRouteId === null;
+
+        map.addSource(sid, {
+          type: 'geojson',
+          data: {
+            type: 'Feature',
+            geometry: { type: 'LineString', coordinates: route.coords }
+          }
+        });
+
+        map.addLayer({
+          id: lid,
+          type: 'line',
+          source: sid,
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: {
+            'line-color': isActive ? '#c7d92c' : (noSelection ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.20)'),
+            'line-width': isActive ? 5 : 3,
+            'line-opacity': isActive ? 1 : (noSelection ? 0.7 : 0.35),
+          }
+        });
+
+        // Klick auf Linie = Auswahl
+        map.on('click', lid, () => setSelectedRoute(route.routeId));
+        map.on('mouseenter', lid, () => { map.getCanvas().style.cursor = 'pointer'; });
+        map.on('mouseleave', lid, () => { map.getCanvas().style.cursor = ''; });
+      });
+
+      // Karte auf alle Routen zoomen
+      const allCoords = availableRoutes.flatMap(r => r.coords);
+      if (allCoords.length) {
+        const lngs = allCoords.map(c => c[0]);
+        const lats = allCoords.map(c => c[1]);
+        map.fitBounds(
+          [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+          { padding: 60, duration: 700 }
+        );
+      }
+    }
+
     // ── RIDE STOP ─────────────────────────────────────
     async function endRide() {
       if (!activeRideId) return;
       const rideId = activeRideId;
       activeRideId = null;
+      clearRouteLines();
       selectedRouteId = null;
       availableRoutes = [];
 
