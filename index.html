@@ -597,7 +597,15 @@
       const zLng = parseFloat(el('zielLng').value);
       const plaetze = parseInt(el('plaetze').value);
       const preis = parseFloat(el('preis').value);
-      const abfahrtZeit = el('abfahrtZeit').value || null;
+      // Abfahrtzeit: "HH:MM" → ISO-Timestamp (heute + gewählte Uhrzeit)
+      const abfahrtZeitRaw = el('abfahrtZeit').value;
+      let abfahrtZeit = null;
+      if (abfahrtZeitRaw) {
+        const [h, m] = abfahrtZeitRaw.split(':').map(Number);
+        const dt = new Date();
+        dt.setHours(h, m, 0, 0);
+        abfahrtZeit = dt.toISOString();
+      }
 
       if (!driverId)                         return showHint('Driver ID fehlt.', true);
       if (isNaN(zLat)||isNaN(zLng))          return showHint('Bitte Ziel-Koordinaten eingeben.', true);
