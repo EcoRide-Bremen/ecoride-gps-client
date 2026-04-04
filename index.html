@@ -367,13 +367,7 @@
     let selectedRouteId = null;
     let availableRoutes = []; // [{ routeId, label, coords, distanceM, durationS }]
 
-    function setSelectedRoute(routeId) {
-      selectedRouteId = routeId;
-      renderRouteCards();
-      updateStartRideButton();
-      renderSheetSummary();
-      renderRouteLines();
-    }
+    function setSelectedRoute(routeId) { selectRoute(routeId); }
 
     function updateStartRideButton() {
       const btn = el('btnRideStart');
@@ -650,50 +644,46 @@
     }
 
     // ── ROUTEN AUF KARTE ──────────────────────────────
+    // Click-Handler-Referenzen für sauberes Cleanup
+    const _routeClickHandlers = {};
+
     function clearRouteLines() {
       if (!map) return;
-      availableRoutes.forEach(r => {
-        const lid = 'route-line-' + r.routeId;
-        const sid = 'route-src-'  + r.routeId;
+      // Layer, Sources und Handler sauber entfernen
+      Object.keys(_routeClickHandlers).forEach(lid => {
+        map.off('click', lid, _routeClickHandlers[lid]);
+        delete _routeClickHandlers[lid];
+      });
+      // Alle möglichen route-line-* Layer entfernen
+      ['0','1','2'].forEach(id => {
+        const lid = 'route-line-' + id;
+        const sid = 'route-src-'  + id;
         if (map.getLayer(lid)) map.removeLayer(lid);
         if (map.getSource(sid)) map.removeSource(sid);
       });
     }
 
-    function renderRouteLines() {
-      if (!map) return;
-      // Alle alten Layer entfernen
-      clearRouteLines();
-      if (!availableRoutes.length) return;
-
+    // Baut Layer neu auf (nur nach Berechnung)
+    function buildRouteLines() {
+      if (!map || !availableRoutes.length) return;
       availableRoutes.forEach(route => {
         const sid = 'route-src-'  + route.routeId;
         const lid = 'route-line-' + route.routeId;
-        const isActive = route.routeId === selectedRouteId;
-        const noSelection = selectedRouteId === null;
 
         map.addSource(sid, {
           type: 'geojson',
-          data: {
-            type: 'Feature',
-            geometry: { type: 'LineString', coordinates: route.coords }
-          }
+          data: { type: 'Feature', geometry: { type: 'LineString', coordinates: route.coords } }
         });
-
         map.addLayer({
-          id: lid,
-          type: 'line',
-          source: sid,
+          id: lid, type: 'line', source: sid,
           layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: {
-            'line-color': isActive ? '#c7d92c' : (noSelection ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.20)'),
-            'line-width': isActive ? 5 : 3,
-            'line-opacity': isActive ? 1 : (noSelection ? 0.7 : 0.35),
-          }
+          paint: { 'line-color': 'rgba(255,255,255,0.45)', 'line-width': 3, 'line-opacity': 0.7 }
         });
 
-        // Klick auf Linie = Auswahl
-        map.on('click', lid, () => setSelectedRoute(route.routeId));
+        // Click-Handler speichern für späteres Cleanup
+        const handler = () => selectRoute(route.routeId);
+        _routeClickHandlers[lid] = handler;
+        map.on('click', lid, handler);
         map.on('mouseenter', lid, () => { map.getCanvas().style.cursor = 'pointer'; });
         map.on('mouseleave', lid, () => { map.getCanvas().style.cursor = ''; });
       });
@@ -708,6 +698,36 @@
           { padding: 60, duration: 700 }
         );
       }
+    }
+
+    // Nur Paint aktualisieren (kein Layer-Rebuild)
+    function updateRouteLineStyles() {
+      if (!map) return;
+      availableRoutes.forEach(route => {
+        const lid = 'route-line-' + route.routeId;
+        if (!map.getLayer(lid)) return;
+        const isActive   = route.routeId === selectedRouteId;
+        const noSelection = selectedRouteId === null;
+        map.setPaintProperty(lid, 'line-color',   isActive ? '#c7d92c'               : (noSelection ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.20)'));
+        map.setPaintProperty(lid, 'line-width',   isActive ? 5                        : 3);
+        map.setPaintProperty(lid, 'line-opacity',  isActive ? 1                        : (noSelection ? 0.7 : 0.35));
+      });
+    }
+
+    // Einzige öffentliche Auswahl-Funktion
+    function selectRoute(routeId) {
+      selectedRouteId = routeId;
+      renderRouteCards();       // Bottom Sheet
+      updateStartRideButton();  // Start-Button
+      renderSheetSummary();     // Compact Summary
+      updateRouteLineStyles();  // Karte (nur Paint, kein Rebuild)
+    }
+
+    // Alias für initiale Berechnung
+    function renderRouteLines() {
+      clearRouteLines();
+      buildRouteLines();
+      updateRouteLineStyles();
     }
 
     // ── RIDE STOP ─────────────────────────────────────
