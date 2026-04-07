@@ -506,7 +506,7 @@
     let lastSendTime = '–';
     let debugPanelOpen = false;
     let userHasTakenMapControl = false;
-    let suppressNextMapInteraction = false;
+    let autoCameraGraceUntil = 0;
 
     // ── WAKE LOCK ─────────────────────────────────────
     let wakeLock = null;
@@ -550,13 +550,11 @@
 
     function allowNextAutoCamera() {
       userHasTakenMapControl = false;
+      autoCameraGraceUntil = Date.now() + 1200;
     }
 
     function markUserMapControl() {
-      if (suppressNextMapInteraction) {
-        suppressNextMapInteraction = false;
-        return;
-      }
+      if (Date.now() < autoCameraGraceUntil) return;
       userHasTakenMapControl = true;
     }
 
@@ -566,8 +564,22 @@
 
     function runAutoCamera(fn) {
       if (!map || !canAutoMoveCamera()) return;
-      suppressNextMapInteraction = true;
+      autoCameraGraceUntil = Date.now() + 1200;
       fn();
+    }
+
+    function resetRideForm() {
+      el('driverId').value = '';
+      el('zielLat').value = '';
+      el('zielLng').value = '';
+      el('abfahrtZeit').value = '';
+      el('plaetze').value = '2';
+      el('preis').value = '0.00';
+      el('stTrackDriver').textContent = '–';
+      el('stRideDriver').textContent = '–';
+      el('stRidePlaetze').textContent = '–';
+      el('stRidePreis').textContent = '–';
+      el('stRideId').textContent = '–';
     }
 
     // ── HINT ──────────────────────────────────────────
@@ -645,8 +657,12 @@
       clearRouteLines();
       selectedRouteId = null;
       availableRoutes = [];
+      userHasTakenMapControl = false;
+      autoCameraGraceUntil = 0;
       const driverId = el('driverId').value.trim();
       if (driverId) await deletePosition(driverId);
+      resetRideForm();
+      hideHint();
       setState('idle');
     }
 
@@ -812,7 +828,7 @@
         map.addLayer({
           id: lid, type: 'line', source: sid,
           layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: { 'line-color': 'rgba(255,255,255,0.45)', 'line-width': 3, 'line-opacity': 0.7 }
+          paint: { 'line-color': 'rgba(125, 211, 252, 0.72)', 'line-width': 3, 'line-opacity': 0.82 }
         });
 
         // Unsichtbarer Hit-Layer für bessere Treffbarkeit auf Mobile
@@ -852,9 +868,9 @@
         if (!map.getLayer(lid)) return;
         const isActive   = route.routeId === selectedRouteId;
         const noSelection = selectedRouteId === null;
-        map.setPaintProperty(lid, 'line-color',   isActive ? '#c7d92c'               : (noSelection ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.20)'));
-        map.setPaintProperty(lid, 'line-width',   isActive ? 5                        : 3);
-        map.setPaintProperty(lid, 'line-opacity',  isActive ? 1                        : (noSelection ? 0.7 : 0.35));
+        map.setPaintProperty(lid, 'line-color',   isActive ? '#c7d92c' : (noSelection ? 'rgba(125, 211, 252, 0.72)' : 'rgba(125, 211, 252, 0.48)'));
+        map.setPaintProperty(lid, 'line-width',   isActive ? 5 : 3);
+        map.setPaintProperty(lid, 'line-opacity', isActive ? 1 : (noSelection ? 0.82 : 0.62));
       });
     }
 
@@ -1004,7 +1020,7 @@
       zoom: 10,
     });
     map.on('error', e => log('Mapbox Fehler: ' + (e?.error?.message || '?')));
-    ['dragstart', 'zoomstart', 'rotatestart', 'pitchstart'].forEach(evt => map.on(evt, markUserMapControl));
+    ['dragstart', 'zoomstart', 'rotatestart', 'pitchstart', 'mousedown', 'touchstart', 'wheel'].forEach(evt => map.on(evt, markUserMapControl));
 
     // ── INIT ──────────────────────────────────────────
     setState('idle');
