@@ -140,6 +140,30 @@
       margin: 8px 0;
     }
 
+    .debug-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.10);
+      color: rgba(234,240,255,0.78);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      cursor: pointer;
+      margin: 8px 0 4px;
+    }
+    .debug-toggle:active { opacity: .8; }
+
+    .debug-panel {
+      display: none;
+      margin: 4px 0 8px;
+    }
+    .debug-panel.open { display: block; }
+
     /* ── Hint ── */
     #rideHint {
       margin: 6px 0;
@@ -154,7 +178,7 @@
     #rideHint.error { background: rgba(239,68,68,.10); border-color: rgba(239,68,68,.30); color: #f87171; }
 
     /* ── Log ── */
-    #log {
+    .log {
       background: #0b0d12;
       border: 1px solid rgba(255,255,255,.07);
       padding: 10px;
@@ -167,6 +191,22 @@
       font-family: monospace;
       color: rgba(234,240,255,0.6);
       margin: 8px 0;
+    }
+
+    .status-inline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 6px;
+      font-size: 12px;
+      opacity: .78;
+    }
+
+    .status-chip {
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
     }
 
     /* ── Route Cards ── */
@@ -244,7 +284,20 @@
             <button id="btnTrackStart" class="btn-primary">Tracking starten</button>
             <button id="btnWake" class="btn-secondary">Wake-Lock: AUS</button>
           </div>
-          <pre id="log" class="log"></pre>
+
+          <div class="status-block">
+            <div style="font-size:11px;opacity:.5;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Tracking-Status</div>
+            <div class="status-inline">
+              <span class="status-chip">Tracking: <span id="trackingStatusCompact">AUS</span></span>
+              <span class="status-chip">Letzter Sendestatus: <span id="lastSendStatus">–</span></span>
+              <span class="status-chip">Letzte Sendung: <span id="lastSendTime">–</span></span>
+            </div>
+          </div>
+
+          <button id="btnDebugIdle" class="debug-toggle" type="button" aria-expanded="false">Debug-Log anzeigen</button>
+          <div id="debugPanelIdle" class="debug-panel">
+            <pre id="log" class="log"></pre>
+          </div>
         </div>
 
         <!-- TRACKING: Ziel + Routen -->
@@ -252,8 +305,16 @@
           <div class="status-block">
             <div>Tracking: <span class="badge badge-tracking">AKTIV</span></div>
             <div style="font-size:12px;opacity:.65">Fahrer: <span id="stTrackDriver">–</span></div>
+            <div class="status-inline">
+              <span class="status-chip">Sendestatus: <span id="lastSendStatusTracking">–</span></span>
+              <span class="status-chip">Letzte Sendung: <span id="lastSendTimeTracking">–</span></span>
+            </div>
           </div>
-          <pre id="logTracking" class="log"></pre>
+
+          <button id="btnDebugTracking" class="debug-toggle" type="button" aria-expanded="false">Debug-Log anzeigen</button>
+          <div id="debugPanelTracking" class="debug-panel">
+            <pre id="logTracking" class="log"></pre>
+          </div>
 
           <div id="rideSection">
             <hr class="divider" />
@@ -388,6 +449,7 @@
       const labels = { idle: 'IDLE', tracking: 'TRACKING', ride: 'AKTIVE FAHRT' };
       el('stState').innerHTML = `<span class="badge ${badges[newState]}">${labels[newState]}</span>`;
       log('Zustand → ' + newState.toUpperCase());
+      updateCompactTrackingStatus();
 
       // Sheet bei Zustandswechsel öffnen
       if (newState === 'tracking') applySheetState('open');
@@ -440,6 +502,11 @@
     let lastSend   = 0;
     const SEND_MS  = 1500;
     let activeRideId = null;
+    let lastSendStatus = '–';
+    let lastSendTime = '–';
+    let debugPanelOpen = false;
+    let userHasTakenMapControl = false;
+    let suppressNextMapInteraction = false;
 
     // ── WAKE LOCK ─────────────────────────────────────
     let wakeLock = null;
@@ -453,6 +520,54 @@
         const logEl = el(id);
         if (logEl) logEl.textContent = line + '\n' + (logEl.textContent || '');
       });
+    }
+
+    function updateCompactTrackingStatus() {
+      const trackingText = (appState === 'tracking' || appState === 'ride') ? 'AN' : 'AUS';
+      ['trackingStatusCompact'].forEach(id => { const node = el(id); if (node) node.textContent = trackingText; });
+      ['lastSendStatus', 'lastSendStatusTracking'].forEach(id => { const node = el(id); if (node) node.textContent = lastSendStatus; });
+      ['lastSendTime', 'lastSendTimeTracking'].forEach(id => { const node = el(id); if (node) node.textContent = lastSendTime; });
+    }
+
+    function setLastSendMeta(status) {
+      lastSendStatus = status;
+      lastSendTime = new Date().toLocaleTimeString();
+      updateCompactTrackingStatus();
+    }
+
+    function setDebugPanelOpen(open) {
+      debugPanelOpen = open;
+      [['btnDebugIdle', 'debugPanelIdle'], ['btnDebugTracking', 'debugPanelTracking']].forEach(([btnId, panelId]) => {
+        const btn = el(btnId);
+        const panel = el(panelId);
+        if (btn) {
+          btn.textContent = open ? 'Debug-Log verbergen' : 'Debug-Log anzeigen';
+          btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        }
+        if (panel) panel.classList.toggle('open', open);
+      });
+    }
+
+    function allowNextAutoCamera() {
+      userHasTakenMapControl = false;
+    }
+
+    function markUserMapControl() {
+      if (suppressNextMapInteraction) {
+        suppressNextMapInteraction = false;
+        return;
+      }
+      userHasTakenMapControl = true;
+    }
+
+    function canAutoMoveCamera() {
+      return !userHasTakenMapControl;
+    }
+
+    function runAutoCamera(fn) {
+      if (!map || !canAutoMoveCamera()) return;
+      suppressNextMapInteraction = true;
+      fn();
     }
 
     // ── HINT ──────────────────────────────────────────
@@ -474,8 +589,8 @@
     async function deletePosition(driverId) {
       if (!driverId) return;
       const { error } = await sb.from('live_positions').delete().eq('driver_id', driverId);
-      if (error) log('DELETE ERROR: ' + error.message);
-      else        log('Position gelöscht ✅ ' + driverId);
+      if (error) { log('DELETE ERROR: ' + error.message); setLastSendMeta('Delete-Fehler'); }
+      else        { log('Position gelöscht ✅ ' + driverId); setLastSendMeta('Position gelöscht'); }
     }
 
     async function sendToSupabase(driverId, pos) {
@@ -491,8 +606,8 @@
         heading: pos.coords.heading,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'driver_id' });
-      if (error) log('SUPABASE ERROR: ' + error.message);
-      else        log('SENT ✅ ' + driverId);
+      if (error) { log('SUPABASE ERROR: ' + error.message); setLastSendMeta('Senden fehlgeschlagen'); }
+      else        { log('SENT ✅ ' + driverId); setLastSendMeta('Gesendet'); }
     }
 
     // ── GPS TRACKING ──────────────────────────────────
@@ -503,6 +618,7 @@
       if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
 
       log('Tracking START…');
+      setLastSendMeta('Tracking gestartet');
       el('stTrackDriver').textContent = driverId;
       el('driverId').disabled = true;
 
@@ -511,8 +627,8 @@
           lastPos = pos;
           log(`GPS ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`);
           sendToSupabase(driverId, pos);
-          // Karte auf Position zentrieren
-          if (map) map.easeTo({ center: [pos.coords.longitude, pos.coords.latitude], duration: 600 });
+          // Karte auf Position zentrieren, solange der Nutzer die Karte nicht übernommen hat
+          runAutoCamera(() => map.easeTo({ center: [pos.coords.longitude, pos.coords.latitude], duration: 600 }));
         },
         err => { log('GPS Fehler: ' + err.message); stopTracking(); },
         { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
@@ -524,6 +640,7 @@
     async function stopTracking() {
       if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
       lastPos = null; lastSend = 0;
+      setLastSendMeta('Tracking gestoppt');
       el('driverId').disabled = false;
       clearRouteLines();
       selectedRouteId = null;
@@ -576,6 +693,7 @@
         routes.forEach((r, idx) => { r.label = getRouteLabel(idx, routes); });
         availableRoutes = routes;
         selectedRouteId = null;
+        allowNextAutoCamera();
         renderRouteCards();
         updateStartRideButton();
         applySheetState('open');
@@ -647,6 +765,7 @@
 
       activeRideId = data.id;
       log('FAHRT GESTARTET ✅ ride_id=' + activeRideId);
+      allowNextAutoCamera();
       showHint('Fahrt läuft! Mitfahrer können dich jetzt sehen.');
 
       el('stRideDriver').textContent  = driverId;
@@ -718,10 +837,10 @@
       if (allCoords.length) {
         const lngs = allCoords.map(c => c[0]);
         const lats = allCoords.map(c => c[1]);
-        map.fitBounds(
+        runAutoCamera(() => map.fitBounds(
           [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
           { padding: 60, duration: 700 }
-        );
+        ));
       }
     }
 
@@ -817,6 +936,8 @@
     el('btnWake2').addEventListener('click', toggleWakeLock);
     el('btnRideStart').addEventListener('click', startRide);
     el('btnRideStop').addEventListener('click',  () => endRide());
+    el('btnDebugIdle').addEventListener('click', () => setDebugPanelOpen(!debugPanelOpen));
+    el('btnDebugTracking').addEventListener('click', () => setDebugPanelOpen(!debugPanelOpen));
 
     // ── DRAG HANDLE: Snap-Points ──────────────────────
     (function initDragHandle() {
@@ -883,9 +1004,12 @@
       zoom: 10,
     });
     map.on('error', e => log('Mapbox Fehler: ' + (e?.error?.message || '?')));
+    ['dragstart', 'zoomstart', 'rotatestart', 'pitchstart'].forEach(evt => map.on(evt, markUserMapControl));
 
     // ── INIT ──────────────────────────────────────────
     setState('idle');
+    updateCompactTrackingStatus();
+    setDebugPanelOpen(false);
     log('EcoRide GPS-Client bereit ✅');
   </script>
 </body>
