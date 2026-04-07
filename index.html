@@ -506,7 +506,7 @@
     let lastSendTime = '–';
     let debugPanelOpen = false;
     let userHasTakenMapControl = false;
-    let autoCameraGraceUntil = 0;
+    let driverMarker = null;
 
     // ── WAKE LOCK ─────────────────────────────────────
     let wakeLock = null;
@@ -550,11 +550,9 @@
 
     function allowNextAutoCamera() {
       userHasTakenMapControl = false;
-      autoCameraGraceUntil = Date.now() + 1200;
     }
 
     function markUserMapControl() {
-      if (Date.now() < autoCameraGraceUntil) return;
       userHasTakenMapControl = true;
     }
 
@@ -564,8 +562,43 @@
 
     function runAutoCamera(fn) {
       if (!map || !canAutoMoveCamera()) return;
-      autoCameraGraceUntil = Date.now() + 1200;
       fn();
+    }
+
+    function updateDriverMarker(pos) {
+      if (!map || !pos) return;
+      const lngLat = [pos.coords.longitude, pos.coords.latitude];
+      if (!driverMarker) {
+        const markerEl = document.createElement('div');
+        markerEl.style.width = '18px';
+        markerEl.style.height = '18px';
+        markerEl.style.borderRadius = '999px';
+        markerEl.style.background = '#22c55e';
+        markerEl.style.border = '3px solid rgba(11,15,20,0.92)';
+        markerEl.style.boxShadow = '0 0 0 4px rgba(34,197,94,0.22)';
+        driverMarker = new mapboxgl.Marker({ element: markerEl }).setLngLat(lngLat).addTo(map);
+      } else {
+        driverMarker.setLngLat(lngLat);
+      }
+    }
+
+    function clearDriverMarker() {
+      if (!driverMarker) return;
+      driverMarker.remove();
+      driverMarker = null;
+    }
+
+    function resetRouteUi() {
+      availableRoutes = [];
+      selectedRouteId = null;
+      clearRouteLines();
+      renderRouteCards();
+      renderSheetSummary();
+      updateStartRideButton();
+      const cards = el('route-cards');
+      if (cards) cards.innerHTML = '';
+      const block = el('routeCardsBlock');
+      if (block) block.style.display = 'none';
     }
 
     function resetRideForm() {
@@ -636,11 +669,15 @@
 
       watchId = navigator.geolocation.watchPosition(
         pos => {
+          const hadNoPositionYet = !lastPos;
           lastPos = pos;
+          updateDriverMarker(pos);
           log(`GPS ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`);
           sendToSupabase(driverId, pos);
-          // Karte auf Position zentrieren, solange der Nutzer die Karte nicht übernommen hat
-          runAutoCamera(() => map.easeTo({ center: [pos.coords.longitude, pos.coords.latitude], duration: 600 }));
+          // Nur beim allerersten Fix sanft zentrieren, danach nie automatisch nachziehen
+          if (hadNoPositionYet) {
+            runAutoCamera(() => map.easeTo({ center: [pos.coords.longitude, pos.coords.latitude], duration: 600 }));
+          }
         },
         err => { log('GPS Fehler: ' + err.message); stopTracking(); },
         { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
@@ -654,11 +691,9 @@
       lastPos = null; lastSend = 0;
       setLastSendMeta('Tracking gestoppt');
       el('driverId').disabled = false;
-      clearRouteLines();
-      selectedRouteId = null;
-      availableRoutes = [];
+      resetRouteUi();
       userHasTakenMapControl = false;
-      autoCameraGraceUntil = 0;
+      clearDriverMarker();
       const driverId = el('driverId').value.trim();
       if (driverId) await deletePosition(driverId);
       resetRideForm();
@@ -709,7 +744,7 @@
         routes.forEach((r, idx) => { r.label = getRouteLabel(idx, routes); });
         availableRoutes = routes;
         selectedRouteId = null;
-        allowNextAutoCamera();
+        if (!userHasTakenMapControl) allowNextAutoCamera();
         renderRouteCards();
         updateStartRideButton();
         applySheetState('open');
@@ -781,7 +816,6 @@
 
       activeRideId = data.id;
       log('FAHRT GESTARTET ✅ ride_id=' + activeRideId);
-      allowNextAutoCamera();
       showHint('Fahrt läuft! Mitfahrer können dich jetzt sehen.');
 
       el('stRideDriver').textContent  = driverId;
@@ -895,9 +929,7 @@
       if (!activeRideId) return;
       const rideId = activeRideId;
       activeRideId = null;
-      clearRouteLines();
-      selectedRouteId = null;
-      availableRoutes = [];
+      resetRouteUi();
 
       const { error } = await sb.from('rides')
         .update({ status: 'abgeschlossen', beendet_am: new Date().toISOString() })
@@ -1021,6 +1053,7 @@
     });
     map.on('error', e => log('Mapbox Fehler: ' + (e?.error?.message || '?')));
     ['dragstart', 'zoomstart', 'rotatestart', 'pitchstart', 'mousedown', 'touchstart', 'wheel'].forEach(evt => map.on(evt, markUserMapControl));
+    map.on('click', markUserMapControl);
 
     // ── INIT ──────────────────────────────────────────
     setState('idle');
