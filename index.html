@@ -285,24 +285,26 @@
       opacity: .62;
       margin-top: 4px;
     }
-    #themeToggle {
+    .map-overlay-icon {
       position: absolute;
       right: 10px;
       top: 10px;
       z-index: 15;
-      width: 32px;
-      height: 32px;
-      border-radius: 10px;
+      background: none;
       border: none;
-      background: transparent;
-      color: var(--fg);
-      display: flex;
-      align-items: center;
-      justify-content: center;
       box-shadow: none;
-      font-size: 15px;
+      color: var(--fg);
+      font-size: 18px;
       line-height: 1;
-      padding: 0;
+      padding: 8px;
+      opacity: 0.8;
+      cursor: pointer;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      transition: opacity 0.2s ease;
+    }
+    .map-overlay-icon:active {
+      opacity: 0.5;
     }
 
     /* ── Ride ID ── */
@@ -330,7 +332,7 @@
       <div id="map"></div>
     </div>
 
-    <button id="themeToggle" type="button" aria-label="Theme wechseln" title="Theme wechseln">◐</button>
+    <div id="themeToggle" class="map-overlay-icon" role="button" tabindex="0" aria-label="Theme wechseln" title="Theme wechseln">◐</div>
 
     <!-- Bottom Sheet -->
     <section id="route-sheet" class="sheet sheet-open">
@@ -1107,6 +1109,12 @@
     el('btnDebugIdle').addEventListener('click', () => setDebugPanelOpen(!debugPanelOpen));
     el('btnDebugTracking').addEventListener('click', () => setDebugPanelOpen(!debugPanelOpen));
     el('themeToggle').addEventListener('click', toggleTheme);
+    el('themeToggle').addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggleTheme();
+      }
+    });
     el('driverId').addEventListener('input', () => {
       if (appState === 'idle') resetRouteUi();
     });
