@@ -417,7 +417,7 @@
             <div class="row time-row-centered">
               <label>Wann willst du losfahren?</label>
               <div class="time-input-wrap">
-                <input id="abfahrtZeit" type="time" />
+                <input id="abfahrtZeit" type="text" inputmode="numeric" placeholder="HH:MM" maxlength="5" autocomplete="off" />
               </div>
               <div class="time-actions-note">Digitale Zeitangabe, mittig und ruhig für den Fahrer-Flow</div>
             </div>
@@ -598,7 +598,7 @@
     let currentTheme = localStorage.getItem('ecoride-theme') || 'dark';
     const MAP_STYLES = {
       dark: 'mapbox://styles/mapbox/dark-v11',
-      light: 'mapbox://styles/mapbox/light-v11'
+      light: 'mapbox://styles/mapbox/streets-v12'
     };
 
     // ── WAKE LOCK ─────────────────────────────────────
@@ -879,10 +879,14 @@
       const plaetze = parseInt(el('plaetze').value);
       const preis = parseFloat(el('preis').value);
       // Abfahrtzeit: "HH:MM" → ISO-Timestamp (heute + gewählte Uhrzeit)
-      const abfahrtZeitRaw = el('abfahrtZeit').value;
+      const abfahrtZeitRaw = el('abfahrtZeit').value.trim();
       let abfahrtZeit = null;
       if (abfahrtZeitRaw) {
-        const [h, m] = abfahrtZeitRaw.split(':').map(Number);
+        const match = abfahrtZeitRaw.match(/^(\d{2}):(\d{2})$/);
+        if (!match) return showHint('Bitte Uhrzeit im Format HH:MM eingeben.', true);
+        const h = Number(match[1]);
+        const m = Number(match[2]);
+        if (h < 0 || h > 23 || m < 0 || m > 59) return showHint('Bitte eine gültige Uhrzeit eingeben.', true);
         const dt = new Date();
         dt.setHours(h, m, 0, 0);
         abfahrtZeit = dt.toISOString();
@@ -1101,6 +1105,11 @@
     el('themeToggle').addEventListener('click', toggleTheme);
     el('driverId').addEventListener('input', () => {
       if (appState === 'idle') resetRouteUi();
+    });
+    el('abfahrtZeit').addEventListener('input', e => {
+      const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
+      if (digits.length <= 2) e.target.value = digits;
+      else e.target.value = `${digits.slice(0,2)}:${digits.slice(2)}`;
     });
 
     // ── DRAG HANDLE: Snap-Points ──────────────────────
