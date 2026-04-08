@@ -183,6 +183,18 @@
       gap: 5px;
       margin: 8px 0;
     }
+    .active-ride-hint {
+      display: none;
+      margin: 10px 0;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(183, 213, 50, 0.10);
+      border: 1px solid rgba(183, 213, 50, 0.28);
+    }
+    .active-ride-hint.visible { display: block; }
+    .active-ride-hint-title { font-size: 13px; font-weight: 700; }
+    .active-ride-hint-meta { font-size: 12px; opacity: .72; }
+    .active-ride-hint-actions { display: flex; gap: 8px; margin-top: 8px; }
 
     .debug-toggle {
       display: inline-flex;
@@ -367,6 +379,15 @@
           <div class="row two">
             <button id="btnTrackStart" class="btn-primary">Tracking starten</button>
             <button id="btnWake" class="btn-secondary">Wake-Lock: AUS</button>
+          </div>
+
+          <div id="activeRideHint" class="active-ride-hint">
+            <div class="active-ride-hint-title">Du hast noch eine aktive Fahrt.</div>
+            <div id="activeRideHintMeta" class="active-ride-hint-meta">Bitte prüfen oder bewusst beenden.</div>
+            <div class="active-ride-hint-actions">
+              <button id="btnResumeRide" class="btn-secondary" type="button">Weiterführen</button>
+              <button id="btnEndExistingRide" class="btn-danger" type="button">Fahrt beenden</button>
+            </div>
           </div>
 
           <div class="status-block">
@@ -593,6 +614,7 @@
     let lastSend   = 0;
     const SEND_MS  = 1500;
     let activeRideId = null;
+    let existingActiveRide = null;
     let lastSendStatus = '–';
     let lastSendTime = '–';
     let debugPanelOpen = false;
@@ -737,6 +759,54 @@
     }
     function hideHint() { el('rideHint').style.display = 'none'; }
 
+    function getRideActivityAgeMs(ride) {
+      if (!ride) return null;
+      const ref = ride.updated_at || ride.created_at || ride.start_time || null;
+      if (!ref) return null;
+      const ts = new Date(ref).getTime();
+      return Number.isFinite(ts) ? (Date.now() - ts) : null;
+    }
+
+    function renderExistingActiveRideHint() {
+      const box = el('activeRideHint');
+      const meta = el('activeRideHintMeta');
+      if (!box || !meta) return;
+      if (!existingActiveRide) {
+        box.classList.remove('visible');
+        meta.textContent = 'Bitte prüfen oder bewusst beenden.';
+        return;
+      }
+      const ageMs = getRideActivityAgeMs(existingActiveRide);
+      const ageMin = ageMs == null ? null : Math.max(1, Math.round(ageMs / 60000));
+      meta.textContent = ageMin == null
+        ? 'Diese Fahrt ist noch aktiv und kann fortgeführt oder beendet werden.'
+        : `Diese Fahrt ist seit ca. ${ageMin} Min aktiv und kann fortgeführt oder beendet werden.`;
+      box.classList.add('visible');
+    }
+
+    async function loadExistingActiveRide(driverId) {
+      if (!driverId) {
+        existingActiveRide = null;
+        renderExistingActiveRideHint();
+        return null;
+      }
+      const { data, error } = await sb.from('rides')
+        .select('id, driver_id, status, updated_at, created_at, ziel_lat, ziel_lng, plaetze, preis')
+        .eq('driver_id', driverId)
+        .eq('status', 'aktiv')
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) {
+        log('ACTIVE RIDE CHECK ERROR: ' + error.message);
+        existingActiveRide = null;
+      } else {
+        existingActiveRide = data || null;
+      }
+      renderExistingActiveRideHint();
+      return existingActiveRide;
+    }
+
     // ── PWA ───────────────────────────────────────────
     function updatePwaStatus() {
       const s = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
@@ -778,6 +848,8 @@
       if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
       if (!preserveRoutes) resetRouteUi();
 
+      existingActiveRide = null;
+      renderExistingActiveRideHint();
       log('Tracking START…');
       setLastSendMeta('Tracking gestartet');
       el('stTrackDriver').textContent = driverId;
@@ -814,6 +886,7 @@
       if (driverId) await deletePosition(driverId);
       resetRideForm();
       hideHint();
+      await loadExistingActiveRide(el('driverId').value.trim());
       setState('idle');
     }
 
@@ -935,6 +1008,8 @@
       if (error) { log('RIDE INSERT ERROR: ' + error.message); showHint('Fehler beim Starten: ' + error.message, true); return; }
 
       activeRideId = data.id;
+      existingActiveRide = { id: data.id, driver_id: driverId, status: 'aktiv', updated_at: new Date().toISOString(), created_at: new Date().toISOString() };
+      renderExistingActiveRideHint();
       log('FAHRT GESTARTET ✅ ride_id=' + activeRideId);
       showHint('Fahrt läuft! Mitfahrer können dich jetzt sehen.');
 
@@ -1108,6 +1183,26 @@
     el('btnRideStop').addEventListener('click',  () => endRide());
     el('btnDebugIdle').addEventListener('click', () => setDebugPanelOpen(!debugPanelOpen));
     el('btnDebugTracking').addEventListener('click', () => setDebugPanelOpen(!debugPanelOpen));
+    el('btnResumeRide').addEventListener('click', () => {
+      if (!existingActiveRide) return;
+      activeRideId = existingActiveRide.id;
+      setState('ride');
+      showHint('Aktive Fahrt weiter im Blick. Bei Bedarf bitte bewusst beenden.');
+    });
+    el('btnEndExistingRide').addEventListener('click', async () => {
+      if (!existingActiveRide?.id) return;
+      const rideId = existingActiveRide.id;
+      const { error } = await sb.from('rides')
+        .update({ status: 'abgeschlossen', beendet_am: new Date().toISOString() })
+        .eq('id', rideId);
+      if (error) {
+        showHint('Aktive Alt-Fahrt konnte nicht beendet werden: ' + error.message, true);
+        return;
+      }
+      existingActiveRide = null;
+      renderExistingActiveRideHint();
+      showHint('Vorherige aktive Fahrt wurde beendet.');
+    });
     el('themeToggle').addEventListener('click', toggleTheme);
     el('themeToggle').addEventListener('keydown', e => {
       if (e.key === 'Enter' || e.key === ' ') {
@@ -1117,6 +1212,9 @@
     });
     el('driverId').addEventListener('input', () => {
       if (appState === 'idle') resetRouteUi();
+    });
+    el('driverId').addEventListener('change', () => {
+      if (appState === 'idle') loadExistingActiveRide(el('driverId').value.trim());
     });
     el('abfahrtZeit').addEventListener('input', e => {
       const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
@@ -1201,6 +1299,7 @@
     setState('idle');
     updateCompactTrackingStatus();
     setDebugPanelOpen(false);
+    renderExistingActiveRideHint();
     log('EcoRide GPS-Client bereit ✅');
   </script>
 </body>

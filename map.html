@@ -1841,9 +1841,11 @@
       const destFeatures  = [];
       const routeFeatures = [];
 
-      for (const [rideId, ride] of getVisibleActiveRides()) {
+      for (const [rideId, ride] of activeRides.entries()) {
+        const driverKey = normId(ride.driver_id);
+        const isFresh = !!driverKey && hasFreshDriverPosition(driverKey);
         const zLat = Number(ride.ziel_lat), zLng = Number(ride.ziel_lng);
-        if (!isValidLatLng(zLat, zLng)) continue;
+        if (isFresh && !isValidLatLng(zLat, zLng)) continue;
 
         const props = {
           rideId,
@@ -1858,11 +1860,13 @@
         };
 
         // ── Ziel-Punkt (orange) ──
-        destFeatures.push({
-          type: "Feature",
-          properties: props,
-          geometry: { type: "Point", coordinates: [zLng, zLat] }
-        });
+        if (isFresh) {
+          destFeatures.push({
+            type: "Feature",
+            properties: props,
+            geometry: { type: "Point", coordinates: [zLng, zLat] }
+          });
+        }
 
         // ── Routen-Linie: route_punkte (JSONB) oder Fallback Start→Ziel ──
         let coords = null;
@@ -1887,7 +1891,12 @@
         if (coords && coords.length >= 2) {
           routeFeatures.push({
             type: "Feature",
-            properties: { rideId, driverId: ride.driver_id || "" },
+            properties: {
+              rideId,
+              driverId: ride.driver_id || "",
+              stale: isFresh ? 0 : 1,
+              color: isFresh ? "#B7D532" : "rgba(148,163,184,0.55)"
+            },
             geometry: { type: "LineString", coordinates: coords }
           });
         }
@@ -2887,7 +2896,7 @@
       // Ride-Routen
       if (!m.getSource(RIDES_ROUTE_SOURCE)) {
         m.addSource(RIDES_ROUTE_SOURCE,{type:"geojson",data:{type:"FeatureCollection",features:[]}});
-        m.addLayer({id:LAYER_RIDE_ROUTES,type:"line",source:RIDES_ROUTE_SOURCE,layout:{"line-join":"round","line-cap":"round"},paint:{"line-color":"#ff9500","line-width":3,"line-opacity":0.65,"line-dasharray":[2,2]}});
+        m.addLayer({id:LAYER_RIDE_ROUTES,type:"line",source:RIDES_ROUTE_SOURCE,layout:{"line-join":"round","line-cap":"round"},paint:{"line-color":["get","color"],"line-width":["case",["==",["get","stale"],1],2.5,4],"line-opacity":["case",["==",["get","stale"],1],0.42,0.88],"line-dasharray":["case",["==",["get","stale"],1],[2,2],[1,0]]}});
       }
       // Ride-Ziele
       if (!m.getSource(RIDES_SOURCE)) {
