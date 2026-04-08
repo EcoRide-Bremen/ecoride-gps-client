@@ -927,10 +927,23 @@
     const endedDrivers = new Set(); // Fahrer mit bewusst beendeter Fahrt -> Marker sofort sperren
     const recentlyEnded = new Set(); // Fahrer im 3-Min-Sperr-Fenster nach manuellem Ende
 
+    function hasFreshDriverPosition(driverKey) {
+      const pos = positions.get(driverKey);
+      if (!pos?.ts) return false;
+      return (Date.now() - pos.ts) <= STALE_MS;
+    }
+
+    function getVisibleActiveRides() {
+      return [...activeRides.entries()].filter(([, ride]) => {
+        const driverKey = normId(ride.driver_id);
+        return !!driverKey && hasFreshDriverPosition(driverKey);
+      });
+    }
+
     function getActiveDriverCount() {
       return new Set(
-        [...activeRides.values()]
-          .map(r => normId(r.driver_id))
+        getVisibleActiveRides()
+          .map(([, ride]) => normId(ride.driver_id))
           .filter(Boolean)
       ).size;
     }
@@ -1828,7 +1841,7 @@
       const destFeatures  = [];
       const routeFeatures = [];
 
-      for (const [rideId, ride] of activeRides.entries()) {
+      for (const [rideId, ride] of getVisibleActiveRides()) {
         const zLat = Number(ride.ziel_lat), zLng = Number(ride.ziel_lng);
         if (!isValidLatLng(zLat, zLng)) continue;
 
@@ -2161,7 +2174,7 @@
       }
       // Timer stoppen damit kein Poll den Wert sofort überschreibt
       clearImpactTimer();
-      const rideCount   = activeRides.size;
+      const rideCount   = getVisibleActiveRides().length;
       setSafeTextContent("impactActive",   String(getActiveDriverCount()));
       setSafeTextContent("impactPoints10", "0");
       setSafeTextContent("impactMarkers",  String(positions.size));
@@ -2422,7 +2435,7 @@
 
       // Fahrer die vorher aktiv waren merken
       const prevDriverKeys = new Set(
-        [...activeRides.values()].map(r => normId(r.driver_id))
+        getVisibleActiveRides().map(([, r]) => normId(r.driver_id))
       );
 
       activeRides.clear();
@@ -2457,6 +2470,13 @@
           positions.delete(driverKey);
           routePoints.delete(driverKey);
           markerChanged = true;
+        }
+      }
+
+      for (const [rideId, ride] of [...activeRides.entries()]) {
+        const driverKey = normId(ride.driver_id);
+        if (!driverKey || !hasFreshDriverPosition(driverKey)) {
+          activeRides.delete(rideId);
         }
       }
 
@@ -2662,11 +2682,11 @@
         }
       }
 
-      // 2. Rides ohne aktive Fahrer-Position ausblenden
+      // 2. Rides ohne frische Fahrer-Position ausblenden
       // (Fahrt in DB noch aktiv, aber Fahrer sendet kein GPS mehr)
       for (const [rideId, ride] of activeRides.entries()) {
         const driverKey = normId(ride.driver_id);
-        if (!positions.has(driverKey)) {
+        if (!driverKey || !hasFreshDriverPosition(driverKey)) {
           activeRides.delete(rideId);
           ridesChanged = true;
         }
