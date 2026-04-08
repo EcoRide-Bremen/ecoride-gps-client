@@ -293,17 +293,16 @@
       width: 32px;
       height: 32px;
       border-radius: 10px;
-      border: 1px solid var(--panel-border);
-      background: color-mix(in srgb, var(--panel-bg) 82%, transparent);
+      border: none;
+      background: transparent;
       color: var(--fg);
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.14);
-      font-size: 14px;
+      box-shadow: none;
+      font-size: 15px;
       line-height: 1;
       padding: 0;
-      backdrop-filter: blur(6px);
     }
 
     /* ── Ride ID ── */
@@ -704,7 +703,7 @@
       if (btn) {
         btn.textContent = theme === 'light' ? '☼' : '◑';
         btn.style.color = theme === 'light' ? '#ffffff' : '#111111';
-        btn.style.background = theme === 'light' ? 'rgba(17,24,39,0.86)' : 'rgba(255,255,255,0.88)';
+        btn.style.background = 'transparent';
       }
       localStorage.setItem('ecoride-theme', theme);
       if (map) map.setStyle(MAP_STYLES[theme]);
