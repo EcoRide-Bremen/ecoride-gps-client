@@ -767,12 +767,13 @@
     }
 
     // ── GPS TRACKING ──────────────────────────────────
-    function startTracking() {
+    function startTracking(options = {}) {
+      const { preserveRoutes = false } = options;
       const driverId = el('driverId').value.trim();
       if (!driverId)             return alert('Bitte Driver ID eingeben.');
       if (!navigator.geolocation) return alert('GPS nicht unterstützt.');
       if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
-      resetRouteUi();
+      if (!preserveRoutes) resetRouteUi();
 
       log('Tracking START…');
       setLastSendMeta('Tracking gestartet');
@@ -816,7 +817,7 @@
     document.addEventListener('visibilitychange', () => {
       if ((appState === 'tracking' || appState === 'ride') && document.visibilityState === 'visible' && watchId === null) {
         log('App zurück → GPS-Watcher neu starten');
-        startTracking();
+        startTracking({ preserveRoutes: true });
       }
     });
 
@@ -978,7 +979,7 @@
         map.addLayer({
           id: lid, type: 'line', source: sid,
           layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: { 'line-color': 'rgba(125, 211, 252, 0.72)', 'line-width': 3, 'line-opacity': 0.82 }
+          paint: { 'line-color': currentTheme === 'light' ? 'rgba(59, 130, 246, 0.78)' : 'rgba(96, 165, 250, 0.78)', 'line-width': 3, 'line-opacity': currentTheme === 'light' ? 0.88 : 0.82 }
         });
 
         // Unsichtbarer Hit-Layer für bessere Treffbarkeit auf Mobile
@@ -1018,9 +1019,11 @@
         if (!map.getLayer(lid)) return;
         const isActive   = route.routeId === selectedRouteId;
         const noSelection = selectedRouteId === null;
-        map.setPaintProperty(lid, 'line-color',   isActive ? '#c7d92c' : (noSelection ? 'rgba(125, 211, 252, 0.72)' : 'rgba(125, 211, 252, 0.48)'));
+        const idleColor = currentTheme === 'light' ? 'rgba(59, 130, 246, 0.78)' : 'rgba(96, 165, 250, 0.78)';
+        const mutedColor = currentTheme === 'light' ? 'rgba(59, 130, 246, 0.56)' : 'rgba(96, 165, 250, 0.56)';
+        map.setPaintProperty(lid, 'line-color',   isActive ? '#c7d92c' : (noSelection ? idleColor : mutedColor));
         map.setPaintProperty(lid, 'line-width',   isActive ? 5 : 3);
-        map.setPaintProperty(lid, 'line-opacity', isActive ? 1 : (noSelection ? 0.82 : 0.62));
+        map.setPaintProperty(lid, 'line-opacity', isActive ? 1 : (noSelection ? 0.88 : 0.68));
       });
     }
 
