@@ -14,11 +14,55 @@
 
   <style>
     /* ── Base ── */
+    :root {
+      --bg: #0b0f14;
+      --fg: #eaf0ff;
+      --sheet-bg: rgba(14, 19, 30, 0.97);
+      --sheet-border: rgba(255,255,255,0.10);
+      --sheet-shadow: 0 -8px 32px rgba(0,0,0,0.5);
+      --panel-bg: rgba(17,24,37,0.6);
+      --panel-border: rgba(255,255,255,0.12);
+      --status-bg: rgba(17,24,37,0.5);
+      --status-border: rgba(255,255,255,0.08);
+      --text-muted: rgba(234,240,255,0.78);
+      --handle-bg: rgba(255,255,255,0.18);
+      --log-bg: #0b0d12;
+      --log-border: rgba(255,255,255,.07);
+      --chip-bg: rgba(255,255,255,0.05);
+      --chip-border: rgba(255,255,255,0.08);
+      --route-card-bg: rgba(255,255,255,0.04);
+      --route-card-hover: rgba(199,217,44,0.07);
+      --route-card-hover-border: rgba(199,217,44,0.25);
+      --divider: rgba(255,255,255,0.08);
+      --sheet-summary: rgba(234,240,255,0.75);
+    }
+    body.theme-light {
+      --bg: #eef3fb;
+      --fg: #111827;
+      --sheet-bg: rgba(255, 255, 255, 0.96);
+      --sheet-border: rgba(15,23,42,0.10);
+      --sheet-shadow: 0 -8px 28px rgba(15,23,42,0.16);
+      --panel-bg: rgba(255,255,255,0.82);
+      --panel-border: rgba(15,23,42,0.10);
+      --status-bg: rgba(255,255,255,0.86);
+      --status-border: rgba(15,23,42,0.10);
+      --text-muted: rgba(17,24,39,0.72);
+      --handle-bg: rgba(15,23,42,0.18);
+      --log-bg: #f8fafc;
+      --log-border: rgba(15,23,42,0.08);
+      --chip-bg: rgba(15,23,42,0.04);
+      --chip-border: rgba(15,23,42,0.10);
+      --route-card-bg: rgba(15,23,42,0.04);
+      --route-card-hover: rgba(199,217,44,0.12);
+      --route-card-hover-border: rgba(199,217,44,0.30);
+      --divider: rgba(15,23,42,0.10);
+      --sheet-summary: rgba(17,24,39,0.72);
+    }
     *, *::before, *::after { box-sizing: border-box; }
     html, body, #app {
       height: 100%; margin: 0; padding: 0;
       font-family: system-ui, Segoe UI, Roboto, Arial, sans-serif;
-      background: #0b0f14; color: #eaf0ff;
+      background: var(--bg); color: var(--fg);
       overflow: hidden;
     }
     #app { position: relative; }
@@ -34,9 +78,9 @@
       position: absolute;
       left: 0; right: 0; bottom: 0;
       border-radius: 20px 20px 0 0;
-      background: rgba(14, 19, 30, 0.97);
-      border-top: 1px solid rgba(255,255,255,0.10);
-      box-shadow: 0 -8px 32px rgba(0,0,0,0.5);
+      background: var(--sheet-bg);
+      border-top: 1px solid var(--sheet-border);
+      box-shadow: var(--sheet-shadow);
       display: flex;
       flex-direction: column;
       transition: height 200ms ease;
@@ -52,7 +96,7 @@
       flex-shrink: 0;
       width: 48px; height: 5px;
       border-radius: 999px;
-      background: rgba(255,255,255,0.18);
+      background: var(--handle-bg);
       margin: 10px auto 8px;
       cursor: grab;
       touch-action: none;
@@ -63,7 +107,7 @@
       flex-shrink: 0;
       font-size: 13px;
       padding: 0 16px 6px;
-      color: rgba(234,240,255,0.75);
+      color: var(--sheet-summary);
       min-height: 0;
     }
 
@@ -75,7 +119,7 @@
       -webkit-overflow-scrolling: touch;
     }
     #sheet-content::-webkit-scrollbar { width: 3px; }
-    #sheet-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 999px; }
+    #sheet-content::-webkit-scrollbar-thumb { background: var(--panel-border); border-radius: 999px; }
 
     /* compact: content + actions verstecken */
     .sheet-compact #sheet-content { display: none; }
@@ -85,21 +129,21 @@
     #sheet-actions {
       flex-shrink: 0;
       padding: 10px 16px 16px;
-      border-top: 1px solid rgba(255,255,255,0.07);
+      border-top: 1px solid var(--status-border);
     }
 
     /* ── Utility ── */
     .muted { opacity: .65; font-size: 13px; }
-    .divider { border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 10px 0; }
+    .divider { border: none; border-top: 1px solid var(--divider); margin: 10px 0; }
     .row { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
     .row.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     label { font-size: 12px; opacity: .6; }
     input {
       padding: 10px 12px;
       border-radius: 10px;
-      border: 1px solid rgba(255,255,255,0.12);
-      background: rgba(17,24,37,0.6);
-      color: #eaf0ff;
+      border: 1px solid var(--panel-border);
+      background: var(--panel-bg);
+      color: var(--fg);
       font-size: 14px;
       width: 100%;
     }
@@ -108,7 +152,7 @@
     button {
       padding: 11px;
       border-radius: 12px;
-      border: 1px solid rgba(255,255,255,0.12);
+      border: 1px solid var(--panel-border);
       cursor: pointer;
       font-size: 14px;
       font-weight: 600;
@@ -118,7 +162,7 @@
     button:disabled { opacity: .35; cursor: not-allowed; }
     button:active { opacity: .75; }
     .btn-primary  { background: #c7d92c; color: #0b0f14; border: none; }
-    .btn-secondary{ background: rgba(17,24,37,0.6); color: #eaf0ff; }
+    .btn-secondary{ background: var(--panel-bg); color: var(--fg); }
     .btn-danger   { background: #ef4444; color: #fff; border-color: #ef4444; }
     .btn-success  { background: #22c55e; color: #000; border-color: #22c55e; }
 
@@ -130,8 +174,8 @@
 
     /* ── Status-Block ── */
     .status-block {
-      background: rgba(17,24,37,0.5);
-      border: 1px solid rgba(255,255,255,0.08);
+      background: var(--status-bg);
+      border: 1px solid var(--status-border);
       border-radius: 12px;
       padding: 10px 12px;
       font-size: 13px;
@@ -146,9 +190,9 @@
       gap: 6px;
       padding: 6px 10px;
       border-radius: 999px;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.10);
-      color: rgba(234,240,255,0.78);
+      background: var(--route-card-bg);
+      border: 1px solid var(--panel-border);
+      color: var(--text-muted);
       font-size: 11px;
       font-weight: 700;
       letter-spacing: .04em;
@@ -179,8 +223,8 @@
 
     /* ── Log ── */
     .log {
-      background: #0b0d12;
-      border: 1px solid rgba(255,255,255,.07);
+      background: var(--log-bg);
+      border: 1px solid var(--log-border);
       padding: 10px;
       border-radius: 10px;
       min-height: 60px;
@@ -189,7 +233,7 @@
       white-space: pre-wrap;
       font-size: 11px;
       font-family: monospace;
-      color: rgba(234,240,255,0.6);
+      color: var(--text-muted);
       margin: 8px 0;
     }
 
@@ -205,8 +249,8 @@
     .status-chip {
       padding: 5px 8px;
       border-radius: 999px;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.08);
+      background: var(--chip-bg);
+      border: 1px solid var(--chip-border);
     }
 
     /* ── Route Cards ── */
@@ -214,16 +258,51 @@
     .route-card {
       padding: 12px 14px;
       border-radius: 14px;
-      background: rgba(255,255,255,0.04);
+      background: var(--route-card-bg);
       border: 2px solid transparent;
       cursor: pointer;
       transition: border-color .15s, background .15s;
     }
-    .route-card:hover { background: rgba(199,217,44,0.07); border-color: rgba(199,217,44,0.25); }
+    .route-card:hover { background: var(--route-card-hover); border-color: var(--route-card-hover-border); }
     .route-card.active { border-color: #c7d92c; background: rgba(199,217,44,0.10); }
     .route-card-label { font-size: 13px; font-weight: 700; color: #c7d92c; margin-bottom: 4px; }
     .route-card-meta  { font-size: 12px; opacity: .65; }
+    .route-card.disabled { opacity: .45; pointer-events: none; }
     .route-loading { font-size: 13px; opacity: .55; text-align: center; padding: 16px 0; }
+
+    .time-row-centered, .time-row-centered label { text-align: center; align-items: center; justify-content: center; }
+    .time-input-wrap { display: flex; justify-content: center; align-items: center; width: 100%; }
+    .time-input-wrap input {
+      text-align: center;
+      max-width: 220px;
+      font-size: 18px;
+      letter-spacing: .04em;
+      font-weight: 700;
+    }
+    .time-actions-note {
+      text-align: center;
+      font-size: 12px;
+      opacity: .62;
+      margin-top: 4px;
+    }
+    #themeToggle {
+      position: absolute;
+      right: 14px;
+      bottom: calc(58vh + 14px);
+      z-index: 15;
+      width: 42px;
+      height: 42px;
+      border-radius: 999px;
+      border: 1px solid var(--panel-border);
+      background: var(--panel-bg);
+      color: var(--fg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+      font-size: 18px;
+      padding: 0;
+    }
 
     /* ── Ride ID ── */
     .ride-id { font-size: 11px; opacity: .45; word-break: break-all; margin-top: 4px; }
@@ -249,6 +328,8 @@
     <div id="map-container">
       <div id="map"></div>
     </div>
+
+    <button id="themeToggle" type="button" aria-label="Theme wechseln" title="Theme wechseln">◐</button>
 
     <!-- Bottom Sheet -->
     <section id="route-sheet" class="sheet sheet-open">
@@ -333,9 +414,12 @@
               </div>
             </div>
             <p class="muted" style="margin:2px 0 8px;font-size:11px">💡 Bremen Hbf = 53.0832 / 8.8133</p>
-            <div class="row">
+            <div class="row time-row-centered">
               <label>Wann willst du losfahren?</label>
-              <input id="abfahrtZeit" type="time" />
+              <div class="time-input-wrap">
+                <input id="abfahrtZeit" type="time" />
+              </div>
+              <div class="time-actions-note">Digitale Zeitangabe, mittig und ruhig für den Fahrer-Flow</div>
             </div>
             <div class="row two">
               <div>
@@ -473,12 +557,16 @@
       container.innerHTML = '';
       if (!availableRoutes.length) { block.style.display = 'none'; return; }
       block.style.display = '';
+      const validRouteIds = new Set(availableRoutes.map(r => r.routeId));
+      if (selectedRouteId && !validRouteIds.has(selectedRouteId)) selectedRouteId = null;
       availableRoutes.forEach(route => {
         const card = document.createElement('div');
-        card.className = 'route-card' + (route.routeId === selectedRouteId ? ' active' : '');
+        const isActive = route.routeId === selectedRouteId;
+        const isValid = Array.isArray(route.coords) && route.coords.length >= 2;
+        card.className = 'route-card' + (isActive ? ' active' : '') + (isValid ? '' : ' disabled');
         card.innerHTML = `<div class="route-card-label">${route.label}</div>`
           + `<div class="route-card-meta">📐 ${fmtDist(route.distanceM)} · ⏱ ${fmtDur(route.durationS)}</div>`;
-        card.onclick = () => setSelectedRoute(route.routeId);
+        if (isValid) card.onclick = () => setSelectedRoute(route.routeId);
         container.appendChild(card);
       });
     }
@@ -507,6 +595,11 @@
     let debugPanelOpen = false;
     let userHasTakenMapControl = false;
     let driverMarker = null;
+    let currentTheme = localStorage.getItem('ecoride-theme') || 'dark';
+    const MAP_STYLES = {
+      dark: 'mapbox://styles/mapbox/dark-v11',
+      light: 'mapbox://styles/mapbox/light-v11'
+    };
 
     // ── WAKE LOCK ─────────────────────────────────────
     let wakeLock = null;
@@ -576,6 +669,7 @@
         markerEl.style.background = '#22c55e';
         markerEl.style.border = '3px solid rgba(11,15,20,0.92)';
         markerEl.style.boxShadow = '0 0 0 4px rgba(34,197,94,0.22)';
+        markerEl.style.zIndex = '5';
         driverMarker = new mapboxgl.Marker({ element: markerEl }).setLngLat(lngLat).addTo(map);
       } else {
         driverMarker.setLngLat(lngLat);
@@ -599,6 +693,23 @@
       if (cards) cards.innerHTML = '';
       const block = el('routeCardsBlock');
       if (block) block.style.display = 'none';
+    }
+
+    function applyTheme(theme) {
+      currentTheme = theme;
+      document.body.classList.toggle('theme-light', theme === 'light');
+      const btn = el('themeToggle');
+      if (btn) {
+        btn.textContent = theme === 'light' ? '☀' : '◐';
+        btn.style.color = theme === 'light' ? '#ffffff' : '#111111';
+        btn.style.background = theme === 'light' ? '#111827' : '#ffffff';
+      }
+      localStorage.setItem('ecoride-theme', theme);
+      if (map) map.setStyle(MAP_STYLES[theme]);
+    }
+
+    function toggleTheme() {
+      applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
     }
 
     function resetRideForm() {
@@ -661,6 +772,7 @@
       if (!driverId)             return alert('Bitte Driver ID eingeben.');
       if (!navigator.geolocation) return alert('GPS nicht unterstützt.');
       if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+      resetRouteUi();
 
       log('Tracking START…');
       setLastSendMeta('Tracking gestartet');
@@ -986,6 +1098,10 @@
     el('btnRideStop').addEventListener('click',  () => endRide());
     el('btnDebugIdle').addEventListener('click', () => setDebugPanelOpen(!debugPanelOpen));
     el('btnDebugTracking').addEventListener('click', () => setDebugPanelOpen(!debugPanelOpen));
+    el('themeToggle').addEventListener('click', toggleTheme);
+    el('driverId').addEventListener('input', () => {
+      if (appState === 'idle') resetRouteUi();
+    });
 
     // ── DRAG HANDLE: Snap-Points ──────────────────────
     (function initDragHandle() {
@@ -1047,15 +1163,20 @@
     mapboxgl.accessToken = CONFIG.mapboxToken;
     map = new mapboxgl.Map({
       container: 'map',
-      style: 'mapbox://styles/mapbox/dark-v11',
+      style: MAP_STYLES[currentTheme],
       center: [8.8, 53.1],
       zoom: 10,
     });
     map.on('error', e => log('Mapbox Fehler: ' + (e?.error?.message || '?')));
+    map.on('style.load', () => {
+      if (availableRoutes.length) renderRouteLines();
+      if (lastPos) updateDriverMarker(lastPos);
+    });
     ['dragstart', 'zoomstart', 'rotatestart', 'pitchstart', 'mousedown', 'touchstart', 'wheel'].forEach(evt => map.on(evt, markUserMapControl));
     map.on('click', markUserMapControl);
 
     // ── INIT ──────────────────────────────────────────
+    applyTheme(currentTheme);
     setState('idle');
     updateCompactTrackingStatus();
     setDebugPanelOpen(false);
