@@ -620,6 +620,7 @@
     let debugPanelOpen = false;
     let userHasTakenMapControl = false;
     let driverMarker = null;
+    let destinationMarker = null;
     let currentTheme = localStorage.getItem('ecoride-theme') || 'dark';
     const MAP_STYLES = {
       dark: 'mapbox://styles/mapbox/dark-v11',
@@ -707,6 +708,41 @@
       driverMarker = null;
     }
 
+    function updateDestinationMarker() {
+      if (!map) return;
+      const zLat = Number(el('zielLat').value);
+      const zLng = Number(el('zielLng').value);
+      const hasValidTarget = Number.isFinite(zLat) && Number.isFinite(zLng) && zLat >= -90 && zLat <= 90 && zLng >= -180 && zLng <= 180;
+      const shouldShow = hasValidTarget && (appState === 'tracking' || appState === 'ride');
+      if (!shouldShow) {
+        if (destinationMarker) {
+          destinationMarker.remove();
+          destinationMarker = null;
+        }
+        return;
+      }
+      const lngLat = [zLng, zLat];
+      if (!destinationMarker) {
+        const markerEl = document.createElement('div');
+        markerEl.style.width = '18px';
+        markerEl.style.height = '18px';
+        markerEl.style.borderRadius = '4px';
+        markerEl.style.transform = 'rotate(45deg)';
+        markerEl.style.background = '#f97316';
+        markerEl.style.border = '3px solid rgba(11,15,20,0.92)';
+        markerEl.style.boxShadow = '0 0 0 4px rgba(249,115,22,0.18)';
+        destinationMarker = new mapboxgl.Marker({ element: markerEl }).setLngLat(lngLat).addTo(map);
+      } else {
+        destinationMarker.setLngLat(lngLat);
+      }
+    }
+
+    function clearDestinationMarker() {
+      if (!destinationMarker) return;
+      destinationMarker.remove();
+      destinationMarker = null;
+    }
+
     function resetRouteUi() {
       availableRoutes = [];
       selectedRouteId = null;
@@ -741,6 +777,7 @@
       el('driverId').value = '';
       el('zielLat').value = '';
       el('zielLng').value = '';
+      clearDestinationMarker();
       el('abfahrtZeit').value = '';
       el('plaetze').value = '2';
       el('preis').value = '0.00';
@@ -882,6 +919,7 @@
       resetRouteUi();
       userHasTakenMapControl = false;
       clearDriverMarker();
+      clearDestinationMarker();
       const driverId = el('driverId').value.trim();
       if (driverId) await deletePosition(driverId);
       resetRideForm();
@@ -933,6 +971,7 @@
         routes.forEach((r, idx) => { r.label = getRouteLabel(idx, routes); });
         availableRoutes = routes;
         selectedRouteId = null;
+        updateDestinationMarker();
         if (!userHasTakenMapControl) allowNextAutoCamera();
         renderRouteCards();
         updateStartRideButton();
@@ -1009,6 +1048,7 @@
 
       activeRideId = data.id;
       existingActiveRide = { id: data.id, driver_id: driverId, status: 'aktiv', updated_at: new Date().toISOString(), created_at: new Date().toISOString() };
+      updateDestinationMarker();
       renderExistingActiveRideHint();
       log('FAHRT GESTARTET ✅ ride_id=' + activeRideId);
       showHint('Fahrt läuft! Mitfahrer können dich jetzt sehen.');
@@ -1216,6 +1256,10 @@
     el('driverId').addEventListener('change', () => {
       if (appState === 'idle') loadExistingActiveRide(el('driverId').value.trim());
     });
+    ['zielLat','zielLng'].forEach(id => {
+      el(id).addEventListener('input', updateDestinationMarker);
+      el(id).addEventListener('change', updateDestinationMarker);
+    });
     el('abfahrtZeit').addEventListener('input', e => {
       const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
       if (digits.length <= 2) e.target.value = digits;
@@ -1290,6 +1334,7 @@
     map.on('style.load', () => {
       if (availableRoutes.length) renderRouteLines();
       if (lastPos) updateDriverMarker(lastPos);
+      updateDestinationMarker();
     });
     ['dragstart', 'zoomstart', 'rotatestart', 'pitchstart', 'mousedown', 'touchstart', 'wheel'].forEach(evt => map.on(evt, markUserMapControl));
     map.on('click', markUserMapControl);
