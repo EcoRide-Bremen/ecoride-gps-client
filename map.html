@@ -930,7 +930,9 @@
     function hasFreshDriverPosition(driverKey) {
       const pos = positions.get(driverKey);
       if (!pos?.ts) return false;
-      return (Date.now() - pos.ts) <= STALE_MS;
+      // Dieselbe Frischegrenze wie der Fahrer-Marker, damit Marker und Route
+      // sichtbar immer denselben Zustand haben.
+      return (Date.now() - pos.ts) <= STALE_VISUAL_MS;
     }
 
     function getVisibleActiveRides() {
