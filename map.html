@@ -1842,10 +1842,28 @@
 
       const destFeatures  = [];
       const routeFeatures = [];
+      const canonicalRideByDriver = new Map();
 
       for (const [rideId, ride] of activeRides.entries()) {
         const driverKey = normId(ride.driver_id);
-        const isFresh = !!driverKey && hasFreshDriverPosition(driverKey);
+        if (!driverKey) continue;
+        const isFresh = hasFreshDriverPosition(driverKey);
+        const candidateTs = new Date(ride.updated_at || ride.created_at || 0).getTime() || 0;
+        const prev = canonicalRideByDriver.get(driverKey);
+        if (!prev) {
+          canonicalRideByDriver.set(driverKey, { rideId, ride, isFresh, candidateTs });
+          continue;
+        }
+        if (isFresh && !prev.isFresh) {
+          canonicalRideByDriver.set(driverKey, { rideId, ride, isFresh, candidateTs });
+          continue;
+        }
+        if (isFresh === prev.isFresh && candidateTs > prev.candidateTs) {
+          canonicalRideByDriver.set(driverKey, { rideId, ride, isFresh, candidateTs });
+        }
+      }
+
+      for (const { rideId, ride, isFresh } of canonicalRideByDriver.values()) {
         const zLat = Number(ride.ziel_lat), zLng = Number(ride.ziel_lng);
         if (isFresh && !isValidLatLng(zLat, zLng)) continue;
 
