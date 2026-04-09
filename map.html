@@ -2896,7 +2896,22 @@
       // Ride-Routen
       if (!m.getSource(RIDES_ROUTE_SOURCE)) {
         m.addSource(RIDES_ROUTE_SOURCE,{type:"geojson",data:{type:"FeatureCollection",features:[]}});
-        m.addLayer({id:LAYER_RIDE_ROUTES,type:"line",source:RIDES_ROUTE_SOURCE,layout:{"line-join":"round","line-cap":"round"},paint:{"line-color":["get","color"],"line-width":["case",["==",["get","stale"],1],2.5,4],"line-opacity":["case",["==",["get","stale"],1],0.42,0.88],"line-dasharray":["case",["==",["get","stale"],1],[2,2],[1,0]]}});
+        m.addLayer({
+          id:LAYER_RIDE_ROUTES,
+          type:"line",
+          source:RIDES_ROUTE_SOURCE,
+          filter:["==",["get","stale"],0],
+          layout:{"line-join":"round","line-cap":"round"},
+          paint:{"line-color":"#B7D532","line-width":4,"line-opacity":0.92}
+        });
+        m.addLayer({
+          id:`${LAYER_RIDE_ROUTES}-stale`,
+          type:"line",
+          source:RIDES_ROUTE_SOURCE,
+          filter:["==",["get","stale"],1],
+          layout:{"line-join":"round","line-cap":"round"},
+          paint:{"line-color":"rgba(148,163,184,0.55)","line-width":2.5,"line-opacity":0.42,"line-dasharray":[2,2]}
+        });
       }
       // Ride-Ziele
       if (!m.getSource(RIDES_SOURCE)) {
