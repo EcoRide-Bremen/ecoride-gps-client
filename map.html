@@ -2326,9 +2326,10 @@
           refreshDriversSource();
           return;
         }
+        const t = Date.parse(row.updated_at);
+        const ts = Number.isFinite(t) ? t : Date.now();
         const lat = Number(row.lat), lng = Number(row.lng);
         if (!isValidLatLng(lat, lng)) return;
-        const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
         if (Date.now() - ts > STALE_MS) return;
         positions.clear();
         positions.set(driverKey, { rawId, lng, lat, ts });
@@ -2350,9 +2351,10 @@
         const rawId = (row?.driver_id ?? "").toString();
         const key = normId(rawId); if (!key) continue;
         if (endedDrivers.has(key)) continue;
+        const t = Date.parse(row.updated_at);
+        const ts = Number.isFinite(t) ? t : Date.now();
         const lat = Number(row.lat), lng = Number(row.lng);
         if (!isValidLatLng(lat, lng)) continue;
-        const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
         if (Date.now() - ts > STALE_MS) continue;
         positions.set(key, { rawId: row.driver_id, lng, lat, ts });
       }
@@ -2435,9 +2437,10 @@
         if (error) { logError("ERR_FETCH_POS_RETRY", error.message); continue; }
         const row = data?.[0];
         if (!row) { logDebug("fetchPositionWithRetry: kein Eintrag (Versuch", i + 1, "):", driverKey); continue; }
+        const t = Date.parse(row.updated_at);
+        const ts = Number.isFinite(t) ? t : Date.now();
         const lat = Number(row.lat), lng = Number(row.lng);
         if (!isValidLatLng(lat, lng)) return;
-        const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
         if (Date.now() - ts > STALE_MS) return; // Position zu alt
         const rawId = (row.driver_id ?? "").toString();
         positions.set(driverKey, { rawId, lng, lat, ts });
@@ -2668,9 +2671,10 @@
       const rawId = (row.driver_id ?? "").toString();
       const driverKey = normId(rawId); if (!driverKey) return;
       if (endedDrivers.has(driverKey)) return;
+      const t = Date.parse(row.updated_at);
+      const ts = Number.isFinite(t) ? t : Date.now();
       const lat = Number(row.lat), lng = Number(row.lng);
       if (!isValidLatLng(lat, lng)) return;
-      const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
       if (Date.now() - ts > STALE_MS) return;
 
       if (currentFilterKey) {
