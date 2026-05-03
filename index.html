@@ -815,9 +815,14 @@
       }
       const ageMs = getRideActivityAgeMs(existingActiveRide);
       const ageMin = ageMs == null ? null : Math.max(1, Math.round(ageMs / 60000));
-      meta.textContent = ageMin == null
-        ? 'Diese Fahrt ist noch aktiv und kann fortgeführt oder beendet werden.'
-        : `Diese Fahrt ist seit ca. ${ageMin} Min aktiv und kann fortgeführt oder beendet werden.`;
+      const isOffered = existingActiveRide.status === 'angeboten';
+      meta.textContent = isOffered
+        ? (ageMin == null
+            ? 'Diese Fahrt ist bereits online angeboten und kann gestartet oder beendet werden.'
+            : `Diese Fahrt ist seit ca. ${ageMin} Min online angeboten und kann gestartet oder beendet werden.`)
+        : (ageMin == null
+            ? 'Diese Fahrt ist noch aktiv und kann fortgeführt oder beendet werden.'
+            : `Diese Fahrt ist seit ca. ${ageMin} Min aktiv und kann fortgeführt oder beendet werden.`);
       box.classList.add('visible');
     }
 
@@ -828,9 +833,9 @@
         return null;
       }
       const { data, error } = await sb.from('rides')
-        .select('id, driver_id, status, updated_at, created_at, ziel_lat, ziel_lng, plaetze, preis')
+        .select('id, driver_id, status, updated_at, created_at, ziel_lat, ziel_lng, plaetze, preis, route_punkte, start_lat, start_lng, departure_time')
         .eq('driver_id', driverId)
-        .eq('status', 'aktiv')
+        .in('status', ['angeboten', 'aktiv'])
         .order('updated_at', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -839,6 +844,7 @@
         existingActiveRide = null;
       } else {
         existingActiveRide = data || null;
+        activeRideId = data?.id || null;
       }
       renderExistingActiveRideHint();
       return existingActiveRide;
@@ -987,78 +993,100 @@
     });
 
     // ── RIDE START ────────────────────────────────────
-    async function startRide() {
-      if (appState !== 'tracking') return;
+    function buildRidePayload(status) {
       const driverId = el('driverId').value.trim();
       const zLat = parseFloat(el('zielLat').value);
       const zLng = parseFloat(el('zielLng').value);
       const plaetze = parseInt(el('plaetze').value);
       const preis = parseFloat(el('preis').value);
-      // Abfahrtzeit: "HH:MM" → ISO-Timestamp (heute + gewählte Uhrzeit)
       const abfahrtZeitRaw = el('abfahrtZeit').value.trim();
       let abfahrtZeit = null;
       if (abfahrtZeitRaw) {
         const match = abfahrtZeitRaw.match(/^(\d{2}):(\d{2})$/);
-        if (!match) return showHint('Bitte Uhrzeit im Format HH:MM eingeben.', true);
+        if (!match) throw new Error('Bitte Uhrzeit im Format HH:MM eingeben.');
         const h = Number(match[1]);
         const m = Number(match[2]);
-        if (h < 0 || h > 23 || m < 0 || m > 59) return showHint('Bitte eine gültige Uhrzeit eingeben.', true);
+        if (h < 0 || h > 23 || m < 0 || m > 59) throw new Error('Bitte eine gültige Uhrzeit eingeben.');
         const dt = new Date();
         dt.setHours(h, m, 0, 0);
         abfahrtZeit = dt.toISOString();
       }
-
-      if (!driverId)                         return showHint('Driver ID fehlt.', true);
-      if (isNaN(zLat)||isNaN(zLng))          return showHint('Bitte Ziel-Koordinaten eingeben.', true);
-      if (zLat<-90||zLat>90)                 return showHint('Lat muss zwischen -90 und 90 liegen.', true);
-      if (zLng<-180||zLng>180)               return showHint('Lng muss zwischen -180 und 180 liegen.', true);
-      if (isNaN(plaetze)||plaetze<1||plaetze>8) return showHint('Sitzplätze: 1–8.', true);
-      if (isNaN(preis)||preis<0)              return showHint('Preis darf nicht negativ sein.', true);
-      if (!lastPos)                           return showHint('Noch keine GPS-Position.', true);
-
-      // Gewählte Route aus availableRoutes holen
+      if (!driverId) throw new Error('Driver ID fehlt.');
+      if (isNaN(zLat)||isNaN(zLng)) throw new Error('Bitte Ziel-Koordinaten eingeben.');
+      if (zLat<-90||zLat>90) throw new Error('Lat muss zwischen -90 und 90 liegen.');
+      if (zLng<-180||zLng>180) throw new Error('Lng muss zwischen -180 und 180 liegen.');
+      if (isNaN(plaetze)||plaetze<1||plaetze>8) throw new Error('Sitzplätze: 1–8.');
+      if (isNaN(preis)||preis<0) throw new Error('Preis darf nicht negativ sein.');
+      if (!lastPos) throw new Error('Noch keine GPS-Position.');
       const selectedRoute = availableRoutes.find(r => r.routeId === selectedRouteId);
       const routePunkte = selectedRoute
         ? selectedRoute.coords
         : [[lastPos.coords.longitude, lastPos.coords.latitude], [zLng, zLat]];
+      return {
+        driverId, zLat, zLng, plaetze, preis, abfahrtZeit, routePunkte,
+        payload: {
+          driver_id: driverId,
+          start_lat: lastPos.coords.latitude,
+          start_lng: lastPos.coords.longitude,
+          ziel_lat:  zLat,
+          ziel_lng:  zLng,
+          route_punkte: routePunkte,
+          plaetze, preis,
+          departure_time: abfahrtZeit,
+          status,
+        }
+      };
+    }
 
-      if (!selectedRoute) log('Keine Route gewählt – Luftlinie als Fallback');
-      else log(`Route übernommen (${routePunkte.length} Punkte)`);
+    async function ensureRideOffered() {
+      const ride = buildRidePayload('angeboten');
+      if (!selectedRouteId) throw new Error('Bitte zuerst eine Route auswählen.');
+      let result;
+      if (activeRideId) {
+        result = await sb.from('rides').update({ ...ride.payload, beendet_am: null }).eq('id', activeRideId).select('id,status,updated_at,created_at').single();
+      } else {
+        result = await sb.from('rides').insert(ride.payload).select('id,status,updated_at,created_at').single();
+      }
+      if (result.error) throw result.error;
+      activeRideId = result.data.id;
+      existingActiveRide = { ...ride.payload, id: result.data.id, updated_at: result.data.updated_at, created_at: result.data.created_at };
+      renderExistingActiveRideHint();
+      el('stRideDriver').textContent  = ride.driverId;
+      el('stRidePlaetze').textContent = ride.plaetze + ' Platz/Plätze';
+      el('stRidePreis').textContent   = ride.preis.toFixed(2) + ' €';
+      el('stRideId').textContent      = activeRideId;
+      return activeRideId;
+    }
 
+    async function startRide() {
+      if (appState !== 'tracking') return;
       el('btnRideStart').disabled = true;
       el('btnRideStart').textContent = 'Starte…';
       hideHint();
-
-      const { data, error } = await sb.from('rides').insert({
-        driver_id: driverId,
-        start_lat: lastPos.coords.latitude,
-        start_lng: lastPos.coords.longitude,
-        ziel_lat:  zLat,
-        ziel_lng:  zLng,
-        route_punkte: routePunkte,
-        plaetze, preis,
-        departure_time: abfahrtZeit,
-        status: 'aktiv',
-      }).select('id').single();
-
-      el('btnRideStart').disabled = false;
-      el('btnRideStart').textContent = 'Fahrt starten';
-
-      if (error) { log('RIDE INSERT ERROR: ' + error.message); showHint('Fehler beim Starten: ' + error.message, true); return; }
-
-      activeRideId = data.id;
-      existingActiveRide = { id: data.id, driver_id: driverId, status: 'aktiv', updated_at: new Date().toISOString(), created_at: new Date().toISOString() };
-      updateDestinationMarker();
-      renderExistingActiveRideHint();
-      log('FAHRT GESTARTET ✅ ride_id=' + activeRideId);
-      showHint('Fahrt läuft! Mitfahrer können dich jetzt sehen.');
-
-      el('stRideDriver').textContent  = driverId;
-      el('stRidePlaetze').textContent = plaetze + ' Platz/Plätze';
-      el('stRidePreis').textContent   = preis.toFixed(2) + ' €';
-      el('stRideId').textContent      = activeRideId;
-
-      setState('ride');
+      try {
+        const ride = buildRidePayload('aktiv');
+        const result = activeRideId
+          ? await sb.from('rides').update({ ...ride.payload, beendet_am: null }).eq('id', activeRideId).select('id,status,updated_at,created_at').single()
+          : await sb.from('rides').insert(ride.payload).select('id,status,updated_at,created_at').single();
+        if (result.error) throw result.error;
+        activeRideId = result.data.id;
+        existingActiveRide = { ...ride.payload, id: result.data.id, updated_at: result.data.updated_at, created_at: result.data.created_at };
+        updateDestinationMarker();
+        renderExistingActiveRideHint();
+        log('FAHRT GESTARTET ✅ ride_id=' + activeRideId);
+        showHint('Fahrt läuft! Mitfahrer können dich jetzt sehen.');
+        el('stRideDriver').textContent  = ride.driverId;
+        el('stRidePlaetze').textContent = ride.plaetze + ' Platz/Plätze';
+        el('stRidePreis').textContent   = ride.preis.toFixed(2) + ' €';
+        el('stRideId').textContent      = activeRideId;
+        setState('ride');
+      } catch (error) {
+        log('RIDE INSERT ERROR: ' + error.message);
+        showHint('Fehler beim Starten: ' + error.message, true);
+      } finally {
+        el('btnRideStart').disabled = false;
+        el('btnRideStart').textContent = 'Fahrt starten';
+      }
     }
 
     // ── ROUTEN AUF KARTE ──────────────────────────────
@@ -1146,12 +1174,19 @@
     }
 
     // Einzige öffentliche Auswahl-Funktion
-    function selectRoute(routeId) {
+    async function selectRoute(routeId) {
       selectedRouteId = routeId;
       renderRouteCards();       // Bottom Sheet
       updateStartRideButton();  // Start-Button
       renderSheetSummary();     // Compact Summary
       updateRouteLineStyles();  // Karte (nur Paint, kein Rebuild)
+      try {
+        await ensureRideOffered();
+        showHint('Fahrt ist jetzt online angeboten. Route ist vor Fahrtstart sichtbar.');
+      } catch (e) {
+        log('RIDE OFFER ERROR: ' + e.message);
+        showHint('Fahrt konnte noch nicht angeboten werden: ' + e.message, true);
+      }
     }
 
     // Alias für initiale Berechnung
@@ -1175,6 +1210,8 @@
       if (error) log('RIDE UPDATE ERROR: ' + error.message);
       else        log('FAHRT BEENDET ✅ ride_id=' + rideId);
 
+      existingActiveRide = null;
+      renderExistingActiveRideHint();
       showHint('Fahrt beendet – Tracking gestoppt.');
       await stopTracking();
     }
@@ -1216,7 +1253,7 @@
 
     // ── BUTTONS ───────────────────────────────────────
     el('btnTrackStart').addEventListener('click', startTracking);
-    el('btnTrackStop').addEventListener('click',  () => stopTracking());
+    el('btnTrackStop').addEventListener('click',  () => activeRideId ? endRide() : stopTracking());
     el('btnWake').addEventListener('click',  toggleWakeLock);
     el('btnWake2').addEventListener('click', toggleWakeLock);
     el('btnRideStart').addEventListener('click', startRide);
@@ -1226,8 +1263,10 @@
     el('btnResumeRide').addEventListener('click', () => {
       if (!existingActiveRide) return;
       activeRideId = existingActiveRide.id;
-      setState('ride');
-      showHint('Aktive Fahrt weiter im Blick. Bei Bedarf bitte bewusst beenden.');
+      setState(existingActiveRide.status === 'aktiv' ? 'ride' : 'tracking');
+      showHint(existingActiveRide.status === 'aktiv'
+        ? 'Aktive Fahrt weiter im Blick. Bei Bedarf bitte bewusst beenden.'
+        : 'Angebotene Fahrt wieder geladen. Du kannst sie starten oder beenden.');
     });
     el('btnEndExistingRide').addEventListener('click', async () => {
       if (!existingActiveRide?.id) return;
