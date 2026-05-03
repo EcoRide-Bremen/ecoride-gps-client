@@ -798,7 +798,7 @@
 
     function getRideActivityAgeMs(ride) {
       if (!ride) return null;
-      const ref = ride.updated_at || ride.created_at || ride.start_time || null;
+      const ref = ride.updated_at || ride.erstellt_am || ride.departure_time || ride.start_time || null;
       if (!ref) return null;
       const ts = new Date(ref).getTime();
       return Number.isFinite(ts) ? (Date.now() - ts) : null;
@@ -833,10 +833,10 @@
         return null;
       }
       const { data, error } = await sb.from('rides')
-        .select('id, driver_id, status, updated_at, created_at, ziel_lat, ziel_lng, plaetze, preis, route_punkte, start_lat, start_lng, departure_time')
+        .select('id, driver_id, status, erstellt_am, ziel_lat, ziel_lng, plaetze, preis, route_punkte, start_lat, start_lng, departure_time')
         .eq('driver_id', driverId)
         .in('status', ['angeboten', 'aktiv'])
-        .order('updated_at', { ascending: false })
+        .order('erstellt_am', { ascending: false })
         .limit(1)
         .maybeSingle();
       if (error) {
@@ -1043,13 +1043,13 @@
       if (!selectedRouteId) throw new Error('Bitte zuerst eine Route auswählen.');
       let result;
       if (activeRideId) {
-        result = await sb.from('rides').update({ ...ride.payload, beendet_am: null }).eq('id', activeRideId).select('id,status,updated_at,created_at').single();
+        result = await sb.from('rides').update({ ...ride.payload, beendet_am: null }).eq('id', activeRideId).select('id,status,erstellt_am').single();
       } else {
-        result = await sb.from('rides').insert(ride.payload).select('id,status,updated_at,created_at').single();
+        result = await sb.from('rides').insert(ride.payload).select('id,status,erstellt_am').single();
       }
       if (result.error) throw result.error;
       activeRideId = result.data.id;
-      existingActiveRide = { ...ride.payload, id: result.data.id, updated_at: result.data.updated_at, created_at: result.data.created_at };
+      existingActiveRide = { ...ride.payload, id: result.data.id, erstellt_am: result.data.erstellt_am };
       renderExistingActiveRideHint();
       el('stRideDriver').textContent  = ride.driverId;
       el('stRidePlaetze').textContent = ride.plaetze + ' Platz/Plätze';
@@ -1066,11 +1066,11 @@
       try {
         const ride = buildRidePayload('aktiv');
         const result = activeRideId
-          ? await sb.from('rides').update({ ...ride.payload, beendet_am: null }).eq('id', activeRideId).select('id,status,updated_at,created_at').single()
-          : await sb.from('rides').insert(ride.payload).select('id,status,updated_at,created_at').single();
+          ? await sb.from('rides').update({ ...ride.payload, beendet_am: null }).eq('id', activeRideId).select('id,status,erstellt_am').single()
+          : await sb.from('rides').insert(ride.payload).select('id,status,erstellt_am').single();
         if (result.error) throw result.error;
         activeRideId = result.data.id;
-        existingActiveRide = { ...ride.payload, id: result.data.id, updated_at: result.data.updated_at, created_at: result.data.created_at };
+        existingActiveRide = { ...ride.payload, id: result.data.id, erstellt_am: result.data.erstellt_am };
         updateDestinationMarker();
         renderExistingActiveRideHint();
         log('FAHRT GESTARTET ✅ ride_id=' + activeRideId);
