@@ -105,10 +105,25 @@
     /* ── Sheet Summary (compact) ── */
     #sheet-summary {
       flex-shrink: 0;
-      font-size: 13px;
+      font-size: 16px;
       padding: 0 16px 6px;
       color: var(--sheet-summary);
       min-height: 0;
+    }
+    .sheet-open #sheet-summary,
+    .sheet-mid #sheet-summary {
+      display: none;
+    }
+    .sheet-compact #sheet-summary {
+      flex: 1;
+      display: grid;
+      place-items: center;
+      width: 100%;
+      padding: 0 16px 10px;
+      text-align: center;
+      color: var(--fg);
+      font-weight: 600;
+      line-height: 1.2;
     }
 
     /* ── Sheet Content (scrollbar) ── */
@@ -353,7 +368,7 @@
       <div id="sheet-handle" class="sheet-handle"></div>
 
       <!-- Compact Summary -->
-      <div id="sheet-summary"></div>
+      <div id="sheet-summary"><span id="sheetStatusText">EcoRide – Fahrer</span></div>
 
       <!-- Scrollbarer Inhalt -->
       <div id="sheet-content">
@@ -566,12 +581,22 @@
     }
 
     // ── RENDER: Sheet Summary (compact) ──────────────
+    function setSheetStatusText(text) {
+      const status = el('sheetStatusText');
+      if (status) status.textContent = text || '';
+    }
+
+    function getDriverSheetStatusText() {
+      if (activeRideId || existingActiveRide?.status === 'angeboten' || existingActiveRide?.status === 'aktiv') {
+        return 'Mitfahrer werden gesucht';
+      }
+      return 'EcoRide – Fahrer';
+    }
+
     function renderSheetSummary() {
       const summary = el('sheet-summary');
-      if (sheetState !== 'compact' || !selectedRouteId) { summary.innerHTML = ''; return; }
-      const route = availableRoutes.find(r => r.routeId === selectedRouteId);
-      if (!route) { summary.innerHTML = ''; return; }
-      summary.innerHTML = `<strong>${route.label}</strong> · ${fmtDur(route.durationS)} · ${fmtDist(route.distanceM)}`;
+      if (!summary) return;
+      setSheetStatusText(getDriverSheetStatusText());
     }
 
     // ── RENDER: Route Cards ───────────────────────────
@@ -847,6 +872,7 @@
         activeRideId = data?.id || null;
       }
       renderExistingActiveRideHint();
+      renderSheetSummary();
       return existingActiveRide;
     }
 
@@ -1051,6 +1077,7 @@
       activeRideId = result.data.id;
       existingActiveRide = { ...ride.payload, id: result.data.id, erstellt_am: result.data.erstellt_am };
       renderExistingActiveRideHint();
+      renderSheetSummary();
       el('stRideDriver').textContent  = ride.driverId;
       el('stRidePlaetze').textContent = ride.plaetze + ' Platz/Plätze';
       el('stRidePreis').textContent   = ride.preis.toFixed(2) + ' €';
@@ -1073,6 +1100,7 @@
         existingActiveRide = { ...ride.payload, id: result.data.id, erstellt_am: result.data.erstellt_am };
         updateDestinationMarker();
         renderExistingActiveRideHint();
+        renderSheetSummary();
         log('FAHRT GESTARTET ✅ ride_id=' + activeRideId);
         showHint('Fahrt läuft! Mitfahrer können dich jetzt sehen.');
         el('stRideDriver').textContent  = ride.driverId;
@@ -1212,6 +1240,7 @@
 
       existingActiveRide = null;
       renderExistingActiveRideHint();
+      renderSheetSummary();
       showHint('Fahrt beendet – Tracking gestoppt.');
       await stopTracking();
     }
@@ -1263,6 +1292,7 @@
     el('btnResumeRide').addEventListener('click', () => {
       if (!existingActiveRide) return;
       activeRideId = existingActiveRide.id;
+      renderSheetSummary();
       setState(existingActiveRide.status === 'aktiv' ? 'ride' : 'tracking');
       showHint(existingActiveRide.status === 'aktiv'
         ? 'Aktive Fahrt weiter im Blick. Bei Bedarf bitte bewusst beenden.'
@@ -1279,7 +1309,9 @@
         return;
       }
       existingActiveRide = null;
+      activeRideId = null;
       renderExistingActiveRideHint();
+      renderSheetSummary();
       showHint('Vorherige aktive Fahrt wurde beendet.');
     });
     el('themeToggle').addEventListener('click', toggleTheme);
@@ -1309,11 +1341,12 @@
     (function initDragHandle() {
       const handle = el('sheet-handle');
       const sheet  = el('route-sheet');
-      let startY = 0, startH = 0, dragging = false;
+      const DRAG_THRESHOLD = 5;
+      let startY = 0, startH = 0, dragging = false, moved = false, suppressClickUntil = 0;
 
       function getH() { return sheet.getBoundingClientRect().height; }
-      function snapToState() {
-        const h = getH();
+      function snapToState(height = getH()) {
+        const h = height;
         const vh = window.innerHeight;
         if (h > vh * 0.44) applySheetState('open');
         else if (h > vh * 0.20) applySheetState('mid');
@@ -1321,43 +1354,58 @@
       }
 
       handle.addEventListener('mousedown', e => {
-        dragging = true; startY = e.clientY; startH = getH();
+        dragging = true; moved = false; startY = e.clientY; startH = getH();
         sheet.style.transition = 'none';
         document.addEventListener('mousemove', onMove);
         document.addEventListener('mouseup', onUp);
       });
       handle.addEventListener('touchstart', e => {
-        dragging = true; startY = e.touches[0].clientY; startH = getH();
+        dragging = true; moved = false; startY = e.touches[0].clientY; startH = getH();
         sheet.style.transition = 'none';
       }, { passive: true });
       handle.addEventListener('touchmove', e => {
         if (!dragging) return;
         const dy = startY - e.touches[0].clientY;
         const newH = Math.max(60, Math.min(window.innerHeight * 0.85, startH + dy));
+        if (Math.abs(newH - startH) > DRAG_THRESHOLD) moved = true;
         sheet.style.height = newH + 'px';
       }, { passive: true });
       handle.addEventListener('touchend', () => {
         if (!dragging) return;
+        const finalH = getH();
         dragging = false;
         sheet.style.transition = '';
         sheet.style.height = '';
-        snapToState();
+        if (moved) suppressClickUntil = Date.now() + 250;
+        snapToState(finalH);
       });
 
       function onMove(e) {
         if (!dragging) return;
         const dy = startY - e.clientY;
         const newH = Math.max(60, Math.min(window.innerHeight * 0.85, startH + dy));
+        if (Math.abs(newH - startH) > DRAG_THRESHOLD) moved = true;
         sheet.style.height = newH + 'px';
       }
       function onUp() {
+        const finalH = getH();
         dragging = false;
         sheet.style.transition = '';
         sheet.style.height = '';
-        snapToState();
+        if (moved) suppressClickUntil = Date.now() + 250;
+        snapToState(finalH);
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
       }
+      handle.addEventListener('click', e => {
+        if (Date.now() < suppressClickUntil) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+        e.preventDefault();
+        applySheetState(sheetState === 'compact' ? 'open' : 'compact');
+      });
     })();
 
     // ── MAPBOX ────────────────────────────────────────
