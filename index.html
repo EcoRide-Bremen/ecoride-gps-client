@@ -296,6 +296,101 @@
     .route-card-meta  { font-size: 12px; opacity: .65; }
     .route-card.disabled { opacity: .45; pointer-events: none; }
     .route-loading { font-size: 13px; opacity: .55; text-align: center; padding: 16px 0; }
+    .target-search-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 8px;
+      align-items: stretch;
+      margin: 10px 0;
+    }
+    .target-search-row.show-clear { grid-template-columns: minmax(0, 1fr) 44px; }
+    .target-search {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 0;
+      width: 100%;
+    }
+    .target-search input[type=search] {
+      min-height: 44px;
+      letter-spacing: 0;
+    }
+    .target-search input[type=search]::placeholder {
+      color: var(--fg);
+      opacity: .55;
+    }
+    .target-search input[type=search]:focus::placeholder {
+      color: transparent;
+      opacity: 0;
+    }
+    .target-search input[type=search]::-webkit-search-cancel-button,
+    .target-search input[type=search]::-webkit-search-decoration {
+      -webkit-appearance: none;
+      appearance: none;
+      display: none;
+    }
+    .target-search-results {
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .target-search-results.show { display: flex; }
+    .target-search-result {
+      appearance: none;
+      -webkit-appearance: none;
+      min-height: 54px;
+      padding: 11px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--panel-border);
+      background: var(--route-card-bg);
+      color: var(--fg);
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 3px;
+      text-align: left;
+    }
+    .target-search-result-main {
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.25;
+    }
+    .target-search-result-sub {
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 1.25;
+      color: var(--text-muted);
+    }
+    .target-search-message {
+      min-height: 16px;
+      font-size: 12px;
+      line-height: 1.35;
+      color: var(--text-muted);
+      text-align: center;
+    }
+    .target-search-message:empty { display: none; }
+    .target-clear-btn {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0;
+      border-radius: 12px;
+      border: 1px solid rgba(239,68,68,0.34);
+      background: rgba(239,68,68,0.10);
+      color: #f87171;
+      font-size: 16px;
+      font-weight: 800;
+      line-height: 1;
+    }
+    .target-search-row.show-clear .target-clear-btn { display: flex; }
+    .target-clear-btn[hidden] { display: none !important; }
+    body.theme-light .target-clear-btn {
+      background: rgba(239,68,68,0.08);
+      color: #b91c1c;
+      border-color: rgba(239,68,68,0.28);
+    }
 
     .time-row-centered, .time-row-centered label { text-align: center; align-items: center; justify-content: center; }
     .time-input-wrap { display: flex; justify-content: center; align-items: center; width: 100%; }
@@ -442,6 +537,23 @@
 
             <div id="rideHint"></div>
 
+            <div class="target-search-row" id="targetSearchRow">
+              <div class="target-search" id="targetSearch">
+                <label for="targetSearchInput">Ziel</label>
+                <input
+                  id="targetSearchInput"
+                  type="search"
+                  inputmode="search"
+                  placeholder="Ort oder Adresse suchen"
+                  autocomplete="off"
+                  enterkeyhint="search"
+                />
+                <div class="target-search-results" id="targetSearchResults"></div>
+                <div class="target-search-message" id="targetSearchMessage"></div>
+              </div>
+              <button class="target-clear-btn" id="btnTargetClear" type="button" hidden aria-label="Ziel aufheben" title="Ziel aufheben">X</button>
+            </div>
+
             <div class="row two">
               <div>
                 <label>Ziel – Lat</label>
@@ -466,7 +578,7 @@
                 <input id="plaetze" type="number" min="1" max="8" value="2" />
               </div>
               <div>
-                <label>Preis (€)</label>
+                <label>Preis pro Sitzplatz (€)</label>
                 <input id="preis" type="number" min="0" step="0.50" value="0.00" />
               </div>
             </div>
@@ -491,7 +603,7 @@
             <div>Fahrt: <span class="badge badge-aktiv">AKTIV</span></div>
             <div style="font-size:12px;opacity:.65">Fahrer: <span id="stRideDriver">–</span></div>
             <div style="font-size:12px;opacity:.65">Plätze: <span id="stRidePlaetze">–</span></div>
-            <div style="font-size:12px;opacity:.65">Preis: <span id="stRidePreis">–</span></div>
+            <div style="font-size:12px;opacity:.65">Preis pro Sitzplatz: <span id="stRidePreis">–</span></div>
             <div class="ride-id">ride_id: <span id="stRideId">–</span></div>
           </div>
         </div>
@@ -503,10 +615,13 @@
         <!-- IDLE: leer -->
         <div class="show-idle" style="height:4px"></div>
 
-        <!-- TRACKING: Routen berechnen + Fahrt starten -->
+        <!-- TRACKING: Routen berechnen + Fahrt anbieten + Fahrt starten -->
         <div class="show-tracking">
           <div class="row two" style="margin:0">
             <button id="btnRoutePreview" class="btn-secondary">Routen berechnen</button>
+            <button id="btnRideOffer" class="btn-primary" disabled>Fahrt anbieten</button>
+          </div>
+          <div class="row" style="margin:8px 0 0">
             <button id="btnRideStart" class="btn-success" disabled>Fahrt starten</button>
           </div>
         </div>
@@ -558,8 +673,16 @@
     function setSelectedRoute(routeId) { selectRoute(routeId); }
 
     function updateStartRideButton() {
-      const btn = el('btnRideStart');
-      if (btn) btn.disabled = !selectedRouteId;
+      const offerBtn = el('btnRideOffer');
+      const startBtn = el('btnRideStart');
+      const hasOfferedRide = !!activeRideId && existingActiveRide?.status === 'angeboten';
+      if (offerBtn) {
+        offerBtn.disabled = !selectedRouteId && !hasOfferedRide;
+        offerBtn.textContent = hasOfferedRide ? 'Fahrt stornieren' : 'Fahrt anbieten';
+        offerBtn.classList.toggle('btn-primary', !hasOfferedRide);
+        offerBtn.classList.toggle('btn-danger', hasOfferedRide);
+      }
+      if (startBtn) startBtn.disabled = !activeRideId;
     }
 
     // ── APP STATE MACHINE ─────────────────────────────
@@ -781,6 +904,316 @@
       if (block) block.style.display = 'none';
     }
 
+    // -- TARGET SEARCH ------------------------------------------------
+    const TARGET_SEARCH_LIMIT = 3;
+    let targetSource = null; // null | 'manual' | 'address'
+    const targetSearchState = {
+      timer: null,
+      abort: null,
+      sessionToken: null,
+      selectedLabel: ''
+    };
+
+    function createSearchSessionToken() {
+      if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+      return 'target-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+    }
+
+    function getTargetSearchSessionToken() {
+      if (!targetSearchState.sessionToken) {
+        targetSearchState.sessionToken = createSearchSessionToken();
+      }
+      return targetSearchState.sessionToken;
+    }
+
+    function resetTargetSearchSession() {
+      targetSearchState.sessionToken = null;
+    }
+
+    function setTargetSearchMessage(text) {
+      const node = el('targetSearchMessage');
+      if (node) node.textContent = text || '';
+    }
+
+    function clearTargetSearchResults() {
+      const results = el('targetSearchResults');
+      if (!results) return;
+      results.innerHTML = '';
+      results.classList.remove('show');
+    }
+
+    function clearTargetSearchUi() {
+      const input = el('targetSearchInput');
+      if (input) input.value = '';
+      clearTargetSearchResults();
+      setTargetSearchMessage('');
+      resetTargetSearchSession();
+    }
+
+    function hasAnyTargetValue() {
+      return !!(el('zielLat')?.value || el('zielLng')?.value || el('targetSearchInput')?.value);
+    }
+
+    function syncTargetClearUi() {
+      const hasTarget = hasAnyTargetValue();
+      el('targetSearchRow')?.classList.toggle('show-clear', hasTarget);
+      const btn = el('btnTargetClear');
+      if (btn) btn.hidden = !hasTarget;
+    }
+
+    function clearDestinationTargetLocal() {
+      targetSearchState.abort?.abort();
+      clearTimeout(targetSearchState.timer);
+      targetSearchState.timer = null;
+      targetSource = null;
+      targetSearchState.selectedLabel = '';
+      clearTargetSearchUi();
+      el('zielLat').value = '';
+      el('zielLng').value = '';
+      clearDestinationMarker();
+      resetRouteUi();
+      syncTargetClearUi();
+    }
+
+    async function withdrawOfferedRideForTargetClear() {
+      if (!activeRideId) return true;
+      if (appState === 'ride' || existingActiveRide?.status === 'aktiv') {
+        showHint('Aktive Fahrt kann nur ueber Fahrt beenden beendet werden.', true);
+        return false;
+      }
+
+      const rideId = activeRideId;
+      const result = await sb.from('rides')
+        .update({ status: 'abgebrochen', beendet_am: new Date().toISOString() })
+        .eq('id', rideId)
+        .eq('status', 'angeboten')
+        .select('id,status');
+
+      if (result.error) {
+        showHint('Online-Angebot konnte nicht zurueckgenommen werden: ' + result.error.message, true);
+        return false;
+      }
+      if (!Array.isArray(result.data) || result.data.length === 0) {
+        showHint('Online-Angebot wurde nicht zurueckgenommen. Bitte Status pruefen.', true);
+        return false;
+      }
+
+      activeRideId = null;
+      existingActiveRide = null;
+      renderExistingActiveRideHint();
+      renderSheetSummary();
+      updateStartRideButton();
+      return true;
+    }
+
+    async function clearDestinationTarget() {
+      const remoteClearOk = await withdrawOfferedRideForTargetClear();
+      if (!remoteClearOk) return false;
+      clearDestinationTargetLocal();
+      return true;
+    }
+
+    function getTargetSearchProximity() {
+      if (lastPos) return `${lastPos.coords.longitude},${lastPos.coords.latitude}`;
+      const center = map?.getCenter?.();
+      return center ? `${center.lng},${center.lat}` : '8.8,53.1';
+    }
+
+    function getSuggestionLabel(suggestion) {
+      return suggestion?.name || suggestion?.place_formatted || suggestion?.full_address || suggestion?.address || 'Ort';
+    }
+
+    function getSuggestionAddress(suggestion) {
+      return suggestion?.full_address || suggestion?.place_formatted || suggestion?.address || '';
+    }
+
+    function renderTargetSearchResults(suggestions) {
+      const results = el('targetSearchResults');
+      if (!results) return;
+      results.innerHTML = '';
+      suggestions.slice(0, TARGET_SEARCH_LIMIT).forEach(suggestion => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'target-search-result';
+
+        const main = document.createElement('span');
+        main.className = 'target-search-result-main';
+        main.textContent = getSuggestionLabel(suggestion);
+
+        const sub = document.createElement('span');
+        sub.className = 'target-search-result-sub';
+        sub.textContent = getSuggestionAddress(suggestion);
+
+        btn.append(main, sub);
+        btn.addEventListener('click', () => selectTargetSuggestion(suggestion));
+        results.appendChild(btn);
+      });
+      results.classList.toggle('show', suggestions.length > 0);
+    }
+
+    function normalizeTargetSearchResult(feature, suggestion) {
+      const coords = feature?.geometry?.coordinates || feature?.properties?.coordinates;
+      const lng = Number(Array.isArray(coords) ? coords[0] : coords?.longitude);
+      const lat = Number(Array.isArray(coords) ? coords[1] : coords?.latitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+      const props = feature?.properties || {};
+      return {
+        label: props.name || getSuggestionLabel(suggestion),
+        address: props.full_address || props.place_formatted || getSuggestionAddress(suggestion),
+        lat,
+        lng
+      };
+    }
+
+    function getTargetDisplayLabel(result) {
+      return result?.label || result?.address || 'Ziel';
+    }
+
+    async function fetchTargetSuggestions(query) {
+      const token = CONFIG?.mapboxToken;
+      if (!token || !String(token).startsWith('pk.')) throw new Error('Kein Mapbox-Token verfuegbar.');
+      const params = new URLSearchParams({
+        q: query,
+        access_token: token,
+        session_token: getTargetSearchSessionToken(),
+        limit: String(TARGET_SEARCH_LIMIT),
+        language: 'de',
+        country: 'de',
+        proximity: getTargetSearchProximity()
+      });
+      targetSearchState.abort?.abort();
+      targetSearchState.abort = new AbortController();
+      const url = `https://api.mapbox.com/search/searchbox/v1/suggest?${params.toString()}`;
+      const res = await fetch(url, { signal: targetSearchState.abort.signal });
+      if (!res.ok) throw new Error('Adresssuche nicht erreichbar.');
+      const data = await res.json();
+      return Array.isArray(data?.suggestions) ? data.suggestions : [];
+    }
+
+    function focusDestinationOnMap(lng, lat) {
+      if (!map) return;
+      map.easeTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 12.5), duration: 650 });
+    }
+
+    function applyTargetSearchResult(result) {
+      const lat = Number(result?.lat);
+      const lng = Number(result?.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        setTargetSearchMessage('Position konnte nicht gelesen werden.');
+        return false;
+      }
+      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        setTargetSearchMessage('Position liegt ausserhalb des gueltigen Bereichs.');
+        return false;
+      }
+      const label = getTargetDisplayLabel(result);
+      targetSource = 'address';
+      targetSearchState.selectedLabel = label;
+      el('zielLat').value = lat.toFixed(6);
+      el('zielLng').value = lng.toFixed(6);
+      resetRouteUi();
+      updateDestinationMarker();
+      focusDestinationOnMap(lng, lat);
+      const input = el('targetSearchInput');
+      if (input) input.value = label;
+      setTargetSearchMessage('Ziel gesetzt');
+      syncTargetClearUi();
+      return true;
+    }
+
+    async function selectTargetSuggestion(suggestion) {
+      const mapboxId = suggestion?.mapbox_id;
+      if (!mapboxId) return setTargetSearchMessage('Vorschlag konnte nicht gelesen werden.');
+      const input = el('targetSearchInput');
+      if (input) {
+        input.value = getSuggestionLabel(suggestion);
+        input.blur();
+      }
+      clearTargetSearchResults();
+      setTargetSearchMessage('Position wird uebernommen...');
+      try {
+        const params = new URLSearchParams({
+          access_token: CONFIG.mapboxToken,
+          session_token: getTargetSearchSessionToken()
+        });
+        const url = `https://api.mapbox.com/search/searchbox/v1/retrieve/${encodeURIComponent(mapboxId)}?${params.toString()}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Adresse konnte nicht geladen werden.');
+        const data = await res.json();
+        const feature = Array.isArray(data?.features) ? data.features[0] : null;
+        const location = normalizeTargetSearchResult(feature, suggestion);
+        if (!location) throw new Error('Adresse hat keine gueltige Position.');
+        if (applyTargetSearchResult(location)) resetTargetSearchSession();
+      } catch (err) {
+        setTargetSearchMessage(err?.message || 'Adresse konnte nicht geladen werden.');
+      }
+    }
+
+    function handleManualDestinationInput() {
+      targetSource = hasAnyTargetValue() ? 'manual' : null;
+      targetSearchState.selectedLabel = '';
+      clearTimeout(targetSearchState.timer);
+      targetSearchState.timer = null;
+      targetSearchState.abort?.abort();
+      clearTargetSearchResults();
+      setTargetSearchMessage('');
+      const input = el('targetSearchInput');
+      if (input) input.value = '';
+      resetTargetSearchSession();
+      resetRouteUi();
+      updateDestinationMarker();
+      syncTargetClearUi();
+    }
+
+    function initTargetSearch() {
+      const input = el('targetSearchInput');
+      if (!input) return;
+      input.addEventListener('input', () => {
+        const query = input.value.trim();
+        targetSearchState.selectedLabel = '';
+        clearTimeout(targetSearchState.timer);
+        syncTargetClearUi();
+        if (!query) {
+          targetSearchState.abort?.abort();
+          if (targetSource === 'address') clearDestinationTarget();
+          else {
+            clearTargetSearchResults();
+            setTargetSearchMessage('');
+            resetTargetSearchSession();
+          }
+          return;
+        }
+        if (query.length < 3) {
+          targetSearchState.abort?.abort();
+          clearTargetSearchResults();
+          setTargetSearchMessage('Bitte mindestens 3 Zeichen eingeben.');
+          return;
+        }
+        setTargetSearchMessage('Adresse wird gesucht...');
+        targetSearchState.timer = setTimeout(async () => {
+          try {
+            const suggestions = await fetchTargetSuggestions(query);
+            if (input.value.trim() !== query) return;
+            renderTargetSearchResults(suggestions);
+            setTargetSearchMessage(suggestions.length ? '' : 'Keine passende Adresse gefunden.');
+          } catch (err) {
+            if (err?.name === 'AbortError') return;
+            clearTargetSearchResults();
+            setTargetSearchMessage(err?.message || 'Adresssuche braucht Internet.');
+          }
+        }, 260);
+      });
+      input.addEventListener('search', () => {
+        if (!input.value.trim()) clearDestinationTarget();
+      });
+      input.addEventListener('blur', () => {
+        window.setTimeout(() => {
+          if (!document.activeElement?.closest?.('#targetSearchRow')) clearTargetSearchResults();
+        }, 160);
+      });
+    }
+
     function applyTheme(theme) {
       currentTheme = theme;
       document.body.classList.toggle('theme-light', theme === 'light');
@@ -800,9 +1233,7 @@
 
     function resetRideForm() {
       el('driverId').value = '';
-      el('zielLat').value = '';
-      el('zielLng').value = '';
-      clearDestinationMarker();
+      clearDestinationTargetLocal();
       el('abfahrtZeit').value = '';
       el('plaetze').value = '2';
       el('preis').value = '0.00';
@@ -873,6 +1304,7 @@
       }
       renderExistingActiveRideHint();
       renderSheetSummary();
+      updateStartRideButton();
       return existingActiveRide;
     }
 
@@ -1078,24 +1510,87 @@
       existingActiveRide = { ...ride.payload, id: result.data.id, erstellt_am: result.data.erstellt_am };
       renderExistingActiveRideHint();
       renderSheetSummary();
+      updateStartRideButton();
       el('stRideDriver').textContent  = ride.driverId;
       el('stRidePlaetze').textContent = ride.plaetze + ' Platz/Plätze';
-      el('stRidePreis').textContent   = ride.preis.toFixed(2) + ' €';
+      el('stRidePreis').textContent   = ride.preis.toFixed(2).replace('.', ',') + ' €';
       el('stRideId').textContent      = activeRideId;
       return activeRideId;
     }
 
+    async function cancelOfferedRide() {
+      if (!activeRideId || existingActiveRide?.status !== 'angeboten') {
+        showHint('Nur eine angebotene Fahrt kann storniert werden.', true);
+        updateStartRideButton();
+        return false;
+      }
+
+      const rideId = activeRideId;
+      const result = await sb.from('rides')
+        .update({ status: 'abgebrochen', beendet_am: new Date().toISOString() })
+        .eq('id', rideId)
+        .eq('status', 'angeboten')
+        .select('id,status')
+        .single();
+
+      if (result.error) throw result.error;
+
+      activeRideId = null;
+      existingActiveRide = null;
+      renderExistingActiveRideHint();
+      renderSheetSummary();
+      updateStartRideButton();
+      showHint('Fahrt storniert. Du kannst sie korrigieren und erneut anbieten.');
+      log('FAHRT STORNIERT ✅ ride_id=' + rideId);
+      return true;
+    }
+
+    async function offerRide() {
+      if (appState !== 'tracking') return;
+      const btn = el('btnRideOffer');
+      const isCancelling = !!activeRideId && existingActiveRide?.status === 'angeboten';
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = isCancelling ? 'Storniere…' : 'Biete an…';
+      }
+      hideHint();
+      try {
+        if (isCancelling) {
+          await cancelOfferedRide();
+        } else {
+          await ensureRideOffered();
+          showHint('Fahrt ist jetzt online angeboten. Route ist vor Fahrtstart sichtbar.');
+        }
+      } catch (error) {
+        log((isCancelling ? 'RIDE CANCEL ERROR: ' : 'RIDE OFFER ERROR: ') + error.message);
+        showHint((isCancelling ? 'Fahrt konnte nicht storniert werden: ' : 'Fahrt konnte noch nicht angeboten werden: ') + error.message, true);
+      } finally {
+        if (btn) {
+          updateStartRideButton();
+        }
+      }
+    }
+
     async function startRide() {
       if (appState !== 'tracking') return;
+      if (!activeRideId) {
+        showHint('Bitte Fahrt zuerst anbieten.', true);
+        updateStartRideButton();
+        return;
+      }
       el('btnRideStart').disabled = true;
       el('btnRideStart').textContent = 'Starte…';
       hideHint();
       try {
         const ride = buildRidePayload('aktiv');
-        const result = activeRideId
-          ? await sb.from('rides').update({ ...ride.payload, beendet_am: null }).eq('id', activeRideId).select('id,status,erstellt_am').single()
-          : await sb.from('rides').insert(ride.payload).select('id,status,erstellt_am').single();
+        const result = await sb.from('rides')
+          .update({ ...ride.payload, beendet_am: null })
+          .eq('id', activeRideId)
+          .eq('status', 'angeboten')
+          .select('id,status,erstellt_am')
+          .maybeSingle();
         if (result.error) throw result.error;
+        if (!result.data) throw new Error('Fahrt konnte nicht gestartet werden. Bitte Status prüfen.');
         activeRideId = result.data.id;
         existingActiveRide = { ...ride.payload, id: result.data.id, erstellt_am: result.data.erstellt_am };
         updateDestinationMarker();
@@ -1105,15 +1600,15 @@
         showHint('Fahrt läuft! Mitfahrer können dich jetzt sehen.');
         el('stRideDriver').textContent  = ride.driverId;
         el('stRidePlaetze').textContent = ride.plaetze + ' Platz/Plätze';
-        el('stRidePreis').textContent   = ride.preis.toFixed(2) + ' €';
+        el('stRidePreis').textContent   = ride.preis.toFixed(2).replace('.', ',') + ' €';
         el('stRideId').textContent      = activeRideId;
         setState('ride');
       } catch (error) {
         log('RIDE INSERT ERROR: ' + error.message);
         showHint('Fehler beim Starten: ' + error.message, true);
       } finally {
-        el('btnRideStart').disabled = false;
         el('btnRideStart').textContent = 'Fahrt starten';
+        updateStartRideButton();
       }
     }
 
@@ -1208,13 +1703,7 @@
       updateStartRideButton();  // Start-Button
       renderSheetSummary();     // Compact Summary
       updateRouteLineStyles();  // Karte (nur Paint, kein Rebuild)
-      try {
-        await ensureRideOffered();
-        showHint('Fahrt ist jetzt online angeboten. Route ist vor Fahrtstart sichtbar.');
-      } catch (e) {
-        log('RIDE OFFER ERROR: ' + e.message);
-        showHint('Fahrt konnte noch nicht angeboten werden: ' + e.message, true);
-      }
+      showHint('Route vorbereitet. Drücke Fahrt anbieten, um sie zu veröffentlichen.');
     }
 
     // Alias für initiale Berechnung
@@ -1285,6 +1774,7 @@
     el('btnTrackStop').addEventListener('click',  () => activeRideId ? endRide() : stopTracking());
     el('btnWake').addEventListener('click',  toggleWakeLock);
     el('btnWake2').addEventListener('click', toggleWakeLock);
+    el('btnRideOffer').addEventListener('click', offerRide);
     el('btnRideStart').addEventListener('click', startRide);
     el('btnRideStop').addEventListener('click',  () => endRide());
     el('btnDebugIdle').addEventListener('click', () => setDebugPanelOpen(!debugPanelOpen));
@@ -1293,6 +1783,7 @@
       if (!existingActiveRide) return;
       activeRideId = existingActiveRide.id;
       renderSheetSummary();
+      updateStartRideButton();
       setState(existingActiveRide.status === 'aktiv' ? 'ride' : 'tracking');
       showHint(existingActiveRide.status === 'aktiv'
         ? 'Aktive Fahrt weiter im Blick. Bei Bedarf bitte bewusst beenden.'
@@ -1301,18 +1792,24 @@
     el('btnEndExistingRide').addEventListener('click', async () => {
       if (!existingActiveRide?.id) return;
       const rideId = existingActiveRide.id;
+      const currentStatus = existingActiveRide.status;
+      const nextStatus = currentStatus === 'angeboten' ? 'abgebrochen' : 'abgeschlossen';
       const { error } = await sb.from('rides')
-        .update({ status: 'abgeschlossen', beendet_am: new Date().toISOString() })
-        .eq('id', rideId);
+        .update({ status: nextStatus, beendet_am: new Date().toISOString() })
+        .eq('id', rideId)
+        .eq('status', currentStatus);
       if (error) {
-        showHint('Aktive Alt-Fahrt konnte nicht beendet werden: ' + error.message, true);
+        showHint('Vorherige Fahrt konnte nicht beendet werden: ' + error.message, true);
         return;
       }
       existingActiveRide = null;
       activeRideId = null;
       renderExistingActiveRideHint();
       renderSheetSummary();
-      showHint('Vorherige aktive Fahrt wurde beendet.');
+      updateStartRideButton();
+      showHint(currentStatus === 'angeboten'
+        ? 'Vorheriges Angebot wurde zurückgenommen.'
+        : 'Vorherige aktive Fahrt wurde beendet.');
     });
     el('themeToggle').addEventListener('click', toggleTheme);
     el('themeToggle').addEventListener('keydown', e => {
@@ -1328,9 +1825,10 @@
       if (appState === 'idle') loadExistingActiveRide(el('driverId').value.trim());
     });
     ['zielLat','zielLng'].forEach(id => {
-      el(id).addEventListener('input', updateDestinationMarker);
-      el(id).addEventListener('change', updateDestinationMarker);
+      el(id).addEventListener('input', handleManualDestinationInput);
+      el(id).addEventListener('change', handleManualDestinationInput);
     });
+    el('btnTargetClear')?.addEventListener('click', clearDestinationTarget);
     el('abfahrtZeit').addEventListener('input', e => {
       const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
       if (digits.length <= 2) e.target.value = digits;
@@ -1432,6 +1930,8 @@
     updateCompactTrackingStatus();
     setDebugPanelOpen(false);
     renderExistingActiveRideHint();
+    initTargetSearch();
+    syncTargetClearUi();
     log('EcoRide GPS-Client bereit ✅');
   </script>
 </body>
